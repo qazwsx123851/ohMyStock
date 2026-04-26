@@ -1,0 +1,147 @@
+# ============================================================
+# Secrets / 環境變數（絕對不可進 git）
+# ============================================================
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.pfx
+secrets/
+credentials.json
+
+# Shioaji / FinMind / Anthropic 金鑰常見落腳點
+shioaji_credentials.*
+finmind_token.*
+anthropic_key.*
+
+# ============================================================
+# Claude Code / IDE 本地設定
+# ============================================================
+.claude/settings.local.json
+.claude/cache/
+.claude/.session/
+.idea/
+.vscode/
+*.code-workspace
+
+# ============================================================
+# Python（src/ 待實作）
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg
+*.egg-info/
+.eggs/
+.Python
+build/
+dist/
+develop-eggs/
+downloads/
+eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+MANIFEST
+
+# Virtual envs
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Test / type / lint caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+nosetests.xml
+
+# ============================================================
+# Node / Frontend（web/ 待實作）
+# ============================================================
+node_modules/
+.pnp
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm
+.yarn-integrity
+
+# Vite / Next / build outputs
+dist/
+build/
+.next/
+out/
+.vite/
+.turbo/
+
+# ============================================================
+# 資料庫 / 本地資料（trade journal、memory、cache）
+# ============================================================
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.db
+*.db-journal
+
+# 本地資料快取（不進 git；FinMind / Shioaji 抓下來的 raw data）
+data/
+.cache/
+*.parquet
+*.feather
+
+# ============================================================
+# Logs / Audit logs
+# ============================================================
+*.log
+logs/
+audit_logs/
+
+# ============================================================
+# 提案驗證自動產出（proposals/ 本身要進 git，但驗證報告可選擇不進）
+# ============================================================
+# 注意：proposals/ 與 reviews/ 資料夾本身依 v3-decisions §3 #10 進 git。
+# 僅 ignore 自動產生且體積大的副產品：
+proposals/*.validation.json
+
+# ============================================================
+# OS
+# ============================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ============================================================
+# 暫存 / 編輯器備份
+# ============================================================
+*.swp
+*.swo
+*.tmp
+*.bak
+*~
+.~lock.*
+
+# ============================================================
+# Docker（部署為 docker-compose，本機 volume 不進 git）
+# ============================================================
+docker-volumes/
+.docker/
