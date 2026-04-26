@@ -137,4 +137,4 @@ ohMyStock/
 
 ## 授權
 
-License: TBD（待決定，候選：MIT / Personal Use Only）
+[MIT License](LICENSE) © 2026 MarkSu
