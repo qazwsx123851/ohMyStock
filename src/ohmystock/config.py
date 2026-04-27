@@ -1,0 +1,34 @@
+"""Settings loader (pydantic-settings, reads .env + env vars).
+
+Fields mirror keys in repo-root .env.example. All fields are Optional /
+have defaults so Settings() can be constructed without any env present;
+downstream code is responsible for asserting required values before use.
+"""
+
+from __future__ import annotations
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    anthropic_api_key: str | None = None
+
+    shioaji_api_key: str | None = None
+    shioaji_secret_key: str | None = None
+    shioaji_ca_path: str | None = None
+    shioaji_ca_passwd: str | None = None
+    shioaji_person_id: str | None = None
+
+    finmind_token: str | None = None
+
+    ohmystock_auto_execute: str | None = None
+    ohmystock_llm_degrade: str | None = None
+    ohmystock_db_path: str = "~/.ohmystock/journal.db"
+    ohmystock_log_level: str = "INFO"

@@ -5,7 +5,10 @@ description = "ohMyStock — Taiwan stock paper-trading agent (Phase 0a scaffold
 requires-python = ">=3.11"
 readme = "README.md"
 license = { file = "LICENSE" }
-dependencies = []
+dependencies = [
+    "typer>=0.12",
+    "pydantic-settings>=2.0",
+]
 
 [project.optional-dependencies]
 dev = [
