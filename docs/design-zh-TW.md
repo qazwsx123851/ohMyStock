@@ -1449,19 +1449,21 @@ D:\ohMyStock\
 
 ---
 
-## 9. 開發路線圖（Roadmap, ~16 週,v3 由 13 週擴充至 16 週）
+## 9. 開發路線圖（Roadmap, ~20 週,v3 由 13 週擴充至 20 週）
 
 > **2026-04-26 拍板**:Phase 3.5 確定 v1 同時做 `OHMYSTOCK_AUTO_EXECUTE=true/false` 兩模式,工期由 2 週擴至 **3 週**;總期程 15 → 16 週;Phase 4 / 5 順延一週。
+> **2026-04-27 thread D 誠實調整**:Phase 0 = 2 週(Shioaji+FinMind 接通實境吃時間)、Phase 4 = 4 週(拆 4a/4b/4c/4d 四子階段)、Phase 5 = 3 週(含模擬 1 週緩衝);總期程 16 → 20 週;完成日 2026-08-18 → 2026-09-15。
 
 | 階段 | 週數 | 範圍 | 驗收 |
 |---|---|---|---|
-| **Phase 0: Scaffold** | 1 | 專案骨架、`uv` 環境、Claude Agent SDK Hello World、Docker、CI（pytest + ruff） | `uv run ohmystock --version` 可執行 |
+| **Phase 0: Scaffold** | **2** | 專案骨架、`uv` 環境、Claude Agent SDK Hello World、Docker、CI（pytest + ruff）;**Shioaji 模擬倉 / FinMind / Anthropic 三方連線測試**;**LLM cost tracking decorator** | `uv run ohmystock --version` 可執行;三方 ping 通 |
 | **Phase 1: 核心 Agent + 基礎 skills** | 2 | Agent loop（async）、5 層壓縮、skill loader、5 個基線 skill（finmind / ma-crossover / kd-macd-rsi / valuation-pe-pb / three-major-investors）、FinMind loader + 快取 | CLI 對話可查詢個股 + 三大法人 |
 | **Phase 2: 回測引擎 + 模擬下單** | 3 | TWSE 回測引擎（含 §4.4.1 全部市場細節）、Shioaji 模擬倉 wrapper、SQLite 部位鏡射、稽核 hook | 跑通 0050 雙均線策略 5 年回測；Shioaji 模擬下單成功 |
 | **Phase 3: 完整 skill 庫 + Swarm** | 3 | 補齊 30 個 skill、Swarm DAG、10 組 preset(不含 v3 兩組閉環 swarm)、`risk_check_tool`、`trade_journal_tool` 基本版 | 「投資委員會」preset 對 2330 出具完整論點 |
 | **Phase 3.5: 閉環 LLM 決策 + 復盤(v3 新增)** | **3** | LLM Decider pipeline(§3 + §4.10.3)、`entry_decision_team` swarm(§4.7.1)、**Confirm Gate 雙模式(human + auto)**、**防線 9 全套熔斷 + 整合測試**(§4.5)、`trade_journal_tool` v3 schema + FTS5 索引(§4.6.1)、`post_trade_review_team` swarm(§4.7.2)、`proposal_tool` 工作流(§16)、`/api/decisions` `/api/reviews` `/api/proposals` 端點(§4.8.2)、wireframe Q/R/S(§4.9.17)、`OHMYSTOCK_AUTO_EXECUTE` 兩種旗標下的 e2e 測試 | **完整跑通「Phase 2B 訊號 → LLM 決策 → 人工 confirm OR 自動執行(經熔斷) → 出場 → 月度復盤 → 提案 → WFA 驗證 → 人工 PR → 合併」一輪;雙模式皆需通過** |
-| **Phase 4: Web UI + 記憶** | 2 | React UI、SSE 串流、跨 session 記憶、FTS5 對話搜尋(整合 v3 journal 索引) | 瀏覽器全流程可用(含決策審核 / 復盤 / 提案頁) |
-| **Phase 5: 強化 / 文件 / 部署** | 2 | 測試覆蓋率 ≥70%、`docs/` 完整、Docker 一鍵部署、自我端對端 demo | 自己跑模擬倉滿 1 週無 crash |
+| **Phase 4: Web UI 後台**(admin only) | **2** | 4a admin 18 頁 + 4c-half Bearer auth;React 19 UI、SSE 串流、跨 session 記憶、FTS5 對話搜尋(整合 v3 journal 索引) | admin 18 頁 wireframe 全部實作;localhost 全流程可用(含決策審核 / 復盤 / 提案頁) |
+| **Phase 4.5: Web UI 公網**(pixel + mask) | **2** | 4b public pixel 9 角色 + 4c-half Mask serializer + 4d E2E mask 滲透測試;**ship admin 後啟動,視 admin 跑況決定是否砍掉**(thread E 決策) | mask 滲透測試零洩漏;9 角色動畫狀態機運作 |
+| **Phase 5: 強化 / 文件 / 部署** | **3** | 測試覆蓋率 ≥70%、`docs/` 完整、Docker 一鍵部署、自我端對端 demo;**第 3 週為「自跑 1 週模擬」緩衝** | 自己跑模擬倉滿 1 週無 crash |
 
 > 並行 Side Tracks（不阻塞主路線）：產業 / 概念股對照表整理、TWSE 行事曆爬蟲、MOPS 公告監控守護程序。
 

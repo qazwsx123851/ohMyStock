@@ -725,6 +725,19 @@ proposals/
 
 > **為何需要**：v2「Optuna 參數最佳化」只能調**現有規則的數字**;v3 加上**邏輯層改動**(條件、門檻、新增/移除規則)的演進通道。**LLM 不可直接 commit cheatsheet**,所有改動走以下流程。
 
+### 16.0 適用範圍（v3 決策 #14 補充）
+
+§16 流程**主管「strategy code / cheatsheet 文字 / 硬規則」改動**：
+- Risk-Off / 月度熔斷 / ATR 停損 / Volatility Targeting sizing / §2.9 防線 9
+- K 線型態檢測程式（`strategies/_kpattern/*.py`）
+- cheatsheet §0、§6.6、§7、§9 等規則文字
+
+**LLM prompt 改動**（Phase 3 Decider system prompt、Phase 5 復盤 swarm system prompt）走**另一通路**，詳 v3 決策 #14：
+- Decider prompt → 回測 PnL/Sharpe 客觀閘 → 直接 merge `prompts/decider.md`
+- Review prompt → `reviews/_golden/` 黃金集比對閘 → 直接 merge `prompts/review.md`
+
+兩條通路互不干擾；硬規則改動進 `strategies/`、判斷層改動進 `prompts/`。
+
 ### 16.1 提案來源
 - §15 復盤的提案節點(主要)
 - 人工發現(任何時候手寫進 `proposals/`)

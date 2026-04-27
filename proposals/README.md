@@ -235,3 +235,10 @@ A: 可以,但建議先檢視 `rejected/` 中相似提案的失敗原因,避免�
 
 **Q: `priority` 怎麼定?**
 A: `high` = 進場條件 / 風控規則層級;`medium` = K 線型態 / 加分項;`low` = 排序 / 顯示 / 文案層級。
+
+**Q: LLM prompt 的改動為何不走 proposals/?**
+A: v3 決策 #14：Decider 與復盤 swarm 的 system prompt 走獨立通路。
+- `prompts/decider.md` 改動 → 回測歷史訊號比 PnL/Sharpe → 通過則 merge prompt（不寫 proposal）
+- `prompts/review.md` 改動 → 跑 `reviews/_golden/` 黃金集比對 reference answer → 通過則 merge prompt
+- proposals/ 仍管 strategy code / cheatsheet 文字 / 硬規則改動（cheatsheet §16.0 邊界說明）
+- 兩通路分工的動機：避免「改判斷層 prompt 也要寫 markdown 提案」的儀式感負擔；prompt diff 本身就是版本紀錄

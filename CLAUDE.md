@@ -13,7 +13,7 @@
 - **市場**：台灣證交所（TWSE）/ 櫃買中心（OTC）
 - **執行範圍**：Paper Trading（永豐 Shioaji 模擬倉，**第一階段不接實單**）
 - **階段**：Spec / Pre-implementation（設計文件完成，原始碼待開工）
-- **目標**：~16 週至 MVP（v3，含 LLM 復盤閉環），預計 2026-08-18 完成
+- **目標**：~20 週至 MVP（v3，含 LLM 復盤閉環），預計 2026-09-15 完成
 
 ### 解決什麼問題
 1. 台股研究流程仰賴人工拼接資料源（技術 / 基本 / 籌碼 / 三大法人）
@@ -165,13 +165,14 @@ Agent 核心層（Claude Agent SDK + PreToolUse/PostToolUse Hooks 稽核）
 
 | Phase | 範圍 | 預計完成 |
 |---|---|---|
-| 0 | Scaffold（環境、CLI 骨架、FastAPI） | 2026-05-05 |
-| 1 | 技術 / 籌碼面 Skills + 回測引擎 | 2026-05-19 |
-| 2 | Screener + 訊號偵測 + Phase 2B Swarm Input Assembler | 2026-06-09 |
-| 3 | LLM Decider + Confirm Gate + Trade Journal v3 | 2026-06-30 |
-| 3.5 | `OHMYSTOCK_AUTO_EXECUTE` 雙模式 + 9 條安全防線 | 2026-07-21 |
-| 4a–d | web-admin / web-public / EventBus + Auth/Mask / E2E mask 滲透測試 | 2026-08-04 |
-| 5 | LLM 復盤五節點 swarm + 提案 → WFA → 合併閉環 | 2026-08-18 |
+| 0 | Scaffold（環境、CLI 骨架、FastAPI、Shioaji+FinMind+Anthropic 三方連線、cost tracker） | 2026-05-12 |
+| 1 | 技術 / 籌碼面 Skills + 回測引擎 | 2026-05-26 |
+| 2 | Screener + 訊號偵測 + Phase 2B Swarm Input Assembler | 2026-06-16 |
+| 3 | LLM Decider + Confirm Gate + Trade Journal v3 | 2026-07-07 |
+| 3.5 | `OHMYSTOCK_AUTO_EXECUTE` 雙模式 + 9 條安全防線 | 2026-07-28 |
+| 4 | web-admin（18 頁）+ Bearer auth（2 週） | 2026-08-11 |
+| 4.5 | web-public pixel + Mask serializer + E2E 滲透測試（2 週，admin ship 後啟動） | 2026-08-25 |
+| 5 | LLM 復盤五節點 swarm + 提案 → WFA → 合併閉環（含模擬 1 週緩衝） | 2026-09-15 |
 
 ---
 

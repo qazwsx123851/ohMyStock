@@ -219,6 +219,9 @@ LLM 輸出 → 系統 Sizing Service / ATR Service / Risk Gate 處理後產出:
     {"tool": "chip_data_tool", "input": {...}, "output_summary": "..."},
     "..."
   ],
+  "llm_input_tokens": 18420,
+  "llm_output_tokens": 1240,
+  "llm_cost_usd": 0.0276,
   "entry_thesis": "(可全文檢索的論點摘要)",
   "thesis_invalidation": ["綜合分數降 > 15", "RS 轉負", "..."],
   "atr_at_entry": 20.3,
@@ -234,6 +237,8 @@ LLM 輸出 → 系統 Sizing Service / ATR Service / Risk Gate 處理後產出:
   "risk_flags": ["借券餘額近 10 日 +18%", "融資增幅 +12.3%"]
 }
 ```
+
+> **v3 決策 #15**：所有 `kind=*` 紀錄中**只要該決策呼叫過 LLM**，都必含 `llm_input_tokens` / `llm_output_tokens` / `llm_cost_usd` 三欄；單純由系統規則觸發的 `kind=reject`（如 Risk Gate 硬擋）不含 LLM 成本欄。月成本由 Admin Dashboard 即時聚合（詳 [`frontend.md`](frontend.md) §17.B），達 80% 預算（USD $40）警示、達 100% 觸發軟熔斷（詳 [`safety-and-simulation.md`](safety-and-simulation.md) §2.11）。
 
 ### 4.2 `kind=exit` (Phase 4 出場後)
 

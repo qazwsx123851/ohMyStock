@@ -516,6 +516,11 @@ Sidebar：Dashboard / Chat / Swarm / Backtest / Paper / Market / Skills /
 │ 2454  聯發科    72  ▲+0.8%   投信+  營收新高    [→ 詳情]          │
 │ ...                                                              │
 └──────────────────────────────────────────────────────────────────┘
+┌─ 本月 LLM 成本 (v3 決策 #15) ────────────────────────────────────┐
+│ ████████░░░░░░░░░░  $24.30 / $50.00  (49%)                       │
+│ 上週 $7.20 ｜ 預估月底 $33.0 ｜ 模型分布: Opus 62% / Sonnet 35%  │
+│ ⚠ 達 80% 視覺轉橘 ｜ 達 100% 觸發軟熔斷(全 Sonnet, §2.11)         │
+└──────────────────────────────────────────────────────────────────┘
 ┌─ 近期 Run ───────────────────┬─ 產業熱度（5D） ────────────────┐
 │ 投資委員會 · 2330 · 5 分前    │ AI伺服器 +5.2%  ████████        │
 │ 月營收掃描 · 02/05            │ 重電    +3.1%  █████            │
@@ -729,7 +734,7 @@ Sidebar：Dashboard / Chat / Swarm / Backtest / Paper / Market / Skills /
 
 ```
 [Tab: 一般] [Tab: API Keys] [Tab: Shioaji] [Tab: FinMind]
-[Tab: 主題與語系] [Tab: 合規] [Tab: 危險區]
+[Tab: 主題與語系] [Tab: 合規] [Tab: Safety] [Tab: 危險區]
 
 一般：使用者名稱、預設 LLM 模型、預設 swarm preset
 API Keys：Anthropic API Key（masked）、OpenAI（fallback）
@@ -737,6 +742,12 @@ Shioaji：api_key / secret_key（masked）+ 連線測試 + 模擬倉重置
 FinMind：token、贊助會員旗標、剩餘額度顯示
 主題：明 / 暗 / 跟隨系統、字級
 合規（個人版）：免責聲明顯示偏好、稽核日誌路徑（90 天 hot）
+Safety：
+  • 自動執行 LLM 進場決策 [ ◯ off / ● on ]
+    （對應 v3 決策 #9 / cheatsheet §6.7 模式 A vs B；
+      狀態持久化於 settings table，不需改 env 重啟；
+      開啟後仍受 safety-and-simulation §2.9 防線 9 的 5 項熔斷限制）
+  • 切換時 ConfirmDialog 二次確認 + 寫入 audit log
 危險區：清空所有 sessions、重置模擬部位（雙重確認）
 ```
 

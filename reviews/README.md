@@ -246,3 +246,44 @@ A: 可以。reviews/ 進 git,任何 clone 都拿到完整歷史。FTS5 索引可
 
 **Q: 如果 LLM 復盤本身有偏誤怎麼辦?**
 A: 三層防護:(1) 提案必經 WFA 樣本外驗證(rubric §6);(2) 人工 PR review;(3) 跨復盤一致性檢查(rubric §7)。
+
+---
+
+## 12. `_golden/` 子目錄 — Review prompt 演進的驗閘集（v3 決策 #14）
+
+`reviews/_golden/` 存放 3-5 份**手挑的典型月度復盤** + 對應的 reference answer，作為改動 `prompts/review.md` 時的回歸驗閘。
+
+### 12.1 用途
+
+每次想修 Phase 5 復盤 swarm 的 system prompt 時：
+1. 用新版 prompt 重跑 `_golden/` 內每份月度的 swarm 五節點
+2. 比對新版產出的 `proposals_created.md` vs reference answer
+3. 通過閘（提案重點命中 + 沒有明顯漏判 / 誤判）才能 merge prompt
+
+這是 thread B「自說自話」的解法：Review prompt 改動沒有快速 PnL ground truth，黃金集是退而求其次的客觀閘。
+
+### 12.2 結構
+
+```
+reviews/_golden/
+├── README.md                              # 黃金集挑選原則 + 各份代表的情境
+├── 2026-04-monthly/                       # 「強多頭月」代表
+│   ├── (一份完整 review 結構,同 §3)
+│   └── reference.md                       # 你當時認可的「合理提案應長這樣」
+├── 2026-08-forced-drawdown/               # 「月度熔斷月」代表
+│   └── ...
+└── 2026-11-quarterly-correction/          # 「回檔月」代表
+    └── ...
+```
+
+### 12.3 挑選原則
+
+- 涵蓋至少 3 種市場情境（強多頭 / 回檔 / 熔斷）
+- 每份要有可區辨的「對 vs 錯」提案（不能太模糊）
+- v1 上線後累積 6 個月實戰再回頭挑;**v1 啟動時可空著**（先用人工 review 把關 prompt 改動）
+
+### 12.4 reference answer 的維護
+
+- reference 由你在事後（merge 提案 → 跑 6 個月 → 驗證有效後）回填
+- 若一個提案實戰證明是錯的 → 把對應 review 從黃金集移除（避免帶錯閘）
+- reference.md 不可被 LLM 自動修改

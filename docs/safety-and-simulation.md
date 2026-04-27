@@ -249,6 +249,28 @@ class AutoExecuteBreaker:
 | 8 | **CI grep lint** | PR 無法合併 | 開發者手滑寫 live |
 | **9** | **LLM 自動下單熔斷**(v3) | fallback 為人工 confirm | LLM 幻覺、prompt injection 造成的異常單 |
 
+---
+
+### 2.11 軟性熔斷 — LLM 成本超標自動降階（v3 決策 #15）
+
+> **不算硬性「防線」**，是預算保護機制；防的是「強多頭月候選爆量導致月成本飆破預算」。
+
+**觸發條件**：當月累積 LLM 成本（由 trade journal `llm_cost_usd` 即時聚合）達 **USD $50（NT$ 1,500）**。
+
+**觸發後行為**：
+- 設定 `OHMYSTOCK_LLM_DEGRADE=true`
+- 所有 LLM call 強制改用 Sonnet 4.6（不再用 Opus 4.7）
+- Phase 5 復盤延後到下個月（避開高成本節點）
+- Admin Dashboard cost widget 顯示紅色 chip + 觸發時間
+- 月初 1 號 00:00 自動清旗標（新月度重啟）
+
+**早期警示**：
+- 達 50% (USD $25) → Dashboard widget 黃色
+- 達 80% (USD $40) → Dashboard widget 橘色 + 推播一次（若已配通知）
+- 達 100% (USD $50) → 觸發軟熔斷如上
+
+**為何不算硬性防線**：軟熔斷不影響交易安全（只影響 LLM 品質），與防線 1-9 的「防止錯誤下單 / 防止 live 誤觸」屬不同範疇。獨立小節記錄。
+
 ### 2.11 個人 build-time invariants checklist
 
 > 每次重大改動（如新增防線、改 broker factory、改 confirm gate）後跑一次自我確認：
