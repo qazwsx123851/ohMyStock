@@ -20,6 +20,7 @@
 | `post-trade-review-rubric.md` | Phase 5 五節點 DAG 評分準則（data_loader → attributor → aggregator → critic → proposer） | 中 |
 | `tools-contracts.md` | **21 個 `@register_tool` 工具的 I/O schema 唯一權威**（input / output / errors） | 中 |
 | `v3-decisions.md` | v3 已拍板決策（13 項）+ 預算追蹤 + 個人 milestone（取代舊 v3-review-summary.md「給主管」框架） | 小 |
+| `user-scenarios.md` | **Operator workflow** — Mark 在 admin 18 頁中的 10 個使用情境（日 / 週 / 月 / 異常 / cold start） | 中 |
 
 ---
 
@@ -74,6 +75,7 @@
 - 「Phase 2B 怎麼組 LLM 輸入？」→ `design-zh-TW.md` §4.7.0
 - 「v3 已拍板的決策 / 預算 / milestone？」→ `v3-decisions.md`
 - 「台股市場細節（T+2、漲跌停、當沖稅率）」→ `design-zh-TW.md` §4.4.1
+- 「Mark 平常怎麼用這套系統？admin 18 頁怎麼串？」→ `user-scenarios.md`
 
 **禁止：** 不要在多個檔複製貼上同一份公式 / schema；引用上面 §2 表格的「唯一權威」。
 
@@ -85,3 +87,4 @@
 本 README 跟著 reorg 一起 bump：
 - v1.0 = 2026-04-26 docs 重整初稿。
 - v1.1 = 2026-04-27 前後台拆兩專案 monorepo + 公網 pixel UI（決策 #13），新增 `frontend-public-pixel.md`、`backend-eventbus.md`、`auth-and-mask.md`。
+- v1.2 = 2026-04-27 新增 `user-scenarios.md`（operator workflow，10 情境）。

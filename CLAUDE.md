@@ -128,6 +128,7 @@ Agent 核心層（Claude Agent SDK + PreToolUse/PostToolUse Hooks 稽核）
 | `post-trade-review-rubric.md` | Phase 5 五節點 DAG（data → attribution → aggregator → critic → proposer）評分準則 |
 | `tools-contracts.md` | 21 個 `@register_tool` 工具 I/O schema 唯一權威 |
 | `v3-decisions.md` | v3 已拍板決策（13 項）+ 預算追蹤 + 個人 milestone |
+| `user-scenarios.md` | **Operator workflow** — Mark 在 admin 18 頁的 10 個使用情境（日 / 週 / 月 / 異常 / cold start） |
 
 ### 前端 / EventBus（v3 新增）
 | 檔案 | 用途 |
@@ -158,6 +159,7 @@ Agent 核心層（Claude Agent SDK + PreToolUse/PostToolUse Hooks 稽核）
 - 「`market_data_tool` 怎麼呼叫？」→ `docs/tools-contracts.md`
 - 「v3 已拍板決策 / 預算 / milestone？」→ `docs/v3-decisions.md`
 - 「台股市場細節（T+2、漲跌停、當沖稅）」→ `docs/design-zh-TW.md` §4.4.1
+- 「Mark 平常怎麼用這套系統？admin 18 頁怎麼串？」→ `docs/user-scenarios.md`
 
 ---
 
