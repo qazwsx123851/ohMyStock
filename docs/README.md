@@ -12,11 +12,14 @@
 | `design-zh-TW.md` | 架構、模組、Tools/Skills/Memory/Backend、目錄結構、路線圖、風險登記 | 大（核心） |
 | `workflow-cheatsheet.md` | **交易邏輯權威**：Phase 0–5 + §16 提案閘 + §17 文件關係表 | 大（業務） |
 | `safety-and-simulation.md` | Live/Sim 防線 9 層 + verify_simulation + Shioaji SDK 限制 + 對賬機制（從 design §4.5 拆出） | 中 |
-| `frontend.md` | React 19 UI 全部設計：路由、Zustand、API client、Tailwind/shadcn、design tokens、a11y、18 頁 wireframes（從 design §4.9 拆出） | 大（前端） |
+| `frontend.md` | **後台 web-admin/** React 19 UI 全部設計：路由、Zustand、API client、Tailwind/shadcn、design tokens、a11y、18 頁 wireframes（v3 拆兩專案後改為 admin 範圍） | 大（後台前端） |
+| `frontend-public-pixel.md` | **公網 web-public/** Pixel 像素辦公室 UI：場景 layout、9 角色 sprite、動畫狀態機、Canvas 2D、event → action 對應（v3 新增） | 大（公網前端） |
+| `backend-eventbus.md` | Backend EventBus 架構 + Event Schema + AdminEventSerializer / MaskedEventSerializer + 14 個 event_type 清單 + Hook 整合（v3 新增） | 中 |
+| `auth-and-mask.md` | 後台 Bearer token auth、公網 Mask Spec 完整白名單、SITC 合規策略、免責 banner 文案、部署拓樸（v3 新增） | 中 |
 | `llm-decision-schema.md` | LLM Decider I/O JSON 規格 + Trade Journal schema（FTS5）+ derived 欄位 + schema 演進規範 | 中 |
 | `post-trade-review-rubric.md` | Phase 5 五節點 DAG 評分準則（data_loader → attributor → aggregator → critic → proposer） | 中 |
 | `tools-contracts.md` | **21 個 `@register_tool` 工具的 I/O schema 唯一權威**（input / output / errors） | 中 |
-| `v3-decisions.md` | v3 已拍板決策（12 項）+ 預算追蹤 + 個人 milestone（取代舊 v3-review-summary.md「給主管」框架） | 小 |
+| `v3-decisions.md` | v3 已拍板決策（13 項）+ 預算追蹤 + 個人 milestone（取代舊 v3-review-summary.md「給主管」框架） | 小 |
 
 ---
 
@@ -61,7 +64,10 @@
 - 「LLM 該輸出什麼 JSON？」→ `llm-decision-schema.md` §1–§3
 - 「Phase 5 復盤節點怎麼評分？」→ `post-trade-review-rubric.md`
 - 「live trading 安全防線是什麼？」→ `safety-and-simulation.md`
-- 「前端怎麼寫 / 用什麼元件 / 顏色配置？」→ `frontend.md`
+- 「**後台**怎麼寫 / 用什麼元件 / 顏色配置？」→ `frontend.md`（v3：web-admin/ 範圍）
+- 「**公網前台** pixel 像素辦公室怎麼設計？9 個角色對應誰？」→ `frontend-public-pixel.md`
+- 「Backend 怎麼推 event 給前端？SSE channel 規格？」→ `backend-eventbus.md`
+- 「公網要 mask 哪些欄位？SITC 合規怎麼避？admin auth 怎麼設？」→ `auth-and-mask.md`
 - 「Trade Journal SQLite 欄位？」→ `llm-decision-schema.md` §4
 - 「Trade Journal 衍生欄位 / 復盤怎麼 join entry-exit？」→ `llm-decision-schema.md` §4.5
 - 「`market_data_tool` 怎麼呼叫 / 哪些參數？」→ `tools-contracts.md`
@@ -76,4 +82,6 @@
 ## 5. 版本
 
 策略版本（v1 → v2 → v3）保留在 `workflow-cheatsheet.md` preamble 的 changelog 區塊。
-本 README 跟著 reorg 一起 bump：v1.0 = 2026-04-26 docs 重整初稿。
+本 README 跟著 reorg 一起 bump：
+- v1.0 = 2026-04-26 docs 重整初稿。
+- v1.1 = 2026-04-27 前後台拆兩專案 monorepo + 公網 pixel UI（決策 #13），新增 `frontend-public-pixel.md`、`backend-eventbus.md`、`auth-and-mask.md`。

@@ -1,10 +1,61 @@
-# Frontend — React Web UI 設計（`web/`）
+# Frontend — Admin Panel React UI 設計（`web-admin/`）
 
 > 本檔從 `design-zh-TW.md` §4.9 拆出（2026-04-26 docs reorg）。
-> 對應程式：`web/src/`
-> SSOT：本檔為 **React UI 全部設計**（路由、Zustand、API client、Tailwind/shadcn、design tokens、a11y、wireframes）的唯一權威。
+> **2026-04-27 update：** v3 拆為**前後台兩專案 monorepo**；本檔範圍**改為 web-admin/**（後台 18 頁完整工作介面）。
+> **公網前台 pixel UI 見 [`frontend-public-pixel.md`](frontend-public-pixel.md)。**
+> 對應程式：`web-admin/src/`
+> SSOT：本檔為 **後台 React UI 全部設計**（路由、Zustand、API client、Tailwind/shadcn、design tokens、a11y、wireframes）的唯一權威。
 
 對標 Vibe-Trading `web/src/`，但採用更現代的元件與狀態方案。**MVP 階段以 CLI 為主**（typer），Web UI 在 Phase 4 才上線。
+
+---
+
+## 0. 前後台分層架構（v3 新增）
+
+### 0.1 兩專案 monorepo 概觀
+
+ohMyStock v3 把網頁拆為**兩個獨立 React app**：
+
+| 專案 | 對象 | 範圍 | 部署 |
+|---|---|---|---|
+| **`web-admin/`**（本檔） | 只有用戶本人（Bearer token auth） | 18 頁完整工作介面：Dashboard / Chat / Swarm / Backtest / Paper Trading / Market / Skills / Memory / Sessions / Settings / Audit | localhost / Cloudflare Tunnel |
+| **`web-public/`**（[`frontend-public-pixel.md`](frontend-public-pixel.md)） | 任何人（無認證、masked） | 像素辦公室 demo：9 角色擬人化呈現 LLM 工作流 | Vercel / Cloudflare Pages（公網） |
+
+**為什麼拆兩專案：** 完全 bundle 隔離 — 訪客連 admin 程式碼都看不到；admin 可放 VPN / 不對公網；details 見 [`auth-and-mask.md`](auth-and-mask.md) §5。
+
+### 0.2 共用 packages（monorepo）
+
+```
+ohMyStock/
+├── web-admin/            ← 本檔範圍
+├── web-public/           ← frontend-public-pixel.md 範圍
+└── packages/
+    ├── ui-tokens/        ← design tokens（紅漲綠跌色票、字型 scale）
+    ├── api-types/        ← OpenAPI codegen 出的 TS types
+    ├── event-types/      ← Event dataclass 對映 TS interface
+    └── api-client-public/← public endpoint client（無 auth header）
+```
+
+### 0.3 資料流（含 EventBus）
+
+```
+Python LLM Agent
+  └─ tool 呼叫 / 決策 → Backend EventBus
+        ├─ admin channel (raw 全資料)  → /api/admin/events  (auth)  → web-admin 即時更新
+        └─ public channel (masked)     → /api/public/events (no auth) → web-public pixel 動畫
+
+  REST CRUD：
+  └─ /api/admin/* (auth required)  → web-admin 18 頁 CRUD
+  └─ /api/public/recent_events     → web-public 歷史 timeline
+```
+
+EventBus / serializer 詳見 [`backend-eventbus.md`](backend-eventbus.md)。
+
+### 0.4 認證與 Mask
+
+- web-admin 所有 API 呼叫帶 `Authorization: Bearer <OHMYSTOCK_ADMIN_TOKEN>`
+- web-admin 看到的資料**未 mask**（含真 symbol / price / pnl_twd / account_id）
+- 詳見 [`auth-and-mask.md`](auth-and-mask.md) §2
 
 ---
 

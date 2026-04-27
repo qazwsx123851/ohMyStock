@@ -50,9 +50,10 @@
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                      使用者介面層                                │
-│   CLI (typer)  │  Web UI (React/Vite)  │  REST/SSE API         │
-│   /decisions(待 confirm)  /reviews  /proposals(v3)              │
+│                      使用者介面層（v3 拆兩專案 monorepo）        │
+│  CLI (typer)  │  web-admin (React, auth)  │  web-public (pixel) │
+│  /api/admin/*（auth） + /api/public/*（masked SSE）              │
+│  Backend EventBus → AdminSerializer / MaskedEventSerializer 兩通道│
 └──────────────────────────┬─────────────────────────────────────┘
                            │
 ┌──────────────────────────▼─────────────────────────────────────┐
@@ -721,12 +722,21 @@ CREATE TABLE backtest_jobs (
 
 ---
 
-### 4.9 Frontend：React Web UI（`web/`）
+### 4.9 Frontend：兩專案 monorepo（`web-admin/` + `web-public/`）
 
-> ⚠️ **本節已搬到** [`frontend.md`](frontend.md)（2026-04-26 docs reorg）
+> ⚠️ **2026-04-27 update：** v3 把網頁拆為**前後台兩專案 monorepo**：
 >
-> 完整內容（技術棧、路由、元件樹、Zustand、API client、圖表選型、design tokens、Tailwind/shadcn 規範、a11y、18 頁 wireframes）請見該檔。
+> | 專案 | 文件 | 對象 | 範圍 |
+> |---|---|---|---|
+> | **`web-admin/`** | [`frontend.md`](frontend.md) | 用戶本人（auth） | 18 頁完整工作介面（Dashboard / Chat / Backtest / Paper / Settings / Audit 等） |
+> | **`web-public/`** | [`frontend-public-pixel.md`](frontend-public-pixel.md) | 任何訪客（無認證、masked） | pixel 像素辦公室 demo（9 角色擬人化呈現 LLM 工作流） |
 >
+> 對應 backend：[`backend-eventbus.md`](backend-eventbus.md)（EventBus + AdminEventSerializer / MaskedEventSerializer 雙通道）
+> 認證與 mask 策略：[`auth-and-mask.md`](auth-and-mask.md)
+>
+> ---
+>
+> **舊 §4.9 完整內容已搬到** [`frontend.md`](frontend.md)（2026-04-26 docs reorg）。
 > 章節對應：原 §4.9.1 → `frontend.md` §1；§4.9.2 → §2；§4.9.3 → §3；§4.9.4 → §4；§4.9.5 → §5；§4.9.6 → §6；§4.9.7 → §7；§4.9.8 → §8；§4.9.9 → §9；§4.9.10 → §10；§4.9.11 → §11；§4.9.12 → §12；§4.9.13 → §13；§4.9.14 → §14；§4.9.15 → §15；§4.9.16 → §16；§4.9.17 → §17；§4.9.18 → §18。
 
 

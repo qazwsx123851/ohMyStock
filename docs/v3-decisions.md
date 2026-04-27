@@ -71,6 +71,7 @@ v2 流程是「自動掃描 → 自動評分 → 人工 Phase 3 進場 → 出�
 | 10 | **`proposals/` 與 `reviews/` 進 git** | 進 git | 預估 +3MB/年，跨機 sync 必要 |
 | 11 | **Confirm Gate timeout** | 30 分鐘 expire | 配合盤中 11:00/13:00 訊號節奏 |
 | 12 | **復盤頻率** | 月度自動 + 任意手動 | 不採週度（代價過高） |
+| 13 | **前後台拆兩專案 monorepo + 公網 pixel UI**（2026-04-27 加） | `web-admin/`（auth）+ `web-public/`（pixel demo，公網）+ Backend EventBus 雙通道（admin raw / public masked） | 完全 bundle 隔離；訪客拿不到 admin code；對應文件：[`frontend.md`](frontend.md)、[`frontend-public-pixel.md`](frontend-public-pixel.md)、[`backend-eventbus.md`](backend-eventbus.md)、[`auth-and-mask.md`](auth-and-mask.md)；Phase 4 拆為 4a (admin) + 4b (public) + 4c (auth/mask) + 4d (E2E mask test) |
 
 ---
 

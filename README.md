@@ -54,10 +54,24 @@ UI 層（CLI / React Web / REST + SSE）
 
 ## 網頁呈現
 
+採**前後台兩專案 monorepo** 架構：
+
+### 後台（Admin Panel） — `web-admin/`
+- **對象**：只有用戶本人（Bearer token auth）
 - **技術**：React 19 + Vite + TypeScript + Tailwind + shadcn/ui
-- **頁面**：18 個 wireframes 設計細節在 [`docs/frontend.md`](docs/frontend.md)
+- **頁面**：18 個 wireframes 完整工作介面（Dashboard / Chat / Backtest / Paper Trading / Settings / Audit 等），設計細節 → [`docs/frontend.md`](docs/frontend.md)
 - **內容**：交易資訊 + AI 觀點視角（決策思考鏈、復盤批判、提案佐證、Confirm Dialog）
-- **存取方式**：本機 localhost（避開 SITC 投顧執照風險）
+- **部署**：localhost / Cloudflare Tunnel（不對公網）
+
+### 前台（Public Pixel UI） — `web-public/`
+- **對象**：任何訪客（無認證、嚴格 mask）
+- **技術**：React 19 + Vite + TypeScript + Canvas 2D（pixel art 像素辦公室）
+- **內容**：把 LLM agents 擬人化為 9 個像素角色（掃盤員 / 決策官 / 圖書館員 / 提案員 / 警衛 …），即時動畫呈現「AI 助手在工作」
+- **靈感來源**：[pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents)
+- **設計細節** → [`docs/frontend-public-pixel.md`](docs/frontend-public-pixel.md)
+- **資料管線** → [`docs/backend-eventbus.md`](docs/backend-eventbus.md)（Backend EventBus 雙通道）
+- **合規與 Mask** → [`docs/auth-and-mask.md`](docs/auth-and-mask.md)
+- **部署**：Vercel / Cloudflare Pages（公網）
 
 ---
 
@@ -119,7 +133,10 @@ ohMyStock/
 | Phase 2 | Screener + 訊號偵測 + Phase 2B Swarm Input Assembler |
 | Phase 3 | LLM Decider + Confirm Gate + Trade Journal v3 |
 | Phase 3.5 | `OHMYSTOCK_AUTO_EXECUTE` 雙模式 + 9 條安全防線 |
-| Phase 4 | React 19 Web UI（18 頁 wireframes 實作） |
+| Phase 4a | `web-admin/` Admin Panel（18 頁 wireframes 實作） |
+| Phase 4b | `web-public/` Pixel UI（像素辦公室 + 9 角色） |
+| Phase 4c | Backend EventBus + Auth middleware + MaskedEventSerializer |
+| Phase 4d | E2E Mask 滲透測試（Playwright 驗證公開端點 0 漏網） |
 | Phase 5 | LLM 復盤五節點 swarm + 提案 → WFA → 合併閉環 |
 
 ---
@@ -132,6 +149,7 @@ ohMyStock/
 > - 任何 LLM 產出的選股、進場、出場、策略改動建議，**使用者需自行判斷風險並承擔後果**
 > - 台灣證期局相關規範（投顧執照、SITC、廣告法等）由使用者自行注意
 > - 過往回測績效不代表未來表現
+> - **公開展示之前台所有股票代號（STK-A、STK-B 等）為虛構代換，不對應任何真實標的**；詳見 [`docs/auth-and-mask.md`](docs/auth-and-mask.md) §3 Mask Spec
 
 ---
 
