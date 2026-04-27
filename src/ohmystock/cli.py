@@ -43,5 +43,29 @@ def screen() -> None:
     raise typer.Exit(1)
 
 
+@app.command(help="啟動 FastAPI backend（uvicorn + factory mode；本機 dev 預設 reload）")
+def api(
+    host: str = typer.Option(
+        "127.0.0.1",
+        help="監聽主機；預設 127.0.0.1 僅本機可達，供 Cloudflare Tunnel 暴露給 admin",
+    ),
+    port: int = typer.Option(8000, help="監聽 port；預設 8000"),
+    reload: bool = typer.Option(
+        True,
+        "--reload/--no-reload",
+        help="開發模式自動 reload；測試 / smoke test 請用 --no-reload",
+    ),
+) -> None:
+    import uvicorn
+
+    uvicorn.run(
+        "ohmystock.api.app:create_app",
+        host=host,
+        port=port,
+        reload=reload,
+        factory=True,
+    )
+
+
 def main() -> None:
     app()
