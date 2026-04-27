@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from importlib.metadata import version as _pkg_version
 
@@ -22,13 +23,17 @@ from sse_starlette.sse import EventSourceResponse
 from ohmystock.eventbus.events import TPE
 
 
-async def _admin_event_stream():
-    while True:
-        yield {
-            "event": "heartbeat",
-            "data": json.dumps({"ts": datetime.now(TPE).isoformat()}),
-        }
-        await asyncio.sleep(15)
+async def _admin_event_stream() -> AsyncGenerator[dict[str, str], None]:
+    try:
+        while True:
+            yield {
+                "event": "heartbeat",
+                "data": json.dumps({"ts": datetime.now(TPE).isoformat()}),
+            }
+            await asyncio.sleep(15)
+    finally:
+        # Phase 1 will replace this with bus.unsubscribe(q) once EventBus is wired in.
+        pass
 
 
 def create_app() -> FastAPI:

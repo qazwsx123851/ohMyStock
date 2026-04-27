@@ -23,7 +23,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from ohmystock.api.app import _admin_event_stream, create_app
-from ohmystock.api.db import get_connection
+from ohmystock.api.db import _get_settings, get_connection
 from ohmystock.eventbus.bus import EventBus
 from ohmystock.eventbus.events import Event
 
@@ -63,13 +63,17 @@ async def test_admin_event_stream_yields_heartbeat() -> None:
 def test_get_connection_pragmas(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     db_path = tmp_path / "test.db"
     monkeypatch.setenv("OHMYSTOCK_DB_PATH", str(db_path))
-    conn = get_connection()
+    _get_settings.cache_clear()
     try:
-        assert conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
-        assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
-        assert db_path.exists()
+        conn = get_connection()
+        try:
+            assert conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+            assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
+            assert db_path.exists()
+        finally:
+            conn.close()
     finally:
-        conn.close()
+        _get_settings.cache_clear()
 
 
 async def test_eventbus_round_trip() -> None:

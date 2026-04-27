@@ -10,7 +10,7 @@ Spec: docs/backend-eventbus.md §2.2
 
 from __future__ import annotations
 
-from asyncio import Queue
+from asyncio import Queue, QueueFull
 
 from ohmystock.eventbus.events import Event
 
@@ -34,7 +34,7 @@ class EventBus:
         for q in self._subscribers:
             try:
                 q.put_nowait(event)
-            except Exception:
+            except QueueFull:
                 pass
 
 

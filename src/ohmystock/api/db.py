@@ -11,16 +11,22 @@ Spec: openspec/changes/fastapi-bootstrap/specs/backend-api-and-eventbus/spec.md
 from __future__ import annotations
 
 import sqlite3
+from functools import lru_cache
 from pathlib import Path
 
 from ohmystock.config import Settings
 
-_FTS5_OK: bool | None = None
+_FTS5_OK: bool = False
+
+
+@lru_cache(maxsize=1)
+def _get_settings() -> Settings:
+    return Settings()
 
 
 def _probe_fts5() -> None:
     global _FTS5_OK
-    if _FTS5_OK is True:
+    if _FTS5_OK:
         return
     probe = sqlite3.connect(":memory:")
     try:
@@ -37,7 +43,7 @@ def _probe_fts5() -> None:
 
 def get_connection() -> sqlite3.Connection:
     _probe_fts5()
-    path = Path(Settings().ohmystock_db_path).expanduser()
+    path = Path(_get_settings().ohmystock_db_path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path))
     conn.execute("PRAGMA journal_mode = WAL")
