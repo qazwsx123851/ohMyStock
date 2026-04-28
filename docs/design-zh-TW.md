@@ -302,6 +302,21 @@ list_proposals(
 | **暫停交易（重訊）** | FinMind 不標記 → 從 MOPS 公開資訊觀測站爬取 | `data/mops_scraper.py` |
 | **早盤試撮（08:30–09:00）** | 產生「預估開盤價」，可作為策略訊號來源 | `engine.py` |
 
+#### 4.4.1.1 Mark Minervini SEPA 在台股的本地化備註（v3.1 新增）
+
+> 完整 SEPA 框架定義見 [`workflow-cheatsheet.md`](workflow-cheatsheet.md) §0.4 / §2 / §6.3 / §9.1（業務邏輯 SSOT）。本節僅記載與台股市場結構衝突 / 不對應的本地化決策，給後續 phase 寫程式時對照。
+
+| Minervini 美股原版 | 台股本地化決策 | 理由 |
+|---|---|---|
+| RS Rating 門檻 ≥ 70（IBD 商業數據） | **RS Percentile ≥ 65**，自建（依 `market_data_tool.get_rs_percentile`） | 台股無 IBD 商業 RS，自建依 252 日加權（63d/126d/189d/252d 各 25%）；門檻下調是因台股流動股池較小（~1500 vs 美股 ~18000） |
+| 流動性以 $ADV（美元日均成交額）計 | **5 日均成交額 ≥ NT$ 100M** 替代 | NT$ 100M ≈ USD $3M，等效 IBD 對小型成長股的流動性下限 |
+| 停損 -7~8% | **沿用既有 §6.6 公式 -6% 下限**（`max(price × 0.94, price - 2 × ATR)`） | 台股 ±10% 漲跌停下，-7~8% 停損遇強波動可能因跌停打不出單 → 預留 4% 緩衝 |
+| Earnings season 季 1/4/7/10 月 | **季報 8/2 月、月營收每月 10 號前公佈** | Phase 3 進場 SHALL 避開季報前 10 個交易日（防止財報前突發跳空）；月營收動能保留為 §3 Phase 1.5 觸發 |
+| Position sizing 以 1% Fixed-Risk | **保留 §6.6 Volatility Targeting** | Vol Targeting 依個股 ATR% 反向縮放，台股漲跌停下對極端波動股自帶保護；Minervini Fixed-Risk 在小型高 ATR 股會下太重（v3 決策 #16） |
+| Stage 4 個股可做空 | **不做空**（v1 paper trading + 後續即使 live 亦不做空） | Shioaji 模擬倉做空券源限制 + 平盤下放空法規限制；Stage 4 一律 hard reject 不進場 |
+
+> **設計用意**：Minervini SEPA 三柱（Trend Template / Stage / VCP+Pivot）的**判讀邏輯不變**，只調整門檻與市場機制適配。Phase 5 復盤的提案閘（§16）會持續驗證這些本地化參數是否最佳。
+
 #### 4.4.2 成本模型（`backtest/costs.py`）
 - 手續費：0.1425% × 折扣率（預設 0.28，可調）
 - 證交稅：賣出 0.3%（一般）/ 0.15%（當沖，至 2027/12/31）

@@ -1,9 +1,11 @@
 # LLM Decision Schema — Phase 3 進場決策資料結構
 
-> **版本**：v3.0 ｜ **更新日期**：2026-04-26
+> **版本**：v3.1 ｜ **更新日期**：2026-04-28
 > **範圍**:Phase 3 LLM Decider 的輸入 / 輸出與 Trade Journal 的儲存格式
 > **權威來源**:[`workflow-cheatsheet.md`](workflow-cheatsheet.md) §6.5 / §6.8
 > **相關章節**:[`design-zh-TW.md`](design-zh-TW.md) §4.3.1 `trade_journal_tool` / §4.6.1 Trade Journal as Memory / §4.7.1 `entry_decision_team` swarm
+>
+> **v3.0 → v3.1 變動**：配合 [`workflow-cheatsheet.md`](workflow-cheatsheet.md) v3.1 引入 Mark Minervini SEPA 框架，新增 5 個 SEPA 欄位（`stage` / `rs_percentile` / `trend_template_passed` / `vcp_quality` / `pivot_price`）至 LLM 輸入候選快照、輸出 schema、Trade Journal entry。**僅追加，不刪改既有欄位**（依 §6 Schema 演進規範）。
 
 ---
 
@@ -13,20 +15,27 @@
 
 ```json
 {
-  "input_schema_version": "v3.0",
+  "input_schema_version": "v3.1",
   "decision_id": "dec_2026-04-30T14-30-00_2330",
   "trigger_at": "2026-04-30T14:30:00+08:00",
   "candidate": {
     "symbol": "2330",
     "name": "台積電",
     "final_score": 78,
-    "tech_score": 28,
-    "chip_score": 36,
-    "industry_score": 8,
+    "tech_score": 32,
+    "chip_score": 18,
+    "fundamental_score": 22,
     "sentiment_score": 6,
     "ema20_distance_pct": 3.2,
     "atr_14_pct": 2.4,
-    "current_price": 845.0
+    "current_price": 845.0,
+    "stage": 2,
+    "rs_percentile": 87,
+    "trend_template_passed": 8,
+    "vcp_quality": "breakout",
+    "pivot_price": 832.0,
+    "distance_from_52w_high_pct": 4.1,
+    "distance_from_52w_low_pct": 41.6
   },
   "market_context": {
     "risk_off": false,
@@ -42,19 +51,19 @@
   },
   "rules_summary": {
     "must_have": [
-      "站穩突破/收盤陽 K 確認",
-      "量能 ≥ 1.5× 5 日均量",
-      "近 5 日 RS > 大盤"
+      "Trend Template 8/8 全過（依 §2 第一層）",
+      "Stage 2 確認（依 §0.4 / §2 第三層）",
+      "VCP/杯柄/平台 + Pivot Breakout 量能（≥ 1.4× 20DMA、Pivot~Pivot+5%）"
     ],
     "bonus_items": [
-      "看漲 K 線型態",
-      "週線確認",
-      "RSI 35-75",
-      "EMA 多頭排列",
-      "外資/投信當日買超",
-      "主力分點 ≥ 25% 或集保遞減",
-      "近 5 日融資增幅 < 10%",
-      "7 日內正面催化劑"
+      "季 EPS YoY ≥ 25%（且本季 > 前季加速）",
+      "月營收 YoY ≥ 20% 且創歷史新高",
+      "RS Percentile ≥ 80",
+      "距 52 週高 ≤ 15%",
+      "VCP 收縮 ≥ 4 次（每次振幅 ≤ 前次 50%）",
+      "機構持股遞增（外資/投信 30 日 + 主力分點 ≥ 25%）",
+      "產業 RS 領先（產業 RS Percentile ≥ 80）",
+      "新高 + 量爆（突破 52 週新高 + 量 ≥ 1.5× 20DMA）"
     ]
   },
   "available_tools": [
@@ -65,12 +74,17 @@
     "fundamental_data_tool"
   ],
   "available_skills": [
+    "technical/trend-template",
+    "technical/stage-analysis",
+    "technical/vcp-pivot",
     "technical/breakout",
-    "technical/ma-crossover",
     "chip/three-major-investors",
     "chip/broker-branch",
     "chip/securities-lending",
-    "tw_specific/momentum-swing"
+    "fundamental/eps-growth",
+    "fundamental/revenue-growth",
+    "tw_specific/momentum-swing",
+    "tw_specific/rs-percentile"
   ]
 }
 ```
@@ -81,47 +95,56 @@
 
 ```json
 {
-  "output_schema_version": "v3.0",
+  "output_schema_version": "v3.1",
   "decision_id": "dec_2026-04-30T14-30-00_2330",
   "decided_at": "2026-04-30T14:34:22+08:00",
   "model": "claude-opus-4-7",
   "decision": "enter",
   "confidence": 0.83,
+  "stage": 2,
+  "rs_percentile": 87,
+  "trend_template_passed": 8,
+  "vcp_quality": "breakout",
+  "pivot_price": 832.0,
   "must_have_check": [
     {
-      "name": "breakout_close",
+      "name": "trend_template_8_of_8",
       "pass": true,
-      "evidence": "當日收 845 > 開 838 > 突破點 832,符合"
+      "evidence": "(1) 845 > MA50(810) ✓ (2) MA50 > MA150(782) ✓ (3) MA150 > MA200(745) ✓ (4) 845 > MA150 ✓ (5) 845 > MA200 ✓ (6) MA200 過去 65 日上升 ✓ (7) 距 52W 高 870 為 -2.9% (≤25%) ✓ (8) RS Percentile 87 ≥ 65 ✓"
     },
     {
-      "name": "volume_15x",
+      "name": "stage_2_confirmed",
       "pass": true,
-      "evidence": "當日量 38,420 張 / 5 日均量 22,140 張 = 1.74×"
+      "evidence": "多頭排列 + MA200 ≥ 65 日上升 + 30 日內振幅 14% (≤20%, 非 Stage 3)"
     },
     {
-      "name": "rs_above_index",
+      "name": "vcp_pivot_breakout_with_volume",
       "pass": true,
-      "evidence": "近 5 日 2330 +4.2% vs TAIEX +1.1%"
+      "evidence": "杯柄突破，Pivot=832；當日收 845 在 Pivot~Pivot+5% (832~873.6) 內；量 38,420 張 / 20DMA 22,140 張 = 1.74× (≥1.4×) ✓；收 > 20MA(820) ✓"
     }
   ],
   "bonus_score": 6,
   "bonus_breakdown": [
-    {"name": "bullish_pattern", "pass": true, "evidence": "形成杯柄突破"},
-    {"name": "weekly_confirm", "pass": true, "evidence": "週線站上 20MA"},
-    {"name": "rsi_in_range", "pass": true, "evidence": "RSI(14) = 62.4"},
-    {"name": "ema_aligned", "pass": true, "evidence": "EMA5 > EMA10 > EMA20"},
-    {"name": "institutional_buy", "pass": true, "evidence": "外資 +12,400 張、投信 +1,820 張"},
-    {"name": "broker_concentration", "pass": true, "evidence": "前 15 大買超佔 28.4%"},
-    {"name": "margin_modest", "pass": false, "evidence": "近 5 日融資 +12.3%(略高)"},
-    {"name": "catalyst_recent", "pass": false, "evidence": "近 7 日無重大重訊"}
+    {"name": "eps_yoy_25", "pass": true, "evidence": "Q1 EPS YoY +32% 且 vs Q4 +28% 加速 +4pp（接近門檻）"},
+    {"name": "revenue_yoy_20_new_high", "pass": true, "evidence": "3 月營收 YoY +24%、創歷史新高"},
+    {"name": "rs_percentile_80", "pass": true, "evidence": "RS Percentile 87 ≥ 80"},
+    {"name": "distance_52w_high_15", "pass": true, "evidence": "距 52W 高 -2.9% ≤ 15%"},
+    {"name": "vcp_contractions_4plus", "pass": false, "evidence": "本次為杯柄非教科書級 VCP，僅 2 次回檔"},
+    {"name": "institutional_buy_increasing", "pass": true, "evidence": "外資 30 日持股 +0.8%、主力分點集中度 28.4%"},
+    {"name": "industry_rs_leadership", "pass": true, "evidence": "半導體產業 RS Percentile 92 ≥ 80"},
+    {"name": "new_high_volume_burst", "pass": false, "evidence": "突破未創 52 週新高 (854 仍距 870 約 -1.0%)"}
   ],
   "proposed_sizing_pct": 18.0,
   "expected_holding_days": 8,
-  "reasoning": "2330 滿足 Must-have 三項全過,加分項通過 6/8。...(≥ 200 字的完整論點)",
+  "reasoning": "2330 滿足 Must-have 三項 SEPA 三柱全過：(a) Trend Template 8/8 全過、(b) Stage 2 確認 + 多頭排列健康、(c) 杯柄突破 Pivot=832 量能 1.74× 20DMA。加分項通過 6/8（季 EPS 加速 + 月營收創高 + RS Percentile 87 + 距 52W 高 -2.9% + 機構買增 + 產業 RS 領先；VCP 收縮次數不足 4 次 + 未創 52W 新高）。...(≥ 200 字的完整論點)",
   "cited_skills": [
-    "technical/breakout",
+    "technical/trend-template",
+    "technical/stage-analysis",
+    "technical/vcp-pivot",
     "chip/three-major-investors",
-    "tw_specific/momentum-swing"
+    "fundamental/eps-growth",
+    "tw_specific/momentum-swing",
+    "tw_specific/rs-percentile"
   ],
   "invalidation_conditions": [
     "綜合分數降 > 15",
@@ -149,11 +172,17 @@
 | `decision` | enum | `enter / reject / reduce_size` 三選一 |
 | `confidence` | float | 0.0~1.0;< 0.6 系統強制改為 `reject` |
 | `must_have_check` | list | 必須 3 項;任一 `pass=false` 系統強制改為 `reject` |
+| `must_have_check[*].name` | enum | v3.1 SEPA 三柱：`trend_template_8_of_8` / `stage_2_confirmed` / `vcp_pivot_breakout_with_volume`（v3.0 三項已 deprecated） |
 | `bonus_score` | int | 0~8;< 4 系統強制改為 `reject` |
 | `proposed_sizing_pct` | float | 0.0~25.0;系統會與 Volatility Targeting 公式取較小者 |
 | `reasoning` | str | ≥ 200 字;低於則拒收 |
 | `cited_skills` | list[str] | ≥ 1 項;空陣列拒收 |
 | `expected_holding_days` | int | 1~30;用於 §7.B 時間停損校準 |
+| **`stage`**（v3.1 新增） | enum | `1 \| 2 \| 3 \| 4`；若 `stage=4` 則系統強制改為 `reject`（依 [`workflow-cheatsheet.md`](workflow-cheatsheet.md) §0.4）；`stage=3` LLM 可仍 `enter` 但 sizing 上限降至 10% |
+| **`rs_percentile`**（v3.1 新增） | int | `0~99`；< 65 時 must_have_check `trend_template_8_of_8` 自動 fail（LLM 不可繞過） |
+| **`trend_template_passed`**（v3.1 新增） | int | `0~8`；< 8 時 must_have_check `trend_template_8_of_8` 自動 fail |
+| **`vcp_quality`**（v3.1 新增） | enum | `none \| forming \| textbook \| breakout`；若 `none` 或 `forming` 則 must_have_check `vcp_pivot_breakout_with_volume` 自動 fail（須等型態完成） |
+| **`pivot_price`**（v3.1 新增） | float \| null | 僅當 `vcp_quality ∈ {textbook, breakout}` 時必為 float（> 0）；否則應為 `null`。進場價必須在 `[pivot_price, pivot_price × 1.05]` 內，否則 must_have_check 第三柱自動 fail |
 
 ---
 
@@ -223,7 +252,7 @@ LLM 輸出 → 系統 Sizing Service / ATR Service / Risk Gate 處理後產出:
   "llm_output_tokens": 1240,
   "llm_cost_usd": 0.0276,
   "entry_thesis": "(可全文檢索的論點摘要)",
-  "thesis_invalidation": ["綜合分數降 > 15", "RS 轉負", "..."],
+  "thesis_invalidation": ["綜合分數降 > 15", "RS Percentile 跌破 50", "Stage 由 2 轉 3", "VCP pivot 跌破", "..."],
   "atr_at_entry": 20.3,
   "risk_regime_at_entry": "risk_on",
   "proposed_sizing_pct": 18.0,
@@ -234,9 +263,16 @@ LLM 輸出 → 系統 Sizing Service / ATR Service / Risk Gate 處理後產出:
   "human_confirmed_at": "2026-04-30T14:36:18+08:00",
   "decision_status": "confirmed",
   "expected_holding_days": 8,
-  "risk_flags": ["借券餘額近 10 日 +18%", "融資增幅 +12.3%"]
+  "risk_flags": ["借券餘額近 10 日 +18%", "融資增幅 +12.3%"],
+  "stage": 2,
+  "rs_percentile": 87,
+  "trend_template_passed": 8,
+  "vcp_quality": "breakout",
+  "pivot_price": 832.0
 }
 ```
+
+> **v3.1 SEPA 欄位（追加，向後相容）**：`stage` / `rs_percentile` / `trend_template_passed` / `vcp_quality` / `pivot_price` 五欄寫入 `kind=entry` journal。`kind=exit` 不重複寫（出場時 SEPA 狀態已變動，不具 snapshot 價值）；Phase 5 復盤的 data_loader 從 entry record 取此 5 欄做歸因（依 §4.5）。
 
 > **v3 決策 #15**：所有 `kind=*` 紀錄中**只要該決策呼叫過 LLM**，都必含 `llm_input_tokens` / `llm_output_tokens` / `llm_cost_usd` 三欄；單純由系統規則觸發的 `kind=reject`（如 Risk Gate 硬擋）不含 LLM 成本欄。月成本由 Admin Dashboard 即時聚合（詳 [`frontend.md`](frontend.md) §17.B），達 80% 預算（USD $40）警示、達 100% 觸發軟熔斷（詳 [`safety-and-simulation.md`](safety-and-simulation.md) §2.11）。
 
@@ -358,6 +394,12 @@ class TradeRecord(BaseModel):
     post_exit_return_5d: float | None  # 4.5.1
     post_exit_return_10d: float | None
     post_exit_return_20d: float | None
+    # v3.1 SEPA 欄位（snapshot at entry）
+    stage: Literal[1, 2, 3, 4]
+    rs_percentile: int                # 0~99
+    trend_template_passed: int        # 0~8
+    vcp_quality: Literal["none", "forming", "textbook", "breakout"]
+    pivot_price: float | None
 ```
 
 ---

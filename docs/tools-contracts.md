@@ -91,10 +91,57 @@ get_post_exit_returns(
 ) -> {
     returns: dict[str, float]                # {"5d": 0.024, "10d": -0.011, "20d": 0.058}
 }
+
+# v3.1 SEPA 新增（Mark Minervini 框架支援）
+get_rs_percentile(
+    symbol: str,
+    asof_date: str | None = None,            # 預設今日；回測用指定歷史日（YYYY-MM-DD）
+    universe: Literal["TWSE+OTC_liquid","top200","custom"] = "TWSE+OTC_liquid"
+                                              # liquid 池 = 5 日均成交額 ≥ NT$ 100M
+) -> {
+    rs_percentile: int,                      # 0~99；99 = 強過 99% 同池個股
+    weights: dict[str, float],               # {"63d": 0.25, "126d": 0.25, "189d": 0.25, "252d": 0.25}
+    raw_returns: dict[str, float],           # 個股對應期間報酬 {"63d": 0.18, ...}
+    benchmark: Literal["TAIEX"] | None,      # 計算池對標（內部 percentile，非單獨對 TAIEX）
+    universe_size: int                       # 該日 liquid 池大小（理應 ~1500）
+}
+
+get_stage(
+    symbol: str,
+    asof_date: str | None = None
+) -> {
+    stage: Literal[1, 2, 3, 4],              # Stan Weinstein / Minervini Stage Analysis
+    evidence: {
+        ma50: float, ma150: float, ma200: float, close: float,
+        ma_aligned_uptrend: bool,            # ma50 > ma150 > ma200
+        ma_aligned_downtrend: bool,          # ma50 < ma150 < ma200
+        ma200_uptrend_days: int,             # 過去 N 個交易日 MA200 上升（≥ 20 = Stage 2 必要）
+        amplitude_30d_pct: float             # 30 日內最高 / 最低 - 1（>20% 警示 Stage 3）
+    }
+}
+
+get_trend_template(
+    symbol: str,
+    asof_date: str | None = None,
+    rs_threshold: int = 65                   # 台股本地化門檻（vs 美股 70）
+) -> {
+    passed: int,                             # 0~8，幾條過
+    all_passed: bool,                        # passed == 8
+    conditions: list[{
+        index: int,                          # 1~8
+        name: str,                           # 例 "price_above_ma50"
+        passed: bool,
+        evidence: str                        # 數值佐證
+    }],
+    distance_from_52w_high_pct: float,       # 距 52 週高 % (應 ≤ 25%)
+    distance_from_52w_low_pct: float,        # 距 52 週低 % (應 ≥ 30%)
+    rs_percentile: int                       # 對應條件 (8) 的值
+}
 ```
 
 **Errors:** `DATA_UNAVAILABLE`（停牌 / 處置全額交割）、`RATE_LIMIT`（Shioaji 60 req/sec）。
 **呼叫方:** Phase 0 Risk Gate（大盤指數）、Phase 2A/2B 掃描、`entry_decision_team` 多空節點、Phase 5 data_loader。
+**v3.1 新方法呼叫方:** `screener_tool.run_screener()` 內部呼叫 `get_trend_template` / `get_stage`；`get_rs_percentile` 由 `screener_tool` 與 `entry_decision_team` 共用。**快取**：`get_rs_percentile` 每日全市場 batch 計算後寫入 SQLite（`cache_rs_percentile_daily` 表，columns: `asof_date DATE, symbol TEXT, rs_percentile INT, raw_returns JSON, computed_at TEXT`），當日 N 次呼叫只跑一次重算。
 
 ---
 
@@ -243,25 +290,40 @@ run_screener(
 # ScreenerFilter discriminated union 範例
 {
     "kind": "negative_filter",            # 對應 cheatsheet §2 第 1 層
-    "exclude": ["disposal","warning","fully_paid","KY"]
+    "exclude": ["disposal","warning","fully_paid","KY","stage_4"]   # v3.1 新增 stage_4 排除
 }
 {
-    "kind": "volume_filter",              # 第 2 層
-    "min_avg_dollar_volume_5d": 50_000_000,
+    "kind": "volume_filter",
+    "min_avg_dollar_volume_5d": 100_000_000,    # v3.1 SEPA 流動性門檻 NT$ 100M
     "min_volume_ratio_15x": True
 }
 {
-    "kind": "chip_filter",                # 第 3 層
+    "kind": "trend_template_filter",      # v3.1 SEPA 核心 — 對應 cheatsheet §2 第一層 / §6.3 第一柱
+    "require_all_8": True,                # True = 8 條全過；False = passed >= min_passed
+    "min_passed": 8,                      # require_all_8=False 時生效
+    "rs_threshold": 65                    # 台股本地化門檻
+}
+{
+    "kind": "stage_filter",               # v3.1 SEPA — 對應 cheatsheet §0.4 / §6.3 第二柱
+    "allowed_stages": [2],                # 只允許 Stage 2；Stage 4 已在 negative_filter 擋
+    "require_ma200_uptrend_days_min": 20  # MA200 至少 20 日上升
+}
+{
+    "kind": "chip_filter",
     "foreign_net_5d_min": 0,
     "invest_trust_consec_buy_days": 3
 }
 {
-    "kind": "technical_filter",           # 第 4 層
+    "kind": "technical_filter",
     "above_ema": [20, 60],
-    "rs_above_index_pct": 5.0,
-    "patterns": ["VCP","cup_handle","flat_base"]
+    "min_rs_percentile": 65,              # v3.1 新增：取代 v3.0 "rs_above_index_pct"（仍保留向後相容）
+    "rs_above_index_pct": 5.0,            # v3.0 沿用，但 v3.1 起 min_rs_percentile 為主要欄
+    "patterns": ["VCP","cup_handle","flat_base"],
+    "vcp_min_quality": "textbook"          # v3.1 新增：篩選 VCP 等級下限（none/forming/textbook/breakout）
 }
 ```
+
+**回傳擴充（v3.1）**：每筆 candidate 額外帶 `rs_percentile: int`、`stage: int`、`trend_template_passed: int`、`vcp_quality: str | null`、`pivot_price: float | null` 五欄，給 `entry_decision_team` 直接 reference 不再重算。
 
 **Errors:** `INVALID_INPUT`（filter kind 不認識）。
 **呼叫方:** Phase 1 / 1.5 / 2A / 2B 各掃描排程器。
@@ -336,14 +398,27 @@ detect_patterns(
         start_idx: int,                   # 在 lookback 內第幾根
         end_idx: int,
         params_match: dict,               # 該型態的具體量化參數通過情況
-                                          # 例 VCP: {"contractions": 4, "depth_decline": [0.15,0.10,0.06,0.03]}
-        invalidation_price: float | None  # 跌破此價 = 型態破壞
+        invalidation_price: float | None, # 跌破此價 = 型態破壞
+        # v3.1 SEPA 擴充：VCP 專用欄位（pattern == "VCP" 時非 null；其他型態 null）
+        vcp_quality: Literal["none","forming","textbook","breakout"] | None,
+        contraction_count: int | None,                # VCP 收縮次數（典型 2-6 次，≥4 為教科書級）
+        amplitude_decay_ratio: list[float] | None,    # 每次振幅 / 前次振幅，例 [1.0, 0.67, 0.6, 0.5]
+        volume_decay_ratio: list[float] | None,       # 每次回檔期間量能 / 突破期間量能（應遞減至 < 0.5）
+        pivot_price: float | None,                    # 整固期最後一個高點，進場 BuyStop 基準
+        days_to_pivot: int | None,                    # 從 pattern start 到 pivot 的交易日數
+        last_contraction_low: float | None            # 最後收縮低點（停損參考；vs entry -7~8% 取較緊）
     }]
 }
 ```
 
+**v3.1 VCP 偵測規範**（對應 cheatsheet §9.1）：
+- `vcp_quality = "breakout"`：突破日當下且量 ≥ 1.4× 20DMA、收 > pivot_price
+- `vcp_quality = "textbook"`：≥ 4 次收縮，每次振幅遞減 ≤ 50%，量能同步遞減，但尚未突破
+- `vcp_quality = "forming"`：2-3 次收縮，型態形成中
+- `vcp_quality = "none"`：未偵測到符合 VCP 結構
+
 **Errors:** `INVALID_INPUT`（pattern 名不認識）、`DATA_UNAVAILABLE`（Bar 數不足）。
-**呼叫方:** Phase 2B 評分（圖形項 12 分）、`entry_decision_team` 多方節點 evidence。
+**呼叫方:** Phase 2B 評分（圖形項）、`entry_decision_team` 多方節點 evidence、`screener_tool` `technical_filter.vcp_min_quality` 過濾。
 
 ---
 
