@@ -19,8 +19,11 @@ anthropic_key.*
 # Claude Code / IDE 本地設定
 # ============================================================
 .claude/settings.local.json
+.claude/launch.json
 .claude/cache/
 .claude/.session/
+.claude/skills/ui-ux-pro-max/
+AGENTS.md
 .idea/
 .vscode/
 *.code-workspace
@@ -140,6 +143,7 @@ desktop.ini
 *.bak
 *~
 .~lock.*
+*.stackdump
 
 # ============================================================
 # Docker（部署為 docker-compose，本機 volume 不進 git）
