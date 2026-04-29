@@ -58,4 +58,4 @@
 - [x] 8.1 跑 `uv run pytest -v` 全綠（既有 13 + 新增 ~13 個測試 ≈ 26 個全 pass）
 - [x] 8.2 在本機放好真實 `.env`（`FINMIND_TOKEN` / `SHIOAJI_*` / `ANTHROPIC_API_KEY`），跑 `uv run ohmystock smoke-test`，三項 `[PASS]`、exit 0
 - [x] 8.3 跑 `openspec validate external-connectors-and-cost --strict` 通過
-- [ ] 8.4 commit 並 push（commit message 引用本 change name + 列關鍵子模組）
+- [x] 8.4 commit 並 push（commit message 引用本 change name + 列關鍵子模組）
