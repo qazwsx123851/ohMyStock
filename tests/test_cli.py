@@ -35,8 +35,23 @@ def test_subcommand_stub_returns_not_implemented(subcommand: str) -> None:
     assert "not implemented" in result.output
 
 
-def test_settings_constructible_without_env() -> None:
-    s = Settings()
+def test_settings_constructible_without_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    env_keys = [
+        "ANTHROPIC_API_KEY",
+        "SHIOAJI_API_KEY",
+        "SHIOAJI_SECRET_KEY",
+        "SHIOAJI_CA_PATH",
+        "SHIOAJI_CA_PASSWD",
+        "SHIOAJI_PERSON_ID",
+        "FINMIND_TOKEN",
+        "OHMYSTOCK_AUTO_EXECUTE",
+        "OHMYSTOCK_LLM_DEGRADE",
+        "OHMYSTOCK_DB_PATH",
+        "OHMYSTOCK_LOG_LEVEL",
+    ]
+    for key in env_keys:
+        monkeypatch.delenv(key, raising=False)
+    s = Settings(_env_file=None)
     assert s.anthropic_api_key is None
     assert s.ohmystock_log_level == "INFO"
     assert s.ohmystock_db_path == "~/.ohmystock/journal.db"
