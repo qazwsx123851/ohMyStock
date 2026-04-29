@@ -99,7 +99,8 @@ out/
 *.db-journal
 
 # 本地資料快取（不進 git；FinMind / Shioaji 抓下來的 raw data）
-data/
+# 注意：用 /data/ 錨定 repo root，避免誤吃 src/ohmystock/data/ 模組
+/data/
 .cache/
 *.parquet
 *.feather

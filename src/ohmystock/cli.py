@@ -1,10 +1,14 @@
-"""ohMyStock CLI — typer app with five stub subcommands.
+"""ohMyStock CLI — typer app with seven subcommands.
 
-Each subcommand is a placeholder that prints "not implemented" and exits 1.
-Real logic lands in later changes (fastapi-bootstrap, core-agent-and-base-skills, etc.).
+Five stubs (run/backtest/review/propose/screen) print "not implemented" and
+exit 1 — real logic lands in later changes. ``api`` launches uvicorn against
+``ohmystock.api.app:create_app``. ``smoke-test`` verifies FinMind / Shioaji /
+Anthropic connectivity for Phase 0d acceptance.
 """
 
 from __future__ import annotations
+
+from datetime import date, timedelta
 
 import typer
 
@@ -65,6 +69,66 @@ def api(
         reload=reload,
         factory=True,
     )
+
+
+@app.command(
+    "smoke-test",
+    help=(
+        "驗證三方連線：依序檢查 finmind / shioaji / anthropic，"
+        "每項獨立 try/except，全跑完彙總；任一 FAIL exit 1，全 PASS exit 0"
+    ),
+)
+def smoke_test() -> None:
+    results: list[tuple[str, bool, str]] = []
+
+    try:
+        from ohmystock.data.finmind_client import FinMindClient
+
+        end = date.today()
+        start = end - timedelta(days=10)
+        rows = FinMindClient().get_taiwan_stock_price(
+            "2330", start.isoformat(), end.isoformat()
+        )
+        results.append(("finmind", True, f"{len(rows)} rows"))
+    except Exception as exc:
+        results.append(("finmind", False, str(exc)))
+
+    try:
+        from ohmystock.paper.shioaji_client import ShioajiPaperClient
+
+        sj_client = ShioajiPaperClient()
+        sj_client.login()
+        snap = sj_client.get_snapshot("2330")
+        results.append(("shioaji", True, f"close={snap.get('close')}"))
+    except Exception as exc:
+        results.append(("shioaji", False, str(exc)))
+
+    try:
+        from anthropic import Anthropic
+
+        from ohmystock.config import Settings
+
+        settings = Settings()
+        anthro = Anthropic(api_key=settings.anthropic_api_key)
+        msg = anthro.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1,
+            messages=[{"role": "user", "content": "ping"}],
+        )
+        results.append(("anthropic", True, f"model={msg.model}"))
+    except Exception as exc:
+        results.append(("anthropic", False, str(exc)))
+
+    any_fail = False
+    for name, ok, detail in results:
+        if ok:
+            typer.echo(f"[PASS] {name}: {detail}")
+        else:
+            any_fail = True
+            typer.echo(f"[FAIL] {name}: {detail}")
+
+    if any_fail:
+        raise typer.Exit(1)
 
 
 def main() -> None:
