@@ -29,6 +29,7 @@ GUARDED_MODULES = {
     "ohmystock.data.sources.finmind": Path("src/ohmystock/data/sources/finmind.py"),
     "ohmystock.data.sources.twstock": Path("src/ohmystock/data/sources/twstock.py"),
     "ohmystock.data.sources.yfinance": Path("src/ohmystock/data/sources/yfinance.py"),
+    "ohmystock.indicators.core": Path("src/ohmystock/indicators/core.py"),
 }
 
 FORBIDDEN_IMPORT_PATTERNS = [
@@ -59,6 +60,7 @@ def test_importing_guarded_modules_does_not_pull_http_stack() -> None:
         import ohmystock.data.sources.finmind
         import ohmystock.data.sources.twstock
         import ohmystock.data.sources.yfinance
+        import ohmystock.indicators.core
 
         forbidden = {"fastapi", "uvicorn", "starlette"}
         leaked = sorted(forbidden & set(sys.modules))
