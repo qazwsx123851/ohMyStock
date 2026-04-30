@@ -54,18 +54,15 @@ def test_sell_credits_cash_and_queues_settlement():
     assert p.positions == {}
 
 
-def test_settlement_drains_strictly_before_today():
+def test_settlement_drains_on_settlement_day():
     p = Portfolio.with_initial(0)
     p.pending_settlements["2026-04-26"] = 100_000.0
     p.advance_to("2026-04-26")
-    assert p.available_cash == 0.0
-    assert p.pending_settlements == {"2026-04-26": 100_000.0}
-    p.advance_to("2026-04-27")
     assert p.available_cash == 100_000.0
     assert p.pending_settlements == {}
 
 
-def test_t2_scenario_not_spendable_at_t2_open():
+def test_t2_scenario_spendable_at_t2_open():
     p = Portfolio.with_initial(0)
     p.positions["2330"] = 1000
     p.apply_sell(
@@ -77,10 +74,10 @@ def test_t2_scenario_not_spendable_at_t2_open():
         settlement_date="2026-04-26",
     )
     p.advance_to("2026-04-26")
-    assert p.can_afford_buy(50.0, 1000, _zero_cost()) is False
+    assert p.can_afford_buy(50.0, 1000, _zero_cost()) is True
 
 
-def test_t2_scenario_available_at_t3_open():
+def test_unsettled_proceeds_not_spendable_before_t2():
     p = Portfolio.with_initial(0)
     p.positions["2330"] = 1000
     p.apply_sell(
@@ -91,9 +88,9 @@ def test_t2_scenario_available_at_t3_open():
         fill_date="2026-04-22",
         settlement_date="2026-04-26",
     )
-    p.advance_to("2026-04-27")
-    assert p.available_cash == 100_000.0
-    assert p.can_afford_buy(50.0, 1000, _zero_cost()) is True
+    p.advance_to("2026-04-25")
+    assert p.available_cash == 0.0
+    assert p.can_afford_buy(50.0, 1000, _zero_cost()) is False
 
 
 def test_oversell_raises():

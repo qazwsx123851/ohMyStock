@@ -26,7 +26,7 @@
 
 ### Requirement: journal_entries 主表 schema
 
-系統 SHALL 在 `init_schema()` 中建立 `journal_entries` 表，欄位至少包含：`id INTEGER PRIMARY KEY AUTOINCREMENT`、`decision_id TEXT NOT NULL`、`kind TEXT NOT NULL CHECK(kind IN ('entry','exit','reject'))`、`symbol TEXT NOT NULL`、`created_at TEXT NOT NULL`（ISO-8601 字串含 `+08:00` 時區偏移）、`payload_json TEXT NOT NULL`（JSON 字串，存依 `kind` 變動的欄位如 `entry_price / atr_at_entry / sepa_*` 等）。`decision_id` SHALL 建 INDEX；`(kind, created_at)` SHALL 建複合 INDEX 以加速 Phase 5 復盤的時間範圍查詢。
+系統 SHALL 在 `init_schema()` 中建立 `journal_entries` 表，欄位至少包含：`id INTEGER PRIMARY KEY AUTOINCREMENT`、`decision_id TEXT NOT NULL`、`kind TEXT NOT NULL CHECK(kind IN ('entry','exit','reject','expire'))`、`symbol TEXT NOT NULL`、`created_at TEXT NOT NULL`（ISO-8601 字串含 `+08:00` 時區偏移）、`payload_json TEXT NOT NULL`（JSON 字串，存依 `kind` 變動的欄位如 `entry_price / atr_at_entry / sepa_*` 等）。`decision_id` SHALL 建 INDEX；`(kind, created_at)` SHALL 建複合 INDEX 以加速 Phase 5 復盤的時間範圍查詢。
 
 #### Scenario: 主表欄位齊全
 - **WHEN** 執行 `init_schema()` 後查詢 `PRAGMA table_info(journal_entries)`
@@ -35,6 +35,10 @@
 #### Scenario: kind CHECK 阻擋非法值
 - **WHEN** 嘗試 `INSERT INTO journal_entries(decision_id, kind, symbol, created_at, payload_json) VALUES ('dec_x', 'partial_fill', '2330', '2026-04-29T11:00:00+08:00', '{}')`
 - **THEN** SQLite 拋出 `IntegrityError`（CHECK constraint failed）
+
+#### Scenario: expire kind is accepted
+- **WHEN** 嘗試 `INSERT INTO journal_entries(decision_id, kind, symbol, created_at, payload_json) VALUES ('dec_expired', 'expire', '2330', '2026-04-29T11:00:00+08:00', '{"expire_reason":"confirm timeout"}')`
+- **THEN** INSERT 成功
 
 #### Scenario: 索引存在
 - **WHEN** 執行 `init_schema()` 後查詢 `sqlite_master` 中 type='index' 的列

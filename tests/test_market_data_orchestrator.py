@@ -119,6 +119,38 @@ def test_partial_cache_triggers_gap_fetch_only(conn: sqlite3.Connection) -> None
     assert fetch_end == WANTED[-1]
 
 
+def test_partial_cache_with_empty_upstream_is_data_unavailable(conn: sqlite3.Connection) -> None:
+    insert_bars(
+        conn, "2330", [_bar(WANTED[0])], "finmind", "2026-04-23T20:00:00+08:00"
+    )
+    adapter = _FakeAdapter("finmind", response=[])
+
+    result = get_kline(
+        "2330", bars=5, end_date=END, _conn=conn, _adapters=[adapter], _today=TODAY
+    )
+
+    assert result["ok"] is False
+    assert result["data"] is None
+    assert result["error"]["code"] == CODE_DATA_UNAVAILABLE
+    assert "2026-04-21" in result["error"]["message"]
+
+
+def test_partial_cache_with_rate_limit_surfaces_rate_limit(conn: sqlite3.Connection) -> None:
+    insert_bars(
+        conn, "2330", [_bar(WANTED[0])], "finmind", "2026-04-23T20:00:00+08:00"
+    )
+    adapter = _FakeAdapter("finmind", exc=RuntimeError("HTTP 429 quota exceeded"))
+
+    result = get_kline(
+        "2330", bars=5, end_date=END, _conn=conn, _adapters=[adapter], _today=TODAY
+    )
+
+    assert result["ok"] is False
+    assert result["data"] is None
+    assert result["error"]["code"] == CODE_RATE_LIMIT
+    assert result["error"]["retriable"] is True
+
+
 def test_finmind_fails_twstock_succeeds(conn: sqlite3.Connection) -> None:
     finmind = _FakeAdapter("finmind", exc=RuntimeError("connection reset"))
     twstock = _FakeAdapter("twstock", response=[_bar(d) for d in WANTED])

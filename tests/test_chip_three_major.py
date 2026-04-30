@@ -117,6 +117,51 @@ def test_full_miss_empty_upstream_returns_data_unavailable(conn) -> None:
     assert result["error"]["retriable"] is False
 
 
+def test_partial_cache_with_empty_upstream_returns_data_unavailable(conn) -> None:
+    insert_three_major_rows(
+        conn,
+        [
+            {"symbol": "2330", "date": "2026-04-23",
+             "foreign_net": 1_000_000, "invest_trust_net": 0, "prop_dealer_net": 0},
+        ],
+        "finmind",
+        "t",
+    )
+    client = FakeClient(rows=[])
+
+    result = get_three_major_investors(
+        "2330", days=5, end_date="2026-04-29",
+        _conn=conn, _client=client,
+    )
+
+    assert result["ok"] is False
+    assert result["data"] is None
+    assert result["error"]["code"] == "DATA_UNAVAILABLE"
+    assert "2026-04-24" in result["error"]["message"]
+
+
+def test_partial_cache_with_rate_limit_surfaces_rate_limit(conn) -> None:
+    insert_three_major_rows(
+        conn,
+        [
+            {"symbol": "2330", "date": "2026-04-23",
+             "foreign_net": 1_000_000, "invest_trust_net": 0, "prop_dealer_net": 0},
+        ],
+        "finmind",
+        "t",
+    )
+    client = FakeClient(raises=RuntimeError("FinMind returned HTTP 429 Too Many Requests"))
+
+    result = get_three_major_investors(
+        "2330", days=5, end_date="2026-04-29",
+        _conn=conn, _client=client,
+    )
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "RATE_LIMIT"
+    assert result["error"]["retriable"] is True
+
+
 def test_shares_to_lots_conversion_at_boundary(conn) -> None:
     insert_three_major_rows(
         conn,

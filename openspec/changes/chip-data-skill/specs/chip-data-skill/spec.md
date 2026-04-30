@@ -107,6 +107,8 @@ Each chip function SHALL follow this sequence: (1) compute the requested busines
 
 If FinMind returns an empty list and no cached row covers the range, the function SHALL return `error.code == "DATA_UNAVAILABLE"` with `retriable=False`.
 
+The success envelope SHALL only be returned when the final cache read covers every requested business date. Partial cache hits MUST NOT be returned as success: if missing dates remain after the FinMind fetch attempt, the function SHALL return `DATA_UNAVAILABLE` when FinMind was empty, or the classified FinMind error when FinMind failed.
+
 #### Scenario: Full cache hit avoids network
 
 - **GIVEN** a cache pre-populated for 2330 covering all 5 requested business days
@@ -124,6 +126,13 @@ If FinMind returns an empty list and no cached row covers the range, the functio
 - **GIVEN** no cached rows for the requested range and a FinMind client returning `[]`
 - **WHEN** either chip function is called
 - **THEN** `result["ok"] is False` and `result["error"]["code"] == "DATA_UNAVAILABLE"` with `retriable=False`
+
+#### Scenario: Partial cache plus empty upstream yields DATA_UNAVAILABLE
+
+- **GIVEN** a cache holding only one of five requested business days
+- **AND** a FinMind client returning `[]` for the missing range
+- **WHEN** either chip function is called
+- **THEN** `result["ok"] is False`, `result["data"] is None`, and `result["error"]["code"] == "DATA_UNAVAILABLE"` with `retriable=False`
 
 ---
 

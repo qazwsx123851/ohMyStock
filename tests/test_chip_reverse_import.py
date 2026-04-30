@@ -35,3 +35,10 @@ def test_chip_modules_do_not_load_fastapi():
     assert payload["forbidden_loaded"] == [], (
         f"chip layer pulled in {payload['forbidden_loaded']}"
     )
+
+
+def test_chip_package_exports_public_entrypoints() -> None:
+    from ohmystock.chip import get_margin_short, get_three_major_investors
+
+    assert callable(get_margin_short)
+    assert callable(get_three_major_investors)

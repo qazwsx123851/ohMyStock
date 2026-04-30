@@ -58,6 +58,8 @@ The system SHALL provide `init_market_data_schema(conn: sqlite3.Connection) -> N
 
 The system SHALL on every `get_kline` call query `bars_daily` first for the requested `(symbol, date-range)`, identify missing dates, and only fetch the missing range from upstream adapters. Successful upstream rows SHALL be written to `bars_daily` before the function returns.
 
+The success envelope SHALL only be returned when the final cache read covers every requested business date. Partial cache hits MUST NOT be returned as success: if missing dates remain after upstream fetch attempts, the function SHALL return `DATA_UNAVAILABLE` when upstream was empty, or the classified upstream error when upstream failed.
+
 #### Scenario: Second call hits cache only
 
 - **WHEN** `get_kline("2330", bars=5, end_date="2026-04-28")` is called twice consecutively against an adapter spy
@@ -68,6 +70,13 @@ The system SHALL on every `get_kline` call query `bars_daily` first for the requ
 - **GIVEN** `bars_daily` already contains rows for symbol `"2330"` covering `2026-04-21` through `2026-04-25`
 - **WHEN** `get_kline("2330", bars=5, end_date="2026-04-28")` is called (which needs `2026-04-21..2026-04-28`, i.e. 5 trading days)
 - **THEN** the upstream adapter SHALL be asked for a range whose end is `2026-04-28` and whose start is no earlier than `2026-04-26`, and the final returned `bars` SHALL include data sourced from cache plus the freshly-fetched tail
+
+#### Scenario: Partial cache plus empty upstream is not success
+
+- **GIVEN** `bars_daily` contains only one of five requested rows
+- **AND** every upstream adapter returns an empty list for the missing range
+- **WHEN** `get_kline("2330", bars=5, end_date="2026-04-28")` is called
+- **THEN** `result["ok"] is False`, `result["data"] is None`, and `result["error"]["code"] == "DATA_UNAVAILABLE"`
 
 ### Requirement: Fallback chain FinMind → twstock → yfinance
 
@@ -126,4 +135,3 @@ The data-fetching modules SHALL NOT import anything from `ohmystock.api`, and im
 
 - **WHEN** a fresh subprocess runs `python -c "import ohmystock.data.market_data, ohmystock.data.cache, ohmystock.data.sources.finmind, ohmystock.data.sources.twstock, ohmystock.data.sources.yfinance"`
 - **THEN** the process SHALL exit 0 and `sys.modules` SHALL NOT contain any of `fastapi`, `uvicorn`, `starlette`
-

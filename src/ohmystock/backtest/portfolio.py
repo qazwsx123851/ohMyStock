@@ -22,7 +22,7 @@ class Portfolio:
         return cls(cash=float(initial_capital), available_cash=float(initial_capital))
 
     def advance_to(self, today: str) -> None:
-        ready = [d for d in self.pending_settlements if d < today]
+        ready = [d for d in self.pending_settlements if d <= today]
         for d in ready:
             self.available_cash += self.pending_settlements.pop(d)
 

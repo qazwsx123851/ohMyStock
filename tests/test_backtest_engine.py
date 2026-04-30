@@ -14,6 +14,32 @@ from ohmystock.backtest.strategy.sma_cross import SmaCross
 from tests._strategies import BuyAndHold, BuyEveryBar, NoIndicators, RaisingStrategy
 
 
+class RoundTripThenRebuy:
+    name = "round_trip_then_rebuy"
+
+    def warmup_bars(self) -> int:
+        return 0
+
+    def on_bar(self, ctx) -> list[dict]:
+        if ctx.date == "2026-04-01":
+            return [_intent("2330", "buy", 1000)]
+        if ctx.date == "2026-04-02" and ctx.portfolio["positions"].get("2330", 0):
+            return [_intent("2330", "sell", 1000)]
+        if ctx.date == "2026-04-04":
+            return [_intent("2330", "buy", 1000)]
+        return []
+
+
+def _intent(symbol: str, side: str, qty: int) -> dict:
+    return {
+        "symbol": symbol,
+        "side": side,
+        "qty": qty,
+        "order_type": "market",
+        "limit_price": None,
+    }
+
+
 def _bars(prices: list[float], start: str = "2026-04-01") -> list[dict]:
     y, m, d = (int(p) for p in start.split("-"))
     base = date(y, m, d)
@@ -50,6 +76,45 @@ def test_success_envelope_shape():
     assert "trades" in result["data"]
     assert "equity_curve" in result["data"]
     assert len(result["data"]["equity_curve"]) >= 1
+
+
+def test_period_clips_bars_and_signals_outside_range():
+    bars = [
+        {"ts": "2026-03-31", "o": 100.0, "h": 101.0, "l": 99.0, "c": 100.0, "v": 1, "amount": 1},
+        {"ts": "2026-04-01", "o": 101.0, "h": 102.0, "l": 100.0, "c": 101.0, "v": 1, "amount": 1},
+        {"ts": "2026-04-02", "o": 102.0, "h": 103.0, "l": 101.0, "c": 102.0, "v": 1, "amount": 1},
+        {"ts": "2026-05-01", "o": 120.0, "h": 121.0, "l": 119.0, "c": 120.0, "v": 1, "amount": 1},
+    ]
+
+    result = run_backtest(
+        BuyEveryBar("2330", qty=1),
+        {"2330": bars},
+        period={"from": "2026-04-01", "to": "2026-04-02"},
+        initial_capital=100_000,
+    )
+
+    assert result["ok"] is True
+    assert [pt["date"] for pt in result["data"]["equity_curve"]] == [
+        "2026-04-01",
+        "2026-04-02",
+    ]
+    assert {t["signal_date"] for t in result["data"]["trades"]} == {
+        "2026-04-01",
+        "2026-04-02",
+    }
+    assert all(t["fill_date"] in {"2026-04-02", None} for t in result["data"]["trades"])
+
+
+def test_period_with_no_bars_after_clipping_is_invalid():
+    result = run_backtest(
+        BuyAndHold("2330", qty=1),
+        {"2330": _rising_bars(3, start_price=100.0)},
+        period={"from": "2026-05-01", "to": "2026-05-31"},
+        initial_capital=100_000,
+    )
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "INVALID_INPUT"
 
 
 def test_strategy_raising_returns_internal_error():
@@ -103,6 +168,26 @@ def test_strategy_without_required_indicators_runs():
         initial_capital=1_000_000,
     )
     assert result["ok"] is True
+
+
+def test_sell_proceeds_are_available_on_t2_open():
+    bars = _bars([100.0, 100.0, 100.0, 100.0, 100.0])
+    result = run_backtest(
+        RoundTripThenRebuy(),
+        {"2330": bars},
+        period={"from": "2026-04-01", "to": "2026-04-05"},
+        initial_capital=110_000,
+        fee_discount=0.28,
+        slippage_bps=0,
+    )
+
+    assert result["ok"] is True
+    trades = result["data"]["trades"]
+    assert [(t["side"], t["fill_date"], t["status"]) for t in trades] == [
+        ("buy", "2026-04-02", "filled"),
+        ("sell", "2026-04-03", "filled"),
+        ("buy", "2026-04-05", "filled"),
+    ]
 
 
 def test_sma_cross_importable_and_usable():

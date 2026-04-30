@@ -95,6 +95,23 @@ def test_kind_check_constraint_blocks_invalid(conn: sqlite3.Connection) -> None:
         )
 
 
+def test_expire_kind_is_allowed(conn: sqlite3.Connection) -> None:
+    init_schema(conn)
+    conn.execute(
+        "INSERT INTO journal_entries(decision_id, kind, symbol, created_at, payload_json) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (
+            "dec_expired",
+            "expire",
+            "2330",
+            "2026-04-29T11:00:00+08:00",
+            '{"expire_reason": "confirm timeout"}',
+        ),
+    )
+    row = conn.execute("SELECT kind FROM journal_entries WHERE decision_id = ?", ("dec_expired",)).fetchone()
+    assert row == ("expire",)
+
+
 def test_missing_fts5_raises_runtime_error() -> None:
     fake_conn = MagicMock(spec=sqlite3.Connection)
     fake_conn.execute.side_effect = sqlite3.OperationalError("no such module: fts5")

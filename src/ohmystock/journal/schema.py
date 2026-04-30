@@ -21,7 +21,7 @@ _DDL_JOURNAL_ENTRIES = """
 CREATE TABLE IF NOT EXISTS journal_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     decision_id TEXT NOT NULL,
-    kind TEXT NOT NULL CHECK(kind IN ('entry','exit','reject')),
+    kind TEXT NOT NULL CHECK(kind IN ('entry','exit','reject','expire')),
     symbol TEXT NOT NULL,
     created_at TEXT NOT NULL,
     payload_json TEXT NOT NULL
