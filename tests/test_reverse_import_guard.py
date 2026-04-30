@@ -24,6 +24,11 @@ GUARDED_MODULES = {
         "src/ohmystock/observability/cost_tracker.py"
     ),
     "ohmystock.journal.schema": Path("src/ohmystock/journal/schema.py"),
+    "ohmystock.data.market_data": Path("src/ohmystock/data/market_data.py"),
+    "ohmystock.data.cache": Path("src/ohmystock/data/cache.py"),
+    "ohmystock.data.sources.finmind": Path("src/ohmystock/data/sources/finmind.py"),
+    "ohmystock.data.sources.twstock": Path("src/ohmystock/data/sources/twstock.py"),
+    "ohmystock.data.sources.yfinance": Path("src/ohmystock/data/sources/yfinance.py"),
 }
 
 FORBIDDEN_IMPORT_PATTERNS = [
@@ -49,6 +54,11 @@ def test_importing_guarded_modules_does_not_pull_http_stack() -> None:
         import ohmystock.paper.shioaji_client
         import ohmystock.observability.cost_tracker
         import ohmystock.journal.schema
+        import ohmystock.data.market_data
+        import ohmystock.data.cache
+        import ohmystock.data.sources.finmind
+        import ohmystock.data.sources.twstock
+        import ohmystock.data.sources.yfinance
 
         forbidden = {"fastapi", "uvicorn", "starlette"}
         leaked = sorted(forbidden & set(sys.modules))
