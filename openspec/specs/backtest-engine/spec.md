@@ -11,6 +11,8 @@ The system SHALL expose `ohmystock.backtest.run_backtest(strategy, bars_by_symbo
 
 `bars_by_symbol` is a `dict[str, list[BarRow]]` where each value matches the `BarRow` shape from `market-data-cache` (`ts, o, h, l, c, v, amount`, ISO date `YYYY-MM-DD`). `period` is `{from: "YYYY-MM-DD", to: "YYYY-MM-DD"}`.
 
+The engine SHALL treat `period` as a hard boundary: bars outside `[period.from, period.to]` MUST NOT be visible to strategies, included in the equity curve, or produce trades. If clipping leaves any symbol with no bars inside the period, the call SHALL fail with `INVALID_INPUT`.
+
 #### Scenario: Successful run returns envelope with metrics and equity curve
 
 - **WHEN** `run_backtest(strategy=BuyAndHold("2330"), bars_by_symbol={"2330": <20 daily bars>}, period={"from": "2026-04-01", "to": "2026-04-28"}, initial_capital=1_000_000)` is called with non-empty bars covering the period
@@ -21,6 +23,12 @@ The system SHALL expose `ohmystock.backtest.run_backtest(strategy, bars_by_symbo
 - **GIVEN** a strategy whose `on_bar` raises `RuntimeError("boom")` on the third bar
 - **WHEN** `run_backtest(...)` is called
 - **THEN** the return value SHALL satisfy `result["ok"] is False`, `result["data"] is None`, `result["error"]["code"] == "INTERNAL_ERROR"`, and no exception SHALL escape the call
+
+#### Scenario: Period clips out-of-range bars
+
+- **GIVEN** `bars_by_symbol["2330"]` contains rows before `period.from` and after `period.to`
+- **WHEN** `run_backtest(...)` is called
+- **THEN** `data["equity_curve"]` SHALL contain only dates inside the period, and every trade's `signal_date` / `fill_date` SHALL be inside the period or `fill_date is None` for `cancelled_eob`
 
 ---
 

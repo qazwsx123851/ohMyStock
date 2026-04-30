@@ -70,11 +70,23 @@ def _validate_inputs(
     return None
 
 
+def _clip_bars_to_period(
+    bars_by_symbol: dict[str, list[BarRow]], period: dict[str, str]
+) -> tuple[dict[str, list[BarRow]], str | None]:
+    clipped: dict[str, list[BarRow]] = {}
+    for sym, bars in bars_by_symbol.items():
+        rows = [b for b in bars if period["from"] <= b["ts"] <= period["to"]]
+        if not rows:
+            return {}, f"bars for {sym} do not cover period {period['from']}..{period['to']}"
+        clipped[sym] = rows
+    return clipped, None
+
+
 def _settlement_date(fill_date: str, timeline: list[str]) -> str:
     """Return T+2 trading-day settlement date.
 
-    `Portfolio.advance_to(today)` drains entries with date `< today`, so a
-    settlement key of `timeline[idx + 2]` becomes spendable from start of T+3.
+    `Portfolio.advance_to(today)` drains entries with date `<= today`, so a
+    settlement key of `timeline[idx + 2]` becomes spendable at T+2 open.
     """
     try:
         idx = timeline.index(fill_date)
@@ -107,6 +119,10 @@ def run_backtest(
 
         symbols = sorted(bars_by_symbol.keys())
         bars_by_symbol = {s: list(bars_by_symbol[s]) for s in symbols}
+        bars_by_symbol, clip_msg = _clip_bars_to_period(bars_by_symbol, period)
+        if clip_msg is not None:
+            elapsed_ms = (time.perf_counter_ns() - t0) // 1_000_000
+            return _envelope(False, int(elapsed_ms), None, _err("INVALID_INPUT", clip_msg))
 
         ind_specs = required_indicators_of(strategy)
         indicators_by_symbol: dict[str, dict[str, list]] = {

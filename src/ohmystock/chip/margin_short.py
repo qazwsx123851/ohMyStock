@@ -78,13 +78,15 @@ def get_margin_short(
             if owns_conn:
                 conn.close()
 
-        if final_rows:
+        missing_after_fetch = _missing_dates(wanted, [row["date"] for row in final_rows])
+        if not missing_after_fetch:
             return _success_envelope(final_rows, started)
 
         if error_code is None:
             return _error_envelope(
                 CODE_DATA_UNAVAILABLE,
-                f"no margin/short data for {symbol} in {wanted[0]}..{wanted[-1]}",
+                f"missing margin/short data for {symbol} in {wanted[0]}..{wanted[-1]}: "
+                f"{_format_missing_dates(missing_after_fetch)}",
                 False,
                 started,
             )
@@ -129,6 +131,17 @@ def _business_day_range(end_date: str, days: int) -> list[str]:
         cursor -= timedelta(days=1)
     out.reverse()
     return [d.isoformat() for d in out]
+
+
+def _missing_dates(wanted: list[str], actual: list[str]) -> list[str]:
+    actual_dates = set(actual)
+    return [d for d in wanted if d not in actual_dates]
+
+
+def _format_missing_dates(missing: list[str]) -> str:
+    if len(missing) <= 5:
+        return ", ".join(missing)
+    return ", ".join(missing[:5]) + f", ... (+{len(missing) - 5} more)"
 
 
 def _open_db() -> sqlite3.Connection:

@@ -110,6 +110,39 @@ def test_full_miss_empty_upstream_returns_data_unavailable(conn) -> None:
     assert result["error"]["retriable"] is False
 
 
+def test_partial_cache_with_empty_upstream_returns_data_unavailable(conn) -> None:
+    insert_margin_short_rows(
+        conn, [_raw("2026-04-23", 90_000, 89_000, 3_000, 3_100)], "finmind", "t"
+    )
+    client = FakeClient(rows=[])
+
+    result = get_margin_short(
+        "2330", days=5, end_date="2026-04-29",
+        _conn=conn, _client=client,
+    )
+
+    assert result["ok"] is False
+    assert result["data"] is None
+    assert result["error"]["code"] == "DATA_UNAVAILABLE"
+    assert "2026-04-24" in result["error"]["message"]
+
+
+def test_partial_cache_with_rate_limit_surfaces_rate_limit(conn) -> None:
+    insert_margin_short_rows(
+        conn, [_raw("2026-04-23", 90_000, 89_000, 3_000, 3_100)], "finmind", "t"
+    )
+    client = FakeClient(raises=RuntimeError("FinMind returned HTTP 429 Too Many Requests"))
+
+    result = get_margin_short(
+        "2330", days=5, end_date="2026-04-29",
+        _conn=conn, _client=client,
+    )
+
+    assert result["ok"] is False
+    assert result["error"]["code"] == "RATE_LIMIT"
+    assert result["error"]["retriable"] is True
+
+
 def test_ratio_computed_from_fetched_rows(conn) -> None:
     fake_rows = [_raw("2026-04-29", 100_000, 100_000, 4_200, 4_200)]
     client = FakeClient(rows=fake_rows)
