@@ -29,8 +29,27 @@ class FinMindClient:
     def get_taiwan_stock_price(
         self, symbol: str, start: str, end: str
     ) -> list[dict[str, Any]]:
+        return self._fetch_dataset("TaiwanStockPrice", symbol, start, end)
+
+    def get_institutional_investors_buy_sell(
+        self, symbol: str, start: str, end: str
+    ) -> list[dict[str, Any]]:
+        return self._fetch_dataset(
+            "TaiwanStockInstitutionalInvestorsBuySell", symbol, start, end
+        )
+
+    def get_margin_purchase_short_sale(
+        self, symbol: str, start: str, end: str
+    ) -> list[dict[str, Any]]:
+        return self._fetch_dataset(
+            "TaiwanStockMarginPurchaseShortSale", symbol, start, end
+        )
+
+    def _fetch_dataset(
+        self, dataset: str, symbol: str, start: str, end: str
+    ) -> list[dict[str, Any]]:
         params: dict[str, str] = {
-            "dataset": "TaiwanStockPrice",
+            "dataset": dataset,
             "data_id": symbol,
             "start_date": start,
             "end_date": end,
