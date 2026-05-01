@@ -54,11 +54,17 @@ def _candidate(symbol: str = "2330", score: float = 78.0) -> Phase2BCandidate:
 
 
 class _FakeMarket:
+    def __init__(self, *args, **kwargs) -> None:  # accept asof for parity
+        self.last_diagnostics: dict[str, str] = {}
+
     def get(self) -> MarketSnapshot:
         return MarketSnapshot(20000.0, 0.5, False, -1.8)
 
 
 class _FakePortfolio:
+    def __init__(self, *args, **kwargs) -> None:  # accept asof for parity
+        pass
+
     def get(self) -> PortfolioSnapshot:
         return PortfolioSnapshot(
             positions=[PortfolioPosition("2454", "半導體", 18.0)],
@@ -67,11 +73,26 @@ class _FakePortfolio:
 
 
 class _FakeJournal:
+    def __init__(self, *args, **kwargs) -> None:  # accept asof for parity
+        pass
+
     def recent_winrate(self, n: int = 20) -> float:
         return 0.55
 
     def consecutive_loss(self) -> int:
         return 1
+
+
+def _fake_candidate_snapshot(symbol: str, asof: str):
+    from ohmystock.swarm import CandidateLiveSnapshot
+
+    return CandidateLiveSnapshot(
+        current_price=845.0,
+        ema20_distance_pct=3.2,
+        atr_14_pct=2.4,
+        distance_from_52w_high_pct=4.1,
+        distance_from_52w_low_pct=41.6,
+    )
 
 
 def test_run_assemble_with_fakes_succeeds() -> None:
@@ -157,6 +178,9 @@ def test_cli_writes_to_out_path(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(cli_assemble, "LivePortfolioSnapshotProvider", _FakePortfolio)
     monkeypatch.setattr(cli_assemble, "LiveJournalStatsProvider", _FakeJournal)
     monkeypatch.setattr(
+        cli_assemble, "live_candidate_snapshot", _fake_candidate_snapshot
+    )
+    monkeypatch.setattr(
         cli_assemble,
         "_candidates_via_score_watchlist",
         lambda asof, symbol: [_candidate()],
@@ -188,6 +212,9 @@ def test_cli_emits_to_stdout_when_no_out(monkeypatch) -> None:
     monkeypatch.setattr(cli_assemble, "LiveMarketSnapshotProvider", _FakeMarket)
     monkeypatch.setattr(cli_assemble, "LivePortfolioSnapshotProvider", _FakePortfolio)
     monkeypatch.setattr(cli_assemble, "LiveJournalStatsProvider", _FakeJournal)
+    monkeypatch.setattr(
+        cli_assemble, "live_candidate_snapshot", _fake_candidate_snapshot
+    )
     monkeypatch.setattr(
         cli_assemble,
         "_candidates_via_score_watchlist",

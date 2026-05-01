@@ -427,6 +427,8 @@ def build_entry_decision_input(
 
 **契約測試：** 產出物必須通過 `pydantic` validation 對 `EntryDecisionInput`（`models/decision.py` 待建）；schema 與 `llm-decision-schema.md` §1 範例 JSON 等價。
 
+**Live providers wiring (2026-05-01)：** `LiveMarketSnapshotProvider` / `LivePortfolioSnapshotProvider` / `LiveJournalStatsProvider` 已從 stub 換成實作（讀 `bars_daily` cache + `journal_entries` SQLite + 螢幕 universe sector index），`live_candidate_snapshot(symbol, asof)` 提供五個技術欄位。Risk-Off 條件本期僅實作 TAIEX vs MA60；SPY / VIX / TWD / TAIFEX 標為 `unknown` 並由 CLI 以 `warning:` 行揭露。錯誤分類碼與 staleness policy 詳見 [`openspec/specs/live-providers/spec.md`](../openspec/specs/live-providers/spec.md)。
+
 ---
 
 #### 4.7.1 進場決策團 `entry_decision_team`(v3)

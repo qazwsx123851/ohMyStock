@@ -32,6 +32,12 @@ from ohmystock.swarm._live_candidate import (
     CandidateLiveSnapshot,
     live_candidate_snapshot,
 )
+from ohmystock.swarm._live_journal import (
+    compute_consecutive_loss,
+    compute_recent_winrate,
+)
+from ohmystock.swarm._live_market import compute_taiex_snapshot
+from ohmystock.swarm._live_portfolio import reconstruct_portfolio
 from ohmystock.swarm._rules_digest import load_rules_digest
 from ohmystock.swarm.models import (
     CandidateSnapshot,
@@ -63,8 +69,12 @@ __all__ = [
     "RulesDigest",
     "RulesDigestError",
     "build_entry_decision_input",
+    "compute_consecutive_loss",
+    "compute_recent_winrate",
+    "compute_taiex_snapshot",
     "discover_available_skills",
     "discover_available_tools",
     "live_candidate_snapshot",
     "load_rules_digest",
+    "reconstruct_portfolio",
 ]

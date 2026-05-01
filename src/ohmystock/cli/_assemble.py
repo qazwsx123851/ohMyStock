@@ -1,12 +1,14 @@
 """``oms assemble-entry-input`` — emit a v3.1 EntryDecisionInput JSON for a symbol.
 
 Used both by humans for sanity-checking and by tests for fixture capture.
-The live ``MarketSnapshot`` / ``PortfolioSnapshot`` / ``JournalStats``
-providers raise ``NotImplementedError`` until the underlying tools are
-wired (Phase 0d/2 work). Tests inject fakes via the ``_run_assemble``
-helper.
+Live providers (``Live{Market,Portfolio,Journal}SnapshotProvider``) read
+from the cached SQLite DB; the five candidate technical metrics are
+derived via ``live_candidate_snapshot``. Tests inject fakes via the
+``_run_assemble`` helper.
 
-Spec: openspec/changes/phase-2b-swarm-input-assembler/specs/swarm-input-assembler/spec.md
+Specs:
+- openspec/changes/phase-2b-swarm-input-assembler/specs/swarm-input-assembler/spec.md
+- openspec/changes/live-providers/specs/live-providers/spec.md
 """
 
 from __future__ import annotations
@@ -30,13 +32,23 @@ from ohmystock.swarm import (
     LiveJournalStatsProvider,
     LiveMarketSnapshotProvider,
     LivePortfolioSnapshotProvider,
+    LiveProviderError,
     MarketSnapshotProvider,
     PortfolioSnapshotProvider,
     build_entry_decision_input,
     discover_available_skills,
     discover_available_tools,
+    live_candidate_snapshot,
     load_rules_digest,
 )
+
+
+_ERROR_CODE_EXIT_CODES = {
+    "DATA_UNAVAILABLE": 4,
+    "STALE_DATA": 5,
+    "UPSTREAM_ERROR": 6,
+    "AUTH_FAILED": 7,
+}
 
 
 def _candidates_via_score_watchlist(
@@ -62,17 +74,21 @@ def _run_assemble(
     journal_provider: JournalStatsProvider | None = None,
     candidate_name: str = "",
     candidate_sector: str = "",
-    current_price: float = 0.0,
-    ema20_distance_pct: float = 0.0,
-    atr_14_pct: float = 0.0,
-    distance_from_52w_high_pct: float = 0.0,
-    distance_from_52w_low_pct: float = 0.0,
+    current_price: float | None = None,
+    ema20_distance_pct: float | None = None,
+    atr_14_pct: float | None = None,
+    distance_from_52w_high_pct: float | None = None,
+    distance_from_52w_low_pct: float | None = None,
 ) -> EntryDecisionInput:
     """Internal assembler runner exposed for tests.
 
-    Parameters mirror ``build_entry_decision_input``. When providers are
-    omitted, the live (NotImplementedError) stubs run. Tests inject
-    fakes here.
+    Parameters mirror ``build_entry_decision_input``. When providers or
+    technical metrics are omitted, the live providers + the
+    ``live_candidate_snapshot`` helper supply real values. Tests inject
+    fakes via these kwargs.
+
+    Side-effects: emits ``warning:`` lines to stderr (does not change
+    exit code) for ``未分類`` open positions and unwired Risk-Off signals.
     """
     cand_list = (
         list(candidates)
@@ -87,19 +103,69 @@ def _run_assemble(
         )
     candidate = matching[0]
 
-    market = (market_provider or LiveMarketSnapshotProvider()).get()
-    portfolio = (portfolio_provider or LivePortfolioSnapshotProvider()).get()
-    journal = journal_provider or LiveJournalStatsProvider()
+    if any(
+        v is None
+        for v in (
+            current_price,
+            ema20_distance_pct,
+            atr_14_pct,
+            distance_from_52w_high_pct,
+            distance_from_52w_low_pct,
+        )
+    ):
+        snap = live_candidate_snapshot(symbol, asof)
+        if current_price is None:
+            current_price = snap.current_price
+        if ema20_distance_pct is None:
+            ema20_distance_pct = snap.ema20_distance_pct
+        if atr_14_pct is None:
+            atr_14_pct = snap.atr_14_pct
+        if distance_from_52w_high_pct is None:
+            distance_from_52w_high_pct = snap.distance_from_52w_high_pct
+        if distance_from_52w_low_pct is None:
+            distance_from_52w_low_pct = snap.distance_from_52w_low_pct
+
+    resolved_market_provider = market_provider or LiveMarketSnapshotProvider(
+        asof=asof
+    )
+    resolved_portfolio_provider = (
+        portfolio_provider or LivePortfolioSnapshotProvider(asof=asof)
+    )
+    journal = journal_provider or LiveJournalStatsProvider(asof=asof)
+
+    market = resolved_market_provider.get()
+    portfolio = resolved_portfolio_provider.get()
+
+    diagnostics = getattr(resolved_market_provider, "last_diagnostics", {}) or {}
+    if not bool(market.risk_off) and any(
+        v == "unknown" for v in diagnostics.values()
+    ):
+        unknown_signals = sorted(
+            k for k, v in diagnostics.items() if v == "unknown"
+        )
+        sys.stderr.write(
+            "warning: risk_off=False with unwired signals: "
+            + ", ".join(unknown_signals)
+            + "\n"
+        )
+    unclassified = [p for p in portfolio.positions if p.sector == "未分類"]
+    if unclassified:
+        symbols = sorted({p.symbol for p in unclassified})
+        sys.stderr.write(
+            "warning: open position(s) with sector=未分類: "
+            + ", ".join(symbols)
+            + "\n"
+        )
 
     return build_entry_decision_input(
         candidate=candidate,
         candidate_name=candidate_name or candidate.symbol,
         candidate_sector=candidate_sector,
-        current_price=current_price,
-        ema20_distance_pct=ema20_distance_pct,
-        atr_14_pct=atr_14_pct,
-        distance_from_52w_high_pct=distance_from_52w_high_pct,
-        distance_from_52w_low_pct=distance_from_52w_low_pct,
+        current_price=float(current_price),
+        ema20_distance_pct=float(ema20_distance_pct),
+        atr_14_pct=float(atr_14_pct),
+        distance_from_52w_high_pct=float(distance_from_52w_high_pct),
+        distance_from_52w_low_pct=float(distance_from_52w_low_pct),
         market=market,
         portfolio=portfolio,
         journal_stats=journal,
@@ -130,6 +196,10 @@ def assemble_entry_input(
     except AssemblerInputError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(2)
+    except LiveProviderError as exc:
+        exit_code = _ERROR_CODE_EXIT_CODES.get(exc.code, 1)
+        typer.echo(f"error: {exc.code}: {exc.message}", err=True)
+        raise typer.Exit(exit_code)
     except NotImplementedError as exc:
         typer.echo(f"error: live provider not wired: {exc}", err=True)
         raise typer.Exit(3)

@@ -107,6 +107,7 @@ Agent 核心層（Claude Agent SDK + PreToolUse/PostToolUse Hooks 稽核）
 | 21 個 Tool 的 I/O schema | `docs/tools-contracts.md` |
 | Auto-execute breaker 閾值 | `docs/safety-and-simulation.md` §2.9 |
 | Phase 2B Swarm Input Assembler | `docs/design-zh-TW.md` §4.7.0 |
+| Live provider error codes / freshness policy | `openspec/specs/live-providers/spec.md` |
 
 完整版（含「不要在這裡改」欄位）見 `docs/README.md` §2。
 

@@ -44,22 +44,20 @@ def test_portfolio_position_round_trip() -> None:
     assert pos.exposure_pct == 18.0
 
 
-def test_live_market_provider_raises_not_implemented() -> None:
-    with pytest.raises(NotImplementedError, match="market_data_tool"):
-        LiveMarketSnapshotProvider().get()
+def test_live_market_provider_requires_asof() -> None:
+    # Constructor now mandates asof — passing none should TypeError.
+    with pytest.raises(TypeError):
+        LiveMarketSnapshotProvider()  # type: ignore[call-arg]
 
 
-def test_live_portfolio_provider_raises_not_implemented() -> None:
-    with pytest.raises(NotImplementedError, match="portfolio_tool"):
-        LivePortfolioSnapshotProvider().get()
+def test_live_portfolio_provider_requires_asof() -> None:
+    with pytest.raises(TypeError):
+        LivePortfolioSnapshotProvider()  # type: ignore[call-arg]
 
 
-def test_live_journal_provider_raises_not_implemented() -> None:
-    p = LiveJournalStatsProvider()
-    with pytest.raises(NotImplementedError, match="trade_journal_tool"):
-        p.recent_winrate()
-    with pytest.raises(NotImplementedError, match="trade_journal_tool"):
-        p.consecutive_loss()
+def test_live_journal_provider_requires_asof() -> None:
+    with pytest.raises(TypeError):
+        LiveJournalStatsProvider()  # type: ignore[call-arg]
 
 
 def test_market_provider_protocol_accepts_fakes() -> None:

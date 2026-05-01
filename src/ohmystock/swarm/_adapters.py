@@ -8,19 +8,25 @@ This file defines:
   consumes.
 - ``MarketSnapshotProvider`` / ``PortfolioSnapshotProvider`` /
   ``JournalStatsProvider`` Protocols so tests can swap fakes.
-- ``Live*`` default implementations that raise ``NotImplementedError`` —
-  they're stubs awaiting the upstream tool modules
-  (``market_data_tool`` / ``portfolio_tool`` / ``chip_data_tool`` /
-  ``trade_journal_tool``) which land in later phases. Once those tools
-  exist, replace the bodies here.
+- ``Live*`` runtime implementations that read from cached daily bars,
+  the trade journal, and the screener universe. Each takes an ``asof``
+  string in its constructor and raises ``LiveProviderError`` (typed
+  code) on data-source failure.
 
-Spec: openspec/changes/phase-2b-swarm-input-assembler/specs/swarm-input-assembler/spec.md
+Specs:
+- openspec/changes/phase-2b-swarm-input-assembler/specs/swarm-input-assembler/spec.md
+- openspec/changes/live-providers/specs/live-providers/spec.md
 """
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Protocol, runtime_checkable
+
+from ohmystock.config import Settings
+from ohmystock.swarm._errors import LiveProviderError
 
 
 @dataclass(frozen=True)
@@ -65,39 +71,91 @@ class JournalStatsProvider(Protocol):
         ...
 
 
-class LiveMarketSnapshotProvider:
-    """Stub. Wraps ``market_data_tool.get_index('TAIEX')`` once that tool exists.
+def _open_journal_conn() -> sqlite3.Connection:
+    """Open the shared SQLite DB (bars_daily + journal_entries + universe_daily).
 
-    Today this raises ``NotImplementedError`` — the upstream tool layer
-    isn't yet built. Tests use fakes via the Protocol.
+    Raises ``LiveProviderError(DATA_UNAVAILABLE)`` when the path cannot be
+    opened — this is the failure surface the live providers expose to the
+    CLI per ``openspec/specs/live-providers/spec.md``.
+    """
+    path = Path(Settings().ohmystock_db_path).expanduser()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return sqlite3.connect(str(path))
+    except (sqlite3.Error, OSError) as exc:
+        raise LiveProviderError(
+            code="DATA_UNAVAILABLE",
+            message=f"cannot open journal db at {path}: {exc}",
+        ) from exc
+
+
+class LiveMarketSnapshotProvider:
+    """TAIEX-derived ``MarketSnapshot`` provider (v1: TAIEX-only Risk-Off).
+
+    ``get()`` delegates to ``compute_taiex_snapshot`` which reads cached
+    daily bars and the trade-journal SQLite. Unwired Risk-Off signals
+    (SPY / VIX / FX / TAIFEX) are recorded on ``last_diagnostics`` after
+    each call so the CLI can emit a `warning:` line.
     """
 
+    def __init__(self, asof: str) -> None:
+        self._asof = asof
+        self.last_diagnostics: dict[str, str] = {}
+
     def get(self) -> MarketSnapshot:
-        raise NotImplementedError(
-            "LiveMarketSnapshotProvider requires market_data_tool.get_index('TAIEX') "
-            "and strategies.risk_gate.evaluate_preview() — not yet wired."
-        )
+        from ohmystock.swarm._live_market import compute_taiex_snapshot
+
+        try:
+            conn: sqlite3.Connection | None = _open_journal_conn()
+        except LiveProviderError:
+            conn = None
+        try:
+            snap, diagnostics = compute_taiex_snapshot(self._asof, conn=conn)
+        finally:
+            if conn is not None:
+                conn.close()
+        self.last_diagnostics = diagnostics
+        return snap
 
 
 class LivePortfolioSnapshotProvider:
-    """Stub. Wraps ``portfolio_tool.get_positions()`` + sector lookup."""
+    """Portfolio reconstruction from the trade journal as of ``asof``.
+
+    Open positions are entries (with ``actual_entry_price`` / ``actual_qty``)
+    that have no matching exit on the same ``decision_id`` by ``asof``.
+    Sector is resolved against the screener universe; missing symbols
+    default to ``"未分類"`` (no raise).
+    """
+
+    def __init__(self, asof: str) -> None:
+        self._asof = asof
 
     def get(self) -> PortfolioSnapshot:
-        raise NotImplementedError(
-            "LivePortfolioSnapshotProvider requires portfolio_tool.get_positions() "
-            "and chip_data_tool sector metadata — not yet wired."
-        )
+        from ohmystock.swarm._live_portfolio import reconstruct_portfolio
+
+        return reconstruct_portfolio(self._asof)
 
 
 class LiveJournalStatsProvider:
-    """Stub. Wraps ``trade_journal_tool.query`` for win-rate / streak helpers."""
+    """Recent winrate + consecutive-loss streak from the trade journal."""
+
+    def __init__(self, asof: str) -> None:
+        self._asof = asof
 
     def recent_winrate(self, n: int = 20) -> float:
-        raise NotImplementedError(
-            "LiveJournalStatsProvider requires trade_journal_tool.query — not yet wired."
-        )
+        from ohmystock.swarm._live_journal import compute_recent_winrate
+
+        conn = _open_journal_conn()
+        try:
+            return compute_recent_winrate(conn, self._asof, n)
+        finally:
+            conn.close()
 
     def consecutive_loss(self) -> int:
-        raise NotImplementedError(
-            "LiveJournalStatsProvider requires trade_journal_tool.query — not yet wired."
-        )
+        from ohmystock.swarm._live_journal import compute_consecutive_loss
+
+        conn = _open_journal_conn()
+        try:
+            return compute_consecutive_loss(conn, self._asof)
+        finally:
+            conn.close()
