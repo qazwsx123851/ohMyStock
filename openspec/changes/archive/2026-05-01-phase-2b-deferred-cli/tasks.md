@@ -79,4 +79,4 @@
 - [x] 10.2 Run `openspec validate phase-2b-deferred-cli`; confirm valid.
 - [x] 10.3 Run `openspec status --change phase-2b-deferred-cli`; confirm all artifacts marked `done`.
 - [x] 10.4 Manual smoke check: `uv run ohmystock score watchlist --asof 2026-04-30 --symbols 2330,2317,1101 --top-n 3 --json` emits a valid JSON envelope to stdout. (Verified: `ok=True`, 3 candidates, 22 subscores per candidate.)
-- [ ] 10.5 Commit with message `feat(scoring): phase 2B deferred sub-scorer stubs + score watchlist CLI`; do **not** archive yet — archive happens in `/opsx:archive` after manual review.
+- [x] 10.5 Commit with message `feat(scoring): phase 2B deferred sub-scorer stubs + score watchlist CLI`; do **not** archive yet — archive happens in `/opsx:archive` after manual review. (Committed as `f7b8a99` and pushed to `origin/codex/fix-data-integrity-backtest-contracts`.)
