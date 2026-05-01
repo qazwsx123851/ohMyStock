@@ -1,9 +1,10 @@
-"""ohMyStock CLI — typer app with seven subcommands.
+"""ohMyStock CLI — typer app with eight subcommands.
 
 Five stubs (run/backtest/review/propose/screen) print "not implemented" and
 exit 1 — real logic lands in later changes. ``api`` launches uvicorn against
 ``ohmystock.api.app:create_app``. ``smoke-test`` verifies FinMind / Shioaji /
-Anthropic connectivity for Phase 0d acceptance.
+Anthropic connectivity for Phase 0d acceptance. ``score`` is a typer group
+backed by ``_score.score_app``; ``score watchlist`` runs Phase 2B scoring.
 """
 
 from __future__ import annotations
@@ -129,6 +130,32 @@ def smoke_test() -> None:
 
     if any_fail:
         raise typer.Exit(1)
+
+
+from ohmystock.cli._score import score_app  # noqa: E402
+
+app.add_typer(score_app, name="score", help="Phase 2B scoring 子命令")
+
+
+from ohmystock.cli._assemble import assemble_entry_input  # noqa: E402
+
+app.command(
+    "assemble-entry-input",
+    help="組裝 Phase 2B 候選 + 市況快照 → entry_decision_team v3.1 LLM 輸入 JSON",
+)(assemble_entry_input)
+
+
+from ohmystock.cli._decide import decide  # noqa: E402
+
+app.command(
+    "decide",
+    help=(
+        "Phase 3 PM Decider — assemble candidate, call Claude Opus 4.7, "
+        "validate §2.1, write kind=entry (pending_confirm) or kind=reject "
+        "(reject_layer=llm). WARNING: writes pending_confirm entries; "
+        "broker submission is not yet wired (Confirm Gate is Phase 3.5)."
+    ),
+)(decide)
 
 
 def main() -> None:

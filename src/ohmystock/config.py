@@ -32,3 +32,15 @@ class Settings(BaseSettings):
     ohmystock_llm_degrade: str | None = None
     ohmystock_db_path: str = "~/.ohmystock/journal.db"
     ohmystock_log_level: str = "INFO"
+
+    # Phase 3 LLM Decider PM node configuration. Defaults to opus-4-7 for
+    # production decisions; tests / dev can override with a fake:// scheme
+    # (allowed only when ohmystock_allow_fake_decider=true). Env keys are
+    # OHMYSTOCK_DECIDER_MODEL / OHMYSTOCK_ALLOW_FAKE_DECIDER (case-insensitive).
+    ohmystock_decider_model: str = "claude-opus-4-7"
+    ohmystock_allow_fake_decider: bool = False
+
+    # Paper-account starting equity in TWD. Used by live providers to compute
+    # exposure_pct and monthly_pnl_pct. Default matches docs/frontend.md §17 and
+    # tools-contracts.md §backtest defaults.
+    starting_equity_twd: int = 1_000_000

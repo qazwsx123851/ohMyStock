@@ -44,7 +44,18 @@ class YFinanceSource:
 
     @staticmethod
     def _to_yahoo_symbol(symbol: str, start: str, end: str):
-        """Try `.TW` (TWSE) then `.TWO` (OTC). Returns the first non-empty df, else None."""
+        """Resolve to a yfinance ticker.
+
+        - Index codes ("TAIEX", "OTC") map to ``^TWII`` / ``^TWOII`` directly.
+        - Numeric stock codes try `.TW` (TWSE) then `.TWO` (OTC).
+        Returns the first non-empty df, else None.
+        """
+        index_map = {"TAIEX": "^TWII", "OTC": "^TWOII"}
+        if symbol in index_map:
+            df = Ticker(index_map[symbol]).history(
+                start=start, end=end, interval="1d"
+            )
+            return df if not df.empty else None
         for suffix in (".TW", ".TWO"):
             df = Ticker(f"{symbol}{suffix}").history(
                 start=start, end=end, interval="1d"

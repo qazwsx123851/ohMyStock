@@ -427,6 +427,8 @@ def build_entry_decision_input(
 
 **契約測試：** 產出物必須通過 `pydantic` validation 對 `EntryDecisionInput`（`models/decision.py` 待建）；schema 與 `llm-decision-schema.md` §1 範例 JSON 等價。
 
+**Live providers wiring (2026-05-01)：** `LiveMarketSnapshotProvider` / `LivePortfolioSnapshotProvider` / `LiveJournalStatsProvider` 已從 stub 換成實作（讀 `bars_daily` cache + `journal_entries` SQLite + 螢幕 universe sector index），`live_candidate_snapshot(symbol, asof)` 提供五個技術欄位。Risk-Off 條件本期僅實作 TAIEX vs MA60；SPY / VIX / TWD / TAIFEX 標為 `unknown` 並由 CLI 以 `warning:` 行揭露。錯誤分類碼與 staleness policy 詳見 [`openspec/specs/live-providers/spec.md`](../openspec/specs/live-providers/spec.md)。
+
 ---
 
 #### 4.7.1 進場決策團 `entry_decision_team`(v3)
@@ -471,6 +473,8 @@ token_budget:
   max_input_tokens: 30000
   max_output_tokens: 4000
 ```
+
+> **實作狀態（2026-05-01）**：`pm_conclusion` 節點 + §2.1 系統覆寫驗證器已實作（`ohmystock.decider.{node,validator,orchestrator}`），由 `ohmystock decide` CLI 觸發；`bull_analyst` / `bear_analyst` / `rule_checker` / `risk_simulator` 等 specialist 節點待後續 change（Phase 3 中段）。目前 `pm_conclusion` 直接吃 Phase 2B 的 `EntryDecisionInput`，不經 specialist 節點。
 
 #### 4.7.2 交易復盤團 `post_trade_review_team`(v3)
 

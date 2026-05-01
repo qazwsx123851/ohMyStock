@@ -4,6 +4,7 @@
 > **範圍**:Phase 3 LLM Decider 的輸入 / 輸出與 Trade Journal 的儲存格式
 > **權威來源**:[`workflow-cheatsheet.md`](workflow-cheatsheet.md) §6.5 / §6.8
 > **相關章節**:[`design-zh-TW.md`](design-zh-TW.md) §4.3.1 `trade_journal_tool` / §4.6.1 Trade Journal as Memory / §4.7.1 `entry_decision_team` swarm
+> **實作狀態（2026-05-01）**：v3.1 §2 schema 已由 `ohmystock.decider.models.DeciderOutput` 實作，§2.1 系統覆寫由 `ohmystock.decider.validator.validate_decider_output` 實作，§4.1 / §4.3 journal payload 由 `ohmystock.decider._journal_writer` 寫入。
 >
 > **v3.0 → v3.1 變動**：配合 [`workflow-cheatsheet.md`](workflow-cheatsheet.md) v3.1 引入 Mark Minervini SEPA 框架，新增 5 個 SEPA 欄位（`stage` / `rs_percentile` / `trend_template_passed` / `vcp_quality` / `pivot_price`）至 LLM 輸入候選快照、輸出 schema、Trade Journal entry。**僅追加，不刪改既有欄位**（依 §6 Schema 演進規範）。
 

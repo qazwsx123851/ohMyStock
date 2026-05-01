@@ -45,6 +45,13 @@ class FinMindClient:
             "TaiwanStockMarginPurchaseShortSale", symbol, start, end
         )
 
+    def get_taiwan_stock_info(self) -> list[dict[str, Any]]:
+        """Full TW market symbol roster (TaiwanStockInfo). No symbol/date filter."""
+        params: dict[str, str] = {"dataset": "TaiwanStockInfo"}
+        if self._token:
+            params["token"] = self._token
+        return self._dispatch(params, label="TaiwanStockInfo")
+
     def _fetch_dataset(
         self, dataset: str, symbol: str, start: str, end: str
     ) -> list[dict[str, Any]]:
@@ -56,17 +63,21 @@ class FinMindClient:
         }
         if self._token:
             params["token"] = self._token
+        return self._dispatch(params, label=symbol)
 
+    def _dispatch(
+        self, params: dict[str, str], *, label: str
+    ) -> list[dict[str, Any]]:
         try:
             response = self._client.get(self.BASE_URL, params=params)
         except httpx.HTTPError as exc:
             raise FinMindConnectionError(
-                f"FinMind request failed for {symbol}: {exc}"
+                f"FinMind request failed for {label}: {exc}"
             ) from exc
 
         if response.status_code != 200:
             raise FinMindConnectionError(
-                f"FinMind returned HTTP {response.status_code} for {symbol}: "
+                f"FinMind returned HTTP {response.status_code} for {label}: "
                 f"{response.text[:200]}"
             )
 
@@ -74,13 +85,13 @@ class FinMindClient:
             payload = response.json()
         except ValueError as exc:
             raise FinMindConnectionError(
-                f"FinMind returned non-JSON body for {symbol}: {exc}"
+                f"FinMind returned non-JSON body for {label}: {exc}"
             ) from exc
 
         data = payload.get("data")
         if not isinstance(data, list):
             raise FinMindConnectionError(
-                f"FinMind response missing 'data' list for {symbol}: "
+                f"FinMind response missing 'data' list for {label}: "
                 f"keys={list(payload)[:5]}"
             )
         return data

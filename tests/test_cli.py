@@ -1,9 +1,9 @@
 """CLI smoke tests — exercises typer.Typer app and pydantic-settings loader.
 
 Spec: openspec/specs/cli-and-config/spec.md
-- root help lists all 7 subcommands (5 stubs + api + smoke-test)
-- each stub exits 1 with "not implemented" in stdout (api / smoke-test
-  excluded — they are non-stub and would actually launch external work)
+- root help lists all 8 subcommands (5 stubs + api + smoke-test + score)
+- each stub exits 1 with "not implemented" in stdout (api / smoke-test /
+  score excluded — they are non-stub and would actually launch external work)
 - Settings() constructible without any env present
 """
 
@@ -18,7 +18,7 @@ from ohmystock.config import Settings
 runner = CliRunner()
 
 STUB_SUBCOMMANDS = ["run", "backtest", "review", "propose", "screen"]
-ALL_SUBCOMMANDS = [*STUB_SUBCOMMANDS, "api", "smoke-test"]
+ALL_SUBCOMMANDS = [*STUB_SUBCOMMANDS, "api", "smoke-test", "score"]
 
 
 def test_root_help_lists_all_subcommands() -> None:
@@ -51,7 +51,27 @@ def test_settings_constructible_without_env(monkeypatch: pytest.MonkeyPatch) -> 
     ]
     for key in env_keys:
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.delenv("OHMYSTOCK_DECIDER_MODEL", raising=False)
+    monkeypatch.delenv("OHMYSTOCK_ALLOW_FAKE_DECIDER", raising=False)
     s = Settings(_env_file=None)
     assert s.anthropic_api_key is None
     assert s.ohmystock_log_level == "INFO"
     assert s.ohmystock_db_path == "~/.ohmystock/journal.db"
+    assert s.ohmystock_decider_model == "claude-opus-4-7"
+    assert s.ohmystock_allow_fake_decider is False
+
+
+def test_settings_decider_model_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OHMYSTOCK_DECIDER_MODEL", "claude-sonnet-4-6")
+    monkeypatch.delenv("OHMYSTOCK_ALLOW_FAKE_DECIDER", raising=False)
+    s = Settings(_env_file=None)
+    assert s.ohmystock_decider_model == "claude-sonnet-4-6"
+    assert s.ohmystock_allow_fake_decider is False
+
+
+def test_settings_allow_fake_decider_truthy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OHMYSTOCK_ALLOW_FAKE_DECIDER", "true")
+    s = Settings(_env_file=None)
+    assert s.ohmystock_allow_fake_decider is True

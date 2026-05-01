@@ -107,18 +107,18 @@ TBD - created by archiving change scaffold-repo. Update Purpose after archive.
 
 ### Requirement: CLI 子命令骨架
 
-系統 SHALL 在 `ohmystock` CLI 提供七個子命令：`run`、`backtest`、`review`、`propose`、`screen`、`api`、`smoke-test`。前五個（`run` / `backtest` / `review` / `propose` / `screen`）在當前階段 SHALL 為 stub：執行時印 `not implemented` 至 stdout 並以 exit code 1 結束，避免 shell pipeline 誤判為成功。第六個子命令 `api` SHALL **非** stub：執行時 SHALL 透過 `uvicorn` 啟動 `ohmystock.api.app:create_app` factory（dev mode 預設 `--reload`），並接受 `--host` / `--port` / `--reload / --no-reload` 旗標。第七個子命令 `smoke-test` SHALL **非** stub：執行時 SHALL 依序驗證 FinMind / Shioaji / Anthropic 三方連線（詳 `external-connectors` capability 對應 Requirement）。前五個子命令的真實邏輯由後續 change 補完（`run`：LLM Decider 主流程；`backtest`：歷史回測；`review`：Phase 5 復盤 swarm；`propose`：策略改動提案；`screen`：股票篩選）。
+系統 SHALL 在 `ohmystock` CLI 提供八個子命令：`run`、`backtest`、`review`、`propose`、`screen`、`api`、`smoke-test`、`score`。前五個（`run` / `backtest` / `review` / `propose` / `screen`）在當前階段 SHALL 為 stub：執行時印 `not implemented` 至 stdout 並以 exit code 1 結束，避免 shell pipeline 誤判為成功。第六個子命令 `api` SHALL **非** stub：執行時 SHALL 透過 `uvicorn` 啟動 `ohmystock.api.app:create_app` factory（dev mode 預設 `--reload`），並接受 `--host` / `--port` / `--reload / --no-reload` 旗標。第七個子命令 `smoke-test` SHALL **非** stub：執行時 SHALL 依序驗證 FinMind / Shioaji / Anthropic 三方連線（詳 `external-connectors` capability 對應 Requirement）。第八個子命令 `score` SHALL **非** stub：為 Typer 子命令群組（`score_app`），其下提供 `watchlist` 子命令，行為由本 capability 內「`ohmystock score watchlist` 子命令」Requirement 定義。前五個子命令的真實邏輯由後續 change 補完（`run`：LLM Decider 主流程；`backtest`：歷史回測；`review`：Phase 5 復盤 swarm；`propose`：策略改動提案；`screen`：股票篩選）。
 
-#### Scenario: root help 列出七個子命令
+#### Scenario: root help 列出八個子命令
 - **WHEN** 執行 `uv run ohmystock --help`
-- **THEN** stdout 同時包含 `run`、`backtest`、`review`、`propose`、`screen`、`api`、`smoke-test` 七個子命令名稱
+- **THEN** stdout 同時包含 `run`、`backtest`、`review`、`propose`、`screen`、`api`、`smoke-test`、`score` 八個子命令名稱
 
 #### Scenario: 前五個子命令 stub 行為一致
 - **WHEN** 執行 `uv run ohmystock <子命令>`（其中 `<子命令>` 為 `run` / `backtest` / `review` / `propose` / `screen` 任一）
 - **THEN** 命令以 exit code 1 結束，stdout 包含字串 `not implemented`
 
 #### Scenario: 子命令各自有 help
-- **WHEN** 執行 `uv run ohmystock <子命令> --help`（七者任一）
+- **WHEN** 執行 `uv run ohmystock <子命令> --help`（八者任一）
 - **THEN** 命令以 exit code 0 結束，stdout 包含該子命令的說明文字（不為空字串、不為 generic placeholder）
 
 #### Scenario: api 子命令不為 stub
@@ -128,6 +128,10 @@ TBD - created by archiving change scaffold-repo. Update Purpose after archive.
 #### Scenario: smoke-test 子命令不為 stub
 - **WHEN** 執行 `uv run ohmystock smoke-test --help`
 - **THEN** 命令以 exit code 0 結束，stdout 不含字串 `not implemented`，且包含 `finmind`、`shioaji`、`anthropic` 三個字串（大小寫不敏感）
+
+#### Scenario: score 子命令群組不為 stub
+- **WHEN** 執行 `uv run ohmystock score --help`
+- **THEN** 命令以 exit code 0 結束，stdout 不含字串 `not implemented`，且包含 `watchlist` 子命令名稱
 
 ---
 
@@ -188,4 +192,131 @@ TBD - created by archiving change scaffold-repo. Update Purpose after archive.
 #### Scenario: `.env` 中設定的值會被讀取
 - **WHEN** 在 repo root 建立 `.env` 含 `ANTHROPIC_API_KEY=test-value-not-real`，然後執行 `Settings()`
 - **THEN** `Settings().anthropic_api_key`（或對應屬性）等於 `test-value-not-real`
+
+### Requirement: `ohmystock score watchlist` 子命令
+
+系統 SHALL 在 `ohmystock` CLI 提供 `score watchlist` 子命令，呼叫 `ohmystock.scoring.score_watchlist(asof_date, candidates, *, top_n, ...)` 並將回傳的 envelope 渲染為 stdout。子命令 SHALL 接受以下旗標：
+
+- `--asof <YYYY-MM-DD>`（必填）— 對應 `score_watchlist` 的 `asof_date` 參數
+- `--symbols <s1,s2,...>`（必填）— 逗號分隔字串，trim 後對應 `candidates` list
+- `--top-n <int>`（選填，預設 None）— 對應 `top_n` 參數
+- `--json / --no-json`（選填，預設 `--no-json`）— `--json` 時 stdout 為原始 envelope 的 JSON dump（`json.dumps(env, ensure_ascii=False)` + 結尾 newline），`--no-json` 時 stdout 為 CSV
+
+CSV 輸出格式 SHALL 為：第一行 header `symbol,final_score,classification,risk_off_applied,tech,chip,fund,sent`；其後每個 candidate 一行；`final_score` SHALL 以浮點數列印（`repr` 等價，例如 `78.0` / `0.0`）；`risk_off_applied` SHALL 列印為 `true` 或 `false`（lowercase）；`tech`/`chip`/`fund`/`sent` 對應 `tech_subtotal`/`chip_subtotal`/`fund_subtotal`/`sent_subtotal`。輸出順序 SHALL 為 `final_score` 由大到小排序，並列以 `symbol` 字典序由小到大 tie-break。`--top-n` SHALL 在排序後 truncate 至前 N 筆。
+
+當 `score_watchlist` 回傳 `ok=False` 時，子命令 SHALL 將 `error: <code>: <message>` 印至 stderr（**不**寫入 stdout），並以 exit code 1 結束。當 `ok=True` 時 SHALL 以 exit code 0 結束。
+
+#### Scenario: `ohmystock score watchlist --help` 列旗標
+- **WHEN** 執行 `uv run ohmystock score watchlist --help`
+- **THEN** 命令以 exit code 0 結束，stdout 同時包含 `--asof`、`--symbols`、`--top-n`、`--json` 四個旗標名稱
+
+#### Scenario: 成功路徑印出 CSV
+- **GIVEN** `score_watchlist` 被 monkeypatch 回傳 `{"ok": True, "elapsed_ms": 12, "data": {"candidates": [{"symbol": "2330", "asof_date": "2026-04-30", "final_score": 78.0, "tech_subtotal": 30.0, "chip_subtotal": 18.0, "fund_subtotal": 25.0, "sent_subtotal": 5.0, "classification": "green", "risk_off_applied": False, "subscores": []}]}, "error": None}`
+- **WHEN** 執行 `ohmystock score watchlist --asof 2026-04-30 --symbols 2330`
+- **THEN** 命令以 exit code 0 結束，stdout 第一行為 `symbol,final_score,classification,risk_off_applied,tech,chip,fund,sent`，第二行為 `2330,78.0,green,false,30.0,18.0,25.0,5.0`
+
+#### Scenario: `--json` 印出原始 envelope
+- **GIVEN** `score_watchlist` 被 monkeypatch 回傳一個 `ok=True` envelope
+- **WHEN** 執行 `ohmystock score watchlist --asof 2026-04-30 --symbols 2330 --json`
+- **THEN** 命令以 exit code 0 結束，stdout 為合法 JSON，且 `json.loads(stdout)` 等於該 envelope
+
+#### Scenario: `--top-n` 在排序後截斷
+- **GIVEN** `score_watchlist` 被 monkeypatch 回傳兩個 candidate（`2330` final_score 70，`2317` final_score 80）
+- **WHEN** 執行 `ohmystock score watchlist --asof 2026-04-30 --symbols 2330,2317 --top-n 1`
+- **THEN** 命令以 exit code 0 結束，stdout 含 header 與**僅一行** `2317,...` data row（`2330` 不出現）
+
+#### Scenario: 排序為 final_score 降序，symbol 升序 tie-break
+- **GIVEN** `score_watchlist` 回傳三個 candidate：`2317` final_score 80、`2330` final_score 80、`1101` final_score 60
+- **WHEN** 執行 `ohmystock score watchlist --asof 2026-04-30 --symbols 1101,2317,2330`
+- **THEN** stdout data row 順序為 `2317`、`2330`、`1101`
+
+#### Scenario: validation error 走 stderr 與 exit 1
+- **GIVEN** 真實 `score_watchlist`（不 monkeypatch）
+- **WHEN** 執行 `ohmystock score watchlist --asof 2026/04/30 --symbols 2330`（asof 格式錯誤）
+- **THEN** 命令以 exit code 1 結束，stderr 包含字串 `INVALID_INPUT`，stdout 為空字串
+
+#### Scenario: 缺少必填旗標
+- **WHEN** 執行 `ohmystock score watchlist`（無任何旗標）
+- **THEN** 命令以非 0 exit code 結束（typer usage error），stderr 包含 `--asof` 或 `--symbols` 字樣
+
+---
+
+### Requirement: `ohmystock decide` 子命令
+
+系統 SHALL 在 `ohmystock` CLI 註冊 `decide` 子命令，串接 live providers 組裝的 `EntryInput` 與 `entry-decider` capability 的 `decide_entry(...)`，並把系統覆寫後的決策印至 stdout。
+
+子命令 SHALL 接受以下旗標：
+
+- `--symbol <s>`（必填）— 候選個股代號（4 位數字 TWSE / OTC）。
+- `--asof <YYYY-MM-DD>`（必填）— 對齊 Phase 2B input assembler 的 `asof_date` 參數。
+- `--json / --no-json`（選填，預設 `--no-json`）— `--json` 時 stdout 為 `OrchestrationResult` 對應 dict 的 JSON dump；`--no-json` 時 stdout 為人類可讀 summary（含 decision / force_reject_reason / cost_usd / decision_id 四行）。
+
+行為：
+
+1. 從 `Settings()` 讀 `decider_model`（env `OHMYSTOCK_DECIDER_MODEL`，預設 `claude-opus-4-7`）。若 `decider_model` 以 `fake://` 開頭且 env `OHMYSTOCK_ALLOW_FAKE_DECIDER` 不為 `true` → exit code 4，stderr 印 `"refused to use fake decider in non-test env"`。
+2. 用既有 live providers 組 `EntryInput`（candidate / market_context / rules_digest / available_tools / available_skills）。組裝失敗 → exit code 2，stderr 印 `"entry_input_assembly_failed: <reason>"`。
+3. 開或建 `OHMYSTOCK_DB_PATH` 指定的 SQLite，呼叫 `init_schema(conn)`（idempotent），呼叫 `decide_entry(...)`。
+4. **enter** → exit code 0，依 `--json` 印 stdout。
+5. **reject**（含 LLM 自願 reject 與系統 force_reject）→ exit code 1，依 `--json` 印 stdout。
+6. **DeciderOutputParseError 或其他 internal exception** → exit code 3，stderr 印 traceback 摘要（前 5 行）。
+
+CLI help 中 SHALL 含字面警告：`"This command writes pending_confirm entries; broker submission is not yet wired."` （提醒目前不會真的下單）。
+
+#### Scenario: `ohmystock decide --help` 列旗標與警告
+- **WHEN** 執行 `uv run ohmystock decide --help`
+- **THEN** 命令以 exit code 0 結束，stdout 同時包含 `--symbol`、`--asof`、`--json` 三個旗標名稱，且含字面 `pending_confirm`
+
+#### Scenario: enter 路徑印 summary 並 exit 0
+- **GIVEN** monkeypatch `decide_entry` 回 `OrchestrationResult(decision_id="dec_2026-04-30T14-30-00_2330", final=DeciderOutput(decision="enter", ...), written_kind="entry", llm_cost=LLMCost(0.37), force_reject_reason=None)`，且 input assembler 順利
+- **WHEN** 執行 `uv run ohmystock decide --symbol 2330 --asof 2026-04-30`
+- **THEN** 命令以 exit code 0 結束，stdout 含字串 `decision: enter`、`decision_id: dec_2026-04-30T14-30-00_2330`、`cost_usd: 0.37`
+
+#### Scenario: --json 印合法 JSON
+- **GIVEN** 同前 GIVEN
+- **WHEN** 執行 `uv run ohmystock decide --symbol 2330 --asof 2026-04-30 --json`
+- **THEN** 命令以 exit code 0 結束，`json.loads(stdout)` 是 dict 且包含 `decision_id` / `decision` / `force_reject_reason` / `cost_usd` 四個 key
+
+#### Scenario: reject 路徑 exit 1
+- **GIVEN** monkeypatch `decide_entry` 回 `written_kind="reject", force_reject_reason="stage_4_excluded"`
+- **WHEN** 執行 `uv run ohmystock decide --symbol 2330 --asof 2026-04-30`
+- **THEN** 命令以 exit code 1 結束，stdout 含 `decision: reject`、`force_reject_reason: stage_4_excluded`
+
+#### Scenario: input assembler 失敗 exit 2
+- **GIVEN** monkeypatch `assemble_entry_input` raise `ValueError("symbol not in universe: 9999")`
+- **WHEN** 執行 `uv run ohmystock decide --symbol 9999 --asof 2026-04-30`
+- **THEN** 命令以 exit code 2 結束，stderr 含 `entry_input_assembly_failed:` 與 `symbol not in universe`
+
+#### Scenario: parse error exit 3
+- **GIVEN** monkeypatch `decide_entry` raise `DeciderOutputParseError(raw_text="...", cause=json.JSONDecodeError(...))`
+- **WHEN** 執行 `uv run ohmystock decide --symbol 2330 --asof 2026-04-30`
+- **THEN** 命令以 exit code 3 結束，stderr 含 `DeciderOutputParseError`
+
+#### Scenario: 拒絕在非測試環境用 fake decider
+- **GIVEN** env `OHMYSTOCK_DECIDER_MODEL=fake://always-enter`、env `OHMYSTOCK_ALLOW_FAKE_DECIDER` 未設或為空
+- **WHEN** 執行 `uv run ohmystock decide --symbol 2330 --asof 2026-04-30`
+- **THEN** 命令以 exit code 4 結束，stderr 含 `refused to use fake decider`
+
+---
+
+### Requirement: `OHMYSTOCK_DECIDER_MODEL` 與 `OHMYSTOCK_ALLOW_FAKE_DECIDER` 環境變數
+
+`Settings` 類別 SHALL 新增兩個欄位：
+
+- `decider_model: str`（env `OHMYSTOCK_DECIDER_MODEL`），預設 `"claude-opus-4-7"`。
+- `ohmystock_allow_fake_decider: bool`（env `OHMYSTOCK_ALLOW_FAKE_DECIDER`），預設 `False`。
+
+`.env.example` SHALL 同時新增這兩個 key（值為 `claude-opus-4-7` 與 `false`）。
+
+#### Scenario: Settings 預設值
+- **WHEN** test 透過 `monkeypatch.delenv` 清掉這兩個 env var key（`raising=False`），執行 `Settings(_env_file=None)`
+- **THEN** `s.decider_model == "claude-opus-4-7"` 且 `s.ohmystock_allow_fake_decider is False`
+
+#### Scenario: env 覆寫 decider_model
+- **GIVEN** env `OHMYSTOCK_DECIDER_MODEL=claude-sonnet-4-6`
+- **WHEN** `Settings()`
+- **THEN** `s.decider_model == "claude-sonnet-4-6"`
+
+#### Scenario: `.env.example` 新增兩個 key
+- **WHEN** 讀取 `.env.example`
+- **THEN** 檔案 SHALL 含 `OHMYSTOCK_DECIDER_MODEL` 與 `OHMYSTOCK_ALLOW_FAKE_DECIDER` 兩個 key
 

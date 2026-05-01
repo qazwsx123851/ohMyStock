@@ -33,7 +33,7 @@ _CODE_PRIORITY = {
 }
 
 _TPE_TZ = timezone(timedelta(hours=8))
-_SYMBOL_RE = re.compile(r"^\d{4,6}$")
+_SYMBOL_RE = re.compile(r"^(?:[A-Z]{3,6}|\d{4,6})$")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -113,7 +113,10 @@ def _validate_inputs(
     symbol: str, period: str, bars: int, end_date: str | None
 ) -> str | None:
     if not isinstance(symbol, str) or not _SYMBOL_RE.match(symbol):
-        return f"symbol must be 4-6 digits, got {symbol!r}"
+        return (
+            f"symbol must be 4-6 digits or a 3-6 letter index code (e.g. TAIEX), "
+            f"got {symbol!r}"
+        )
     if period not in _VALID_PERIODS:
         return f"period must be one of {sorted(_VALID_PERIODS)}, got {period!r}"
     if not isinstance(bars, int) or isinstance(bars, bool) or bars <= 0 or bars > 5000:
