@@ -137,5 +137,13 @@ from ohmystock.cli._score import score_app  # noqa: E402
 app.add_typer(score_app, name="score", help="Phase 2B scoring 子命令")
 
 
+from ohmystock.cli._assemble import assemble_entry_input  # noqa: E402
+
+app.command(
+    "assemble-entry-input",
+    help="組裝 Phase 2B 候選 + 市況快照 → entry_decision_team v3.1 LLM 輸入 JSON",
+)(assemble_entry_input)
+
+
 def main() -> None:
     app()

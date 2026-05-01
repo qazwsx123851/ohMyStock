@@ -12,13 +12,22 @@ from twstock import Stock
 from ohmystock.data.sources.base import BarRow
 
 
+# Index code translation: callers pass canonical codes (e.g. "TAIEX") and the
+# adapter rewrites them to the upstream library's expected form.
+_INDEX_CODE_MAP = {
+    "TAIEX": "TWII",
+    "OTC": "TWO",
+}
+
+
 class TwstockSource:
     name = "twstock"
 
     def fetch_daily(self, symbol: str, start: str, end: str) -> list[BarRow]:
+        upstream_symbol = _INDEX_CODE_MAP.get(symbol, symbol)
         try:
             year, month = _parse_year_month(start)
-            stock = Stock(symbol)
+            stock = Stock(upstream_symbol)
             raw = stock.fetch_from(year, month)
         except Exception as exc:
             raise RuntimeError(f"twstock failed for {symbol}: {exc}") from exc

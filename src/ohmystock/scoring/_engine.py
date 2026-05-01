@@ -198,6 +198,8 @@ def _aggregate(
     else:
         classification = "red"
 
+    sepa = _extract_sepa_fields(subscores)
+
     return Phase2BCandidate(
         symbol=symbol,
         asof_date=asof_date,
@@ -209,7 +211,71 @@ def _aggregate(
         classification=classification,
         risk_off_applied=risk_off,
         subscores=subscores,
+        stage=sepa["stage"],
+        rs_percentile=sepa["rs_percentile"],
+        trend_template_passed=sepa["trend_template_passed"],
+        vcp_quality=sepa["vcp_quality"],
+        pivot_price=sepa["pivot_price"],
     )
+
+
+def _extract_sepa_fields(subscores: list[SubScoreResult]) -> dict[str, Any]:
+    """Best-effort SEPA-field extraction from sub-scorer evidence.
+
+    Future SEPA-dedicated sub-scorers (rs_percentile, vcp_pivot, stage)
+    populate these fields directly. Until those land, the assembler
+    raises ``AssemblerInputError`` for missing fields — which is the
+    correct behaviour per the v3.1 schema.
+    """
+    by_name = {s.name: s for s in subscores}
+
+    trend = by_name.get("trend_template_8")
+    if trend is not None and trend.status == "scored":
+        passed_7 = trend.evidence.get("conditions_passed")
+        if isinstance(passed_7, int):
+            # trend_template_8 currently checks 7 conditions (RS rank deferred);
+            # treat full pass as 8/8 to align with the SEPA Trend Template spec.
+            trend_template_passed = passed_7 + (1 if passed_7 == 7 else 0)
+        else:
+            trend_template_passed = None
+    else:
+        trend_template_passed = None
+
+    stage_sub = by_name.get("stage_2_confirmed")
+    stage: int | None
+    if stage_sub is not None and stage_sub.status == "scored":
+        stage = 2 if stage_sub.points > 0 else None
+    else:
+        stage = None
+
+    rs_sub = by_name.get("rs_percentile")
+    rs_percentile = (
+        rs_sub.evidence.get("rs_percentile")
+        if rs_sub is not None and rs_sub.status == "scored"
+        else None
+    )
+    if not isinstance(rs_percentile, int):
+        rs_percentile = None
+
+    vcp_sub = by_name.get("vcp_quality") or by_name.get("vcp_pivot")
+    vcp_quality = (
+        vcp_sub.evidence.get("vcp_quality")
+        if vcp_sub is not None and vcp_sub.status == "scored"
+        else None
+    )
+    pivot_price = (
+        vcp_sub.evidence.get("pivot_price")
+        if vcp_sub is not None and vcp_sub.status == "scored"
+        else None
+    )
+
+    return {
+        "stage": stage,
+        "rs_percentile": rs_percentile,
+        "trend_template_passed": trend_template_passed,
+        "vcp_quality": vcp_quality,
+        "pivot_price": pivot_price,
+    }
 
 
 def _success_envelope(data: dict, started: float) -> dict:

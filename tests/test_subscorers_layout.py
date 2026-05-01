@@ -65,7 +65,8 @@ def test_deferred_one_file_per_stub() -> None:
 
 
 def test_deferred_count_matches_spec() -> None:
-    # Spec locks 16 deferred stubs.
-    assert len(_deferred_stub_filenames()) == 16, (
-        "deferred sub-package must contain exactly 16 stub modules per spec"
+    # Spec locks 14 deferred stubs after rs_percentile and kline_patterns
+    # were promoted to real sub-scorers under subscorers/.
+    assert len(_deferred_stub_filenames()) == 14, (
+        "deferred sub-package must contain exactly 14 stub modules per spec"
     )

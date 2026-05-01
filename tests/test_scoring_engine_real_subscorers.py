@@ -14,9 +14,13 @@ from unittest.mock import patch
 
 
 def _make_max_score_data() -> tuple[list[dict], list[dict], list[dict]]:
-    """Synthetic context that drives all 6 real sub-scorers to full points.
+    """Synthetic context that drives all 8 real sub-scorers to full points.
 
-    Six sub-scorers × max_points = 10 + 5 + 5 + 5 + 5 + 4 = 34.
+    Per-scorer max_points (technical clamps at 40):
+      trend_structure_ma 10 + trend_template_8 5 + stage_2_confirmed 5
+      + volume_breakout_obv 5 + rs_percentile 7 + vcp_pivot 8 = 40 (clamped)
+      + foreign_5d_net_buy 5 + trust_5d_net_buy 4 = 9 (chip)
+      → final = 49.
     """
 
     closes = [10.0 + (90.0 * i / 251.0) for i in range(252)]
@@ -95,17 +99,18 @@ def test_full_max_score_with_real_subscorers() -> None:
     assert len(candidates) == 1
     c = candidates[0]
 
-    # Final score = 34 — the 6 real sub-scorers score full points; the 16
-    # deferred stubs return status="skipped" and contribute 0.
-    assert c["final_score"] == 34
+    # Final score = 49 — 8 real sub-scorers score full points (technical
+    # clamped at 40); the 14 deferred stubs return status="skipped" and
+    # contribute 0.
+    assert c["final_score"] == 49
     assert c["classification"] == "red"
     assert c["risk_off_applied"] is False
 
-    # 22 sub-scorers total: 6 scored + 16 skipped. No placeholder.
+    # 22 sub-scorers total: 8 scored + 14 skipped. No placeholder.
     assert len(c["subscores"]) == 22
     assert all(s["name"] != "_always_zero_placeholder" for s in c["subscores"])
-    assert sum(1 for s in c["subscores"] if s["status"] == "scored") == 6
-    assert sum(1 for s in c["subscores"] if s["status"] == "skipped") == 16
+    assert sum(1 for s in c["subscores"] if s["status"] == "scored") == 8
+    assert sum(1 for s in c["subscores"] if s["status"] == "skipped") == 14
 
     by_name = {s["name"]: s for s in c["subscores"]}
     expected_full_points = {
@@ -113,6 +118,8 @@ def test_full_max_score_with_real_subscorers() -> None:
         "trend_template_8": 5.0,
         "stage_2_confirmed": 5.0,
         "volume_breakout_obv": 5.0,
+        "rs_percentile": 7.0,
+        "vcp_pivot": 8.0,
         "foreign_5d_net_buy": 5.0,
         "trust_5d_net_buy": 4.0,
     }

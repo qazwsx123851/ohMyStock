@@ -1,0 +1,17 @@
+{
+  "must_have": [
+    "Trend Template 8/8 全過（依 §2 第一層）",
+    "Stage 2 確認（依 §0.4 / §2 第三層）",
+    "VCP/杯柄/平台 + Pivot Breakout 量能（≥ 1.4× 20DMA、Pivot~Pivot+5%）"
+  ],
+  "bonus_items": [
+    "季 EPS YoY ≥ 25%（且本季 > 前季加速）",
+    "月營收 YoY ≥ 20% 且創歷史新高",
+    "RS Percentile ≥ 80",
+    "距 52 週高 ≤ 15%",
+    "VCP 收縮 ≥ 4 次（每次振幅 ≤ 前次 50%）",
+    "機構持股遞增（外資/投信 30 日 + 主力分點 ≥ 25%）",
+    "產業 RS 領先（產業 RS Percentile ≥ 80）",
+    "新高 + 量爆（突破 52 週新高 + 量 ≥ 1.5× 20DMA）"
+  ]
+}

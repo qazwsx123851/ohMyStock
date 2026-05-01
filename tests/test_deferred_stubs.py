@@ -15,10 +15,10 @@ from ohmystock.scoring.registry import dispatch, list_subscorers
 import ohmystock.scoring  # noqa: F401
 
 
-# Spec contract: 16 deferred stubs with exact (name, category, max_points).
+# Spec contract: 14 deferred stubs with exact (name, category, max_points)
+# after phase-2b-sepa-subscorers promoted rs_percentile and kline_patterns
+# (the latter renamed to vcp_pivot) to real sub-scorers under subscorers/.
 DEFERRED_STUBS: list[tuple[str, str, float]] = [
-    ("kline_patterns", "technical", 8.0),
-    ("rs_percentile", "technical", 7.0),
     ("broker_concentration", "chip", 7.0),
     ("futures_oi", "chip", 3.0),
     ("margin_tightening", "chip", 2.0),
@@ -35,15 +35,17 @@ DEFERRED_STUBS: list[tuple[str, str, float]] = [
     ("search_heat", "sentiment", 2.0),
 ]
 
-# Existing 6 real sub-scorers (confirmed in archived
-# 2026-05-01-phase-2b-shipped-subscorers spec). Used to assert the registry
-# contains exactly 22 entries after package load.
+# 8 real sub-scorers after phase-2b-sepa-subscorers shipped rs_percentile
+# and vcp_pivot. Used to assert the registry contains exactly 22 entries
+# (14 deferred + 8 real) after package load.
 REAL_SUBSCORERS: list[tuple[str, str, float]] = [
     ("foreign_5d_net_buy", "chip", 5.0),
+    ("rs_percentile", "technical", 7.0),
     ("stage_2_confirmed", "technical", 5.0),
     ("trend_structure_ma", "technical", 10.0),
     ("trend_template_8", "technical", 5.0),
     ("trust_5d_net_buy", "chip", 4.0),
+    ("vcp_pivot", "technical", 8.0),
     ("volume_breakout_obv", "technical", 5.0),
 ]
 

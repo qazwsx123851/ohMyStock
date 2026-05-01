@@ -32,3 +32,8 @@ class Settings(BaseSettings):
     ohmystock_llm_degrade: str | None = None
     ohmystock_db_path: str = "~/.ohmystock/journal.db"
     ohmystock_log_level: str = "INFO"
+
+    # Paper-account starting equity in TWD. Used by live providers to compute
+    # exposure_pct and monthly_pnl_pct. Default matches docs/frontend.md §17 and
+    # tools-contracts.md §backtest defaults.
+    starting_equity_twd: int = 1_000_000
