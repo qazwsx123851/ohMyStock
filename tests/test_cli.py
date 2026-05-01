@@ -1,9 +1,9 @@
 """CLI smoke tests — exercises typer.Typer app and pydantic-settings loader.
 
 Spec: openspec/specs/cli-and-config/spec.md
-- root help lists all 7 subcommands (5 stubs + api + smoke-test)
-- each stub exits 1 with "not implemented" in stdout (api / smoke-test
-  excluded — they are non-stub and would actually launch external work)
+- root help lists all 8 subcommands (5 stubs + api + smoke-test + score)
+- each stub exits 1 with "not implemented" in stdout (api / smoke-test /
+  score excluded — they are non-stub and would actually launch external work)
 - Settings() constructible without any env present
 """
 
@@ -18,7 +18,7 @@ from ohmystock.config import Settings
 runner = CliRunner()
 
 STUB_SUBCOMMANDS = ["run", "backtest", "review", "propose", "screen"]
-ALL_SUBCOMMANDS = [*STUB_SUBCOMMANDS, "api", "smoke-test"]
+ALL_SUBCOMMANDS = [*STUB_SUBCOMMANDS, "api", "smoke-test", "score"]
 
 
 def test_root_help_lists_all_subcommands() -> None:

@@ -14,3 +14,4 @@ from ohmystock.scoring.subscorers import trend_structure_ma  # noqa: F401
 from ohmystock.scoring.subscorers import trend_template_8  # noqa: F401
 from ohmystock.scoring.subscorers import trust_5d_net_buy  # noqa: F401
 from ohmystock.scoring.subscorers import volume_breakout_obv  # noqa: F401
+from ohmystock.scoring.subscorers import deferred  # noqa: F401

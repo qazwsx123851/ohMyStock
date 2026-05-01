@@ -1,9 +1,10 @@
-"""ohMyStock CLI — typer app with seven subcommands.
+"""ohMyStock CLI — typer app with eight subcommands.
 
 Five stubs (run/backtest/review/propose/screen) print "not implemented" and
 exit 1 — real logic lands in later changes. ``api`` launches uvicorn against
 ``ohmystock.api.app:create_app``. ``smoke-test`` verifies FinMind / Shioaji /
-Anthropic connectivity for Phase 0d acceptance.
+Anthropic connectivity for Phase 0d acceptance. ``score`` is a typer group
+backed by ``_score.score_app``; ``score watchlist`` runs Phase 2B scoring.
 """
 
 from __future__ import annotations
@@ -129,6 +130,11 @@ def smoke_test() -> None:
 
     if any_fail:
         raise typer.Exit(1)
+
+
+from ohmystock.cli._score import score_app  # noqa: E402
+
+app.add_typer(score_app, name="score", help="Phase 2B scoring 子命令")
 
 
 def main() -> None:

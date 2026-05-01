@@ -95,14 +95,17 @@ def test_full_max_score_with_real_subscorers() -> None:
     assert len(candidates) == 1
     c = candidates[0]
 
-    # Final score = 34 (placeholder removed; only the 6 real sub-scorers contribute).
+    # Final score = 34 — the 6 real sub-scorers score full points; the 16
+    # deferred stubs return status="skipped" and contribute 0.
     assert c["final_score"] == 34
     assert c["classification"] == "red"
     assert c["risk_off_applied"] is False
 
-    # Exactly 6 sub-scorers — no placeholder.
-    assert len(c["subscores"]) == 6
+    # 22 sub-scorers total: 6 scored + 16 skipped. No placeholder.
+    assert len(c["subscores"]) == 22
     assert all(s["name"] != "_always_zero_placeholder" for s in c["subscores"])
+    assert sum(1 for s in c["subscores"] if s["status"] == "scored") == 6
+    assert sum(1 for s in c["subscores"] if s["status"] == "skipped") == 16
 
     by_name = {s["name"]: s for s in c["subscores"]}
     expected_full_points = {
