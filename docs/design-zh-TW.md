@@ -474,6 +474,8 @@ token_budget:
   max_output_tokens: 4000
 ```
 
+> **實作狀態（2026-05-01）**：`pm_conclusion` 節點 + §2.1 系統覆寫驗證器已實作（`ohmystock.decider.{node,validator,orchestrator}`），由 `ohmystock decide` CLI 觸發；`bull_analyst` / `bear_analyst` / `rule_checker` / `risk_simulator` 等 specialist 節點待後續 change（Phase 3 中段）。目前 `pm_conclusion` 直接吃 Phase 2B 的 `EntryDecisionInput`，不經 specialist 節點。
+
 #### 4.7.2 交易復盤團 `post_trade_review_team`(v3)
 
 對應 cheatsheet §15。月底自動 + 人工任意觸發。

@@ -108,6 +108,7 @@ Agent 核心層（Claude Agent SDK + PreToolUse/PostToolUse Hooks 稽核）
 | Auto-execute breaker 閾值 | `docs/safety-and-simulation.md` §2.9 |
 | Phase 2B Swarm Input Assembler | `docs/design-zh-TW.md` §4.7.0 |
 | Live provider error codes / freshness policy | `openspec/specs/live-providers/spec.md` |
+| LLM Decider PM 節點 + §2.1 系統覆寫驗證 | `openspec/specs/entry-decider/spec.md`（archive 後）+ `src/ohmystock/decider/validator.py` |
 
 完整版（含「不要在這裡改」欄位）見 `docs/README.md` §2。
 

@@ -145,5 +145,18 @@ app.command(
 )(assemble_entry_input)
 
 
+from ohmystock.cli._decide import decide  # noqa: E402
+
+app.command(
+    "decide",
+    help=(
+        "Phase 3 PM Decider — assemble candidate, call Claude Opus 4.7, "
+        "validate §2.1, write kind=entry (pending_confirm) or kind=reject "
+        "(reject_layer=llm). WARNING: writes pending_confirm entries; "
+        "broker submission is not yet wired (Confirm Gate is Phase 3.5)."
+    ),
+)(decide)
+
+
 def main() -> None:
     app()
