@@ -26,6 +26,9 @@ from importlib.metadata import version as _pkg_version
 from fastapi import FastAPI
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
+from ohmystock.api.routes.confirm_gate import router as confirm_gate_router
+from ohmystock.api.routes.exit_engine import router as exit_engine_router
+from ohmystock.api.routes.screener import router as screener_router
 from ohmystock.eventbus import AdminEventSerializer, bus
 
 _KEEPALIVE_TIMEOUT_SECONDS = 15.0
@@ -61,5 +64,9 @@ def create_app() -> FastAPI:
     @app.get("/api/admin/events")
     async def admin_events() -> EventSourceResponse:
         return EventSourceResponse(_admin_event_stream())
+
+    app.include_router(screener_router)
+    app.include_router(confirm_gate_router)
+    app.include_router(exit_engine_router)
 
     return app

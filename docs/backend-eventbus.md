@@ -391,7 +391,28 @@ async def events():
     return EventSourceResponse(stream())
 ```
 
-### 5.3 CORS / Rate Limit
+### 5.3 Admin action endpoints（v0，server-action-endpoints capability）
+
+下列 6 個 write 端點包裝既有核心函式，提供 admin UI 用的 HTTP 觸發接口。
+全部走統一 envelope `{"ok": true, "data": ...}` 或 `{"ok": false, "error": {"code", "message"}}`，
+HTTP status 對應 `code` 一一映射（見對應 spec 與 `src/ohmystock/api/routes/_envelope.py`）。
+
+| Method | Path | Body / Query | Wraps | 主要 success data | 主要 error code (HTTP) |
+|---|---|---|---|---|---|
+| POST | `/api/admin/screener/run` | `{universe, custom_symbols?, filters?, asof_date?}` | `screen_universe()` | `asof_date_used`, `candidates`, `elapsed_ms` | `invalid_input` (400) / `data_unavailable` (503) / `upstream_error` (502) |
+| GET | `/api/admin/confirm-gate/pending` | `?timeout_minutes=int?` | `list_pending()` | `items`, `timeout_minutes` | `invalid_input` (400) |
+| POST | `/api/admin/confirm-gate/confirm` | `{decision_id, user}` | `confirm()` | `decision_id`, `fill`, `qty` | `not_found` (404) / `not_pending` (409) / `payload_invalid` (409) / `broker_failed` (502) |
+| POST | `/api/admin/confirm-gate/reject` | `{decision_id, user, reason}` | `reject()` | `decision_id`, `reject_row_id` | `invalid_input` (400) / `not_found` (404) / `not_pending` (409) |
+| POST | `/api/admin/confirm-gate/sweep-expired` | `{timeout_minutes?}` | `sweep_expired()` | `swept_decision_ids`, `swept_count`, `timeout_minutes` | `invalid_input` (400) |
+| POST | `/api/admin/exit-engine/run` | `{asof_date?, symbol?}` | `evaluate_open_positions()` | `results`, `evaluated_count`, `closed_count`, `held_count`, `asof_date_used` | `invalid_input` (400) / `market_data_unavailable` (503) |
+
+設計細節（per-request connection lifecycle、unified envelope mapping、no-auth invariant、
+不洩漏 stack trace / SQL / 絕對路徑）見 `openspec/specs/server-action-endpoints/spec.md`（archive 後）。
+
+Phase 4 接 Bearer auth 由獨立 capability `web-admin-bearer-auth` 補上；本 v0 維持無認證、
+僅綁 `localhost`。
+
+### 5.4 CORS / Rate Limit
 
 | 端點 | CORS 允許來源 | Rate Limit |
 |---|---|---|

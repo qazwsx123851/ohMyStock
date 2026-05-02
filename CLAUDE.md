@@ -113,6 +113,7 @@ Agent 核心層（Claude Agent SDK + PreToolUse/PostToolUse Hooks 稽核）
 | Exit Engine v0 行為（daily, full-position close on stop_loss/T1/time_stop）| `openspec/specs/exit-engine/spec.md`（archive 後）+ `src/ohmystock/exit_engine/evaluator.py` |
 | Auto-execute Phase 3.5 — breaker thresholds + audit row format（5 hard breakers + sizing clamp + flag/live defense-in-depth）| `openspec/specs/auto-execute/spec.md`（archive 後）+ `src/ohmystock/safety/auto_execute.py` + `OHMYSTOCK_AUTO_EXECUTE_*` 於 `src/ohmystock/config.py` |
 | EventBus emitters v0 — 9 of 16 event_type wired (screener / decider / confirm-gate / journal / auto-execute) + AdminEventSerializer + admin SSE subscriber | `openspec/specs/eventbus-emitters/spec.md`（archive 後）+ `src/ohmystock/eventbus/` + `src/ohmystock/api/app.py` |
+| Server action endpoints v0 — 6 admin write endpoints (screener.run / confirm-gate.{pending,confirm,reject,sweep-expired} / exit-engine.run) + unified `{ok,data,error}` envelope + per-request DB conn + no-auth invariant | `openspec/specs/server-action-endpoints/spec.md`（archive 後）+ `src/ohmystock/api/routes/` + `src/ohmystock/api/app.py` |
 
 完整版（含「不要在這裡改」欄位）見 `docs/README.md` §2。
 
