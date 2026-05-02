@@ -279,6 +279,8 @@ LLM 輸出 → 系統 Sizing Service / ATR Service / Risk Gate 處理後產出:
 
 > **Confirm Gate v0（2026-05-02 實作）**：`actual_entry_price` / `actual_qty` / `human_confirmed_by` / `human_confirmed_at` 四欄由 `ohmystock.safety.confirm_gate.confirm()` 在 paper broker fill 後寫入；`decision_status` 由 v0 的 `confirm` / `reject` / `sweep_expired` 三函式翻為 `confirmed` / `rejected` / `expired`。`current_price` 由 `decide_entry` 在寫入 pending_confirm 時 snapshot，作為後續 broker `reference_price`。
 
+> **Exit Engine v0（2026-05-02 實作，§4.1 欄位影響）**：`atr_14_pct`（候選 ATR 百分比）為 `decide_entry` 在 pending_confirm 寫入時新增 snapshot；`atr_at_entry` 與 `stop_loss_price` 改為 confirm 後**非 null**（由 `ohmystock.safety.confirm_gate.confirm()` 用 cheatsheet §6.6 公式 `atr_at_entry = fill_price × atr_14_pct / 100`、`stop_loss_price = max(fill_price × 0.94, fill_price − 2 × atr_at_entry)` backfill）；`decision_status` enum 加入 `closed`（由 Exit Engine 翻轉）。
+
 ### 4.2 `kind=exit` (Phase 4 出場後)
 
 ```json
@@ -298,6 +300,8 @@ LLM 輸出 → 系統 Sizing Service / ATR Service / Risk Gate 處理後產出:
   "remaining_strategy": "T1.5 + Chandelier 衛星倉"
 }
 ```
+
+> **Exit Engine v0（2026-05-02 實作）**：`actual_exit_price` / `pnl_pct` / `hold_days` / `exit_tag` / `exited_at` / `close_price_evaluated` 六欄由 `ohmystock.exit_engine.evaluator.evaluate_open_positions()` 寫入。v0 三標籤 `hit_stop_loss` / `hit_t1` / `time_stop` 為實作子集；其餘四標籤 `hit_t1_5` / `chandelier` / `thesis_invalid` / `discretionary` 為 Phase 4+ 預留（partial fills + Chandelier trailing stop + thesis_invalid 自動偵測 待 `position-tranches` change）。
 
 ### 4.3 `kind=reject` (硬性檢查或 LLM 拒絕)
 

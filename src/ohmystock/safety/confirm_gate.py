@@ -134,10 +134,12 @@ def confirm(
         try:
             sizing_pct = float(payload["final_sizing_pct"])
             current_price = float(payload["current_price"])
+            atr_14_pct = float(payload["atr_14_pct"])
         except (KeyError, TypeError, ValueError) as exc:
             raise ConfirmGateError(
                 "payload_invalid",
-                f"missing or non-numeric final_sizing_pct/current_price: {exc}",
+                "missing or non-numeric final_sizing_pct / current_price / "
+                f"atr_14_pct: {exc}",
             ) from exc
 
         qty = _compute_qty(default_capital_twd, sizing_pct, current_price)
@@ -156,6 +158,13 @@ def confirm(
                 cause=exc,
             ) from exc
 
+        # cheatsheet §6.6 normal-market case
+        atr_at_entry = fill.fill_price * atr_14_pct / 100.0
+        stop_loss_price = max(
+            fill.fill_price * 0.94,
+            fill.fill_price - 2.0 * atr_at_entry,
+        )
+
         confirmed_at = clock.now_iso()
         _update_entry_payload(
             conn,
@@ -164,6 +173,8 @@ def confirm(
                 "decision_status": "confirmed",
                 "actual_entry_price": fill.fill_price,
                 "actual_qty": fill.filled_qty,
+                "atr_at_entry": atr_at_entry,
+                "stop_loss_price": stop_loss_price,
                 "human_confirmed_by": user,
                 "human_confirmed_at": confirmed_at,
             },

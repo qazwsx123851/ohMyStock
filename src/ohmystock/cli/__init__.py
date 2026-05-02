@@ -171,5 +171,18 @@ app.command(
 )(confirm_command)
 
 
+from ohmystock.cli._evaluate_exits import evaluate_exits  # noqa: E402
+
+app.command(
+    "evaluate-exits",
+    help=(
+        "Exit Engine v0 — daily, full-position evaluator. Scans confirmed "
+        "entries, evaluates v0 conditions (hit_stop_loss / hit_t1 / time_stop) "
+        "against today's close, writes kind=exit rows and flips entry "
+        "decision_status to closed for triggered positions."
+    ),
+)(evaluate_exits)
+
+
 def main() -> None:
     app()

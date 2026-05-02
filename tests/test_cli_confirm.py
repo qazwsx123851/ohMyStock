@@ -38,6 +38,7 @@ def _seed_pending(
     created_at: str = "2026-05-02T10:00:00+08:00",
     final_sizing_pct: float = 16.5,
     current_price: float = 832.0,
+    atr_14_pct: float = 2.85,
 ) -> str:
     conn = sqlite3.connect(str(db_path))
     init_schema(conn)
@@ -45,6 +46,7 @@ def _seed_pending(
         "decision_status": "pending_confirm",
         "final_sizing_pct": final_sizing_pct,
         "current_price": current_price,
+        "atr_14_pct": atr_14_pct,
         "actual_entry_price": None,
         "actual_qty": None,
         "human_confirmed_by": None,

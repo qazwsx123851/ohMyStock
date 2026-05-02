@@ -62,6 +62,7 @@ def write_entry_pending_confirm(
         "vcp_quality": raw.vcp_quality,
         "pivot_price": raw.pivot_price,
         "current_price": entry_input.candidate.current_price,
+        "atr_14_pct": entry_input.candidate.atr_14_pct,
         "llm_input_tokens": usage.input_tokens,
         "llm_output_tokens": usage.output_tokens,
         "llm_cost_usd": usage.cost_usd,

@@ -192,13 +192,14 @@ def test_enter_payload_contains_required_fields(conn: sqlite3.Connection) -> Non
         "must_have_check", "bonus_score", "proposed_sizing_pct",
         "expected_holding_days", "stage", "rs_percentile",
         "trend_template_passed", "vcp_quality", "pivot_price",
-        "current_price",
+        "current_price", "atr_14_pct",
         "llm_input_tokens", "llm_output_tokens", "llm_cost_usd",
         "entry_thesis", "thesis_invalidation",
     }
     assert required_keys.issubset(payload.keys())
     assert payload["decision_status"] == "pending_confirm"
     assert payload["current_price"] == 845.0
+    assert payload["atr_14_pct"] == 2.4
     assert payload["actual_entry_price"] is None
     assert payload["actual_qty"] is None
     assert payload["llm_input_tokens"] == 18420

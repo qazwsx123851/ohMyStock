@@ -52,6 +52,7 @@ def _seed_pending(
     created_at: str = "2026-05-02T10:00:00+08:00",
     final_sizing_pct: float = 16.5,
     current_price: float = 832.0,
+    atr_14_pct: float | None = 2.85,
     extra: dict | None = None,
 ) -> str:
     payload = {
@@ -63,6 +64,8 @@ def _seed_pending(
         "human_confirmed_by": None,
         "human_confirmed_at": None,
     }
+    if atr_14_pct is not None:
+        payload["atr_14_pct"] = atr_14_pct
     if extra:
         payload.update(extra)
     conn.execute(
@@ -135,6 +138,57 @@ def test_confirm_success_updates_entry_and_returns_result() -> None:
         "mark@local",
         "2026-05-02T10:15:00+08:00",
     )
+
+
+def test_confirm_success_backfills_atr_at_entry_and_stop_loss() -> None:
+    """Per cheatsheet §6.6 normal-market: stop = max(entry*0.94, entry-2*ATR)."""
+    conn = _conn()
+    decision_id = _seed_pending(conn, atr_14_pct=2.85)
+    clock = _FakeClock("2026-05-02T10:15:00+08:00")
+    broker = FakePaperBroker(clock=clock)
+
+    confirm(
+        conn,
+        decision_id=decision_id,
+        broker=broker,
+        default_capital_twd=_DEFAULT_CAPITAL,
+        user="mark@local",
+        clock=clock,
+    )
+
+    atr, stop = conn.execute(
+        "SELECT json_extract(payload_json, '$.atr_at_entry'),"
+        " json_extract(payload_json, '$.stop_loss_price')"
+        " FROM journal_entries WHERE kind='entry'"
+    ).fetchone()
+    # atr = 832 * 2.85 / 100 = 23.712
+    # stop = max(832 * 0.94, 832 - 2 * 23.712) = max(782.08, 784.576) = 784.576
+    assert atr == pytest.approx(23.712, rel=1e-4)
+    assert stop == pytest.approx(784.576, rel=1e-4)
+
+
+def test_confirm_payload_invalid_when_missing_atr_14_pct() -> None:
+    conn = _conn()
+    # Seed without atr_14_pct (atr_14_pct=None tells _seed_pending to omit it).
+    decision_id = _seed_pending(conn, atr_14_pct=None)
+    clock = _FakeClock("2026-05-02T10:15:00+08:00")
+
+    with pytest.raises(ConfirmGateError) as exc_info:
+        confirm(
+            conn,
+            decision_id=decision_id,
+            broker=FakePaperBroker(clock=clock),
+            default_capital_twd=_DEFAULT_CAPITAL,
+            user="mark",
+            clock=clock,
+        )
+    assert exc_info.value.code == "payload_invalid"
+    assert "atr_14_pct" in str(exc_info.value)
+
+    status = conn.execute(
+        "SELECT json_extract(payload_json, '$.decision_status') FROM journal_entries"
+    ).fetchone()[0]
+    assert status == "pending_confirm"  # rollback succeeded
 
 
 def test_confirm_not_found_raises() -> None:
