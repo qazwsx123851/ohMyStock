@@ -390,3 +390,77 @@ def test_created_at_uses_clock(conn: sqlite3.Connection) -> None:
     c_at = conn.execute("SELECT created_at FROM llm_costs").fetchone()[0]
     assert j_at == _FIXED_NOW
     assert c_at == _FIXED_NOW
+
+
+# ---------------------------------------------------------------------------
+# system_sizing_pct payload field (auto-execute capability dependency)
+# Spec: openspec/changes/auto-execute-toggle-and-breakers/specs/entry-decider/spec.md
+# ---------------------------------------------------------------------------
+
+
+def test_stage_2_entry_writes_system_sizing_pct_25(
+    conn: sqlite3.Connection,
+) -> None:
+    fake = FakePMConclusionNode(
+        output=_make_output(stage=2, proposed_sizing_pct=20.0),
+        usage=_make_usage(),
+    )
+    _decide(conn, fake)
+
+    val = conn.execute(
+        "SELECT json_extract(payload_json, '$.system_sizing_pct')"
+        " FROM journal_entries WHERE kind='entry'"
+    ).fetchone()[0]
+    assert val == 25.0
+
+
+def test_stage_3_entry_writes_system_sizing_pct_10_no_cap(
+    conn: sqlite3.Connection,
+) -> None:
+    """stage=3, proposed=8.0 (≤10 so §2.1 cap untouched). Both fields set."""
+    output = _make_output(stage=3, proposed_sizing_pct=8.0)
+    candidate = _make_candidate(stage=3)
+    fake = FakePMConclusionNode(output=output, usage=_make_usage())
+
+    _decide(conn, fake, _make_entry_input(candidate=candidate))
+
+    row = conn.execute(
+        "SELECT json_extract(payload_json, '$.system_sizing_pct'),"
+        " json_extract(payload_json, '$.final_sizing_pct')"
+        " FROM journal_entries WHERE kind='entry'"
+    ).fetchone()
+    assert row == (10.0, 8.0)
+
+
+def test_stage_3_capped_entry_still_records_system_sizing_pct_10(
+    conn: sqlite3.Connection,
+) -> None:
+    """stage=3, proposed=18.0 → §2.1 caps final to 10. system_sizing_pct stays 10."""
+    output = _make_output(stage=3, proposed_sizing_pct=18.0)
+    candidate = _make_candidate(stage=3)
+    fake = FakePMConclusionNode(output=output, usage=_make_usage())
+
+    _decide(conn, fake, _make_entry_input(candidate=candidate))
+
+    row = conn.execute(
+        "SELECT json_extract(payload_json, '$.system_sizing_pct'),"
+        " json_extract(payload_json, '$.final_sizing_pct'),"
+        " json_extract(payload_json, '$.proposed_sizing_pct')"
+        " FROM journal_entries WHERE kind='entry'"
+    ).fetchone()
+    # raw proposed=18 capped to 10; system stays at 10 (stage cap).
+    assert row == (10.0, 10.0, 18.0)
+
+
+def test_reject_row_does_not_contain_system_sizing_pct(
+    conn: sqlite3.Connection,
+) -> None:
+    output = _make_output(decision="reject", confidence=0.4)
+    fake = FakePMConclusionNode(output=output, usage=_make_usage())
+    _decide(conn, fake)
+
+    val = conn.execute(
+        "SELECT json_extract(payload_json, '$.system_sizing_pct')"
+        " FROM journal_entries WHERE kind='reject'"
+    ).fetchone()[0]
+    assert val is None

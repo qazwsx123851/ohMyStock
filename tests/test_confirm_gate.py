@@ -263,6 +263,56 @@ def test_confirm_broker_failure_rolls_back_payload() -> None:
     assert status == "pending_confirm"  # rollback succeeded
 
 
+def test_confirm_default_writes_auto_executed_false() -> None:
+    """Spec: confirm-gate delta (auto-execute-toggle-and-breakers).
+
+    Calling confirm() without the auto_executed kwarg keeps the human-flow
+    behavior: payload `auto_executed` is False (stored as SQLite 0).
+    """
+    conn = _conn()
+    decision_id = _seed_pending(conn)
+    clock = _FakeClock("2026-05-02T10:15:00+08:00")
+    confirm(
+        conn,
+        decision_id=decision_id,
+        broker=FakePaperBroker(clock=clock),
+        default_capital_twd=_DEFAULT_CAPITAL,
+        user="mark@local",
+        clock=clock,
+    )
+    val = conn.execute(
+        "SELECT json_extract(payload_json, '$.auto_executed')"
+        " FROM journal_entries WHERE kind='entry'"
+    ).fetchone()[0]
+    assert val == 0
+
+
+def test_confirm_auto_executed_true_writes_true() -> None:
+    """Spec: confirm-gate delta (auto-execute-toggle-and-breakers).
+
+    Calling confirm(..., auto_executed=True, user='auto') marks the row as
+    auto-executed (SQLite 1) and records the synthetic 'auto' user.
+    """
+    conn = _conn()
+    decision_id = _seed_pending(conn)
+    clock = _FakeClock("2026-05-02T10:15:00+08:00")
+    confirm(
+        conn,
+        decision_id=decision_id,
+        broker=FakePaperBroker(clock=clock),
+        default_capital_twd=_DEFAULT_CAPITAL,
+        user="auto",
+        auto_executed=True,
+        clock=clock,
+    )
+    row = conn.execute(
+        "SELECT json_extract(payload_json, '$.auto_executed'),"
+        " json_extract(payload_json, '$.human_confirmed_by')"
+        " FROM journal_entries WHERE kind='entry'"
+    ).fetchone()
+    assert row == (1, "auto")
+
+
 def test_confirm_payload_missing_current_price_raises_payload_invalid() -> None:
     conn = _conn()
     payload = {"decision_status": "pending_confirm", "final_sizing_pct": 16.5}

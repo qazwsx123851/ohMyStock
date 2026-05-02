@@ -235,6 +235,8 @@ class AutoExecuteBreaker:
 
 熔斷觸發 → fallback 為人工 confirm(寫入 pending decisions 佇列),不直接下單。每次 fallback 寫 audit log。
 
+> **程式碼 SSOT**：上述閾值（5/0.7/25%/30%/3 連虧 5%/24h）的權威值現由 `ohmystock.config.Settings` 的 `OHMYSTOCK_AUTO_EXECUTE_*` 欄位控制；行為 SSOT 為 `openspec/specs/auto-execute/spec.md`（archive 後）+ `src/ohmystock/safety/auto_execute.py`。本節僅供設計脈絡，調整數值請改 settings + 對應 spec。
+
 ### 2.10 防線總表（一目了然）
 
 | # | 防線 | 失敗時的後果 | 防住什麼 |

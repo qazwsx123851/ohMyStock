@@ -3,9 +3,7 @@
 ## Purpose
 
 定義 LLM 進場決策（PMConclusionNode）的完整契約：Anthropic SDK 預設實作、`DeciderOutput` v3.1 Pydantic 模型、系統覆寫驗證器（`validate_decider_output`）、編排函式（`decide_entry`）將「LLM 呼叫 → 驗證 → trade journal 寫入 → llm_costs 寫入」串成 atomic 流程，以及 model 計費表。本 capability 對齊 `docs/llm-decision-schema.md` v3.1 schema 與 §2.1 系統硬約束，並由 `cli-and-config` 的 `ohmystock decide` 子命令驅動。
-
 ## Requirements
-
 ### Requirement: PMConclusionNode 介面與 Anthropic 預設實作
 
 系統 SHALL 在 `ohmystock.decider` 模組對外公開以下符號：
@@ -183,12 +181,14 @@
 
 1. 呼叫 `decider.decide(entry_input)` 取 `(raw, usage)`。若 raise `DeciderOutputParseError` → 寫一筆 `kind=reject`（reject_layer=llm，reject_reason `"json_parse_error: <exc.raw_text 截 500 字>"`），仍寫 `llm_costs`（若 `usage` 可取得；否則 `input_tokens=output_tokens=0, cost_usd=0.0`），並 re-raise。
 2. 跑 `validate_decider_output(raw, entry_input.candidate)` 取 `vr`。
-3. `vr.final_decision.decision == "enter"` → 寫 `kind=entry` payload 含 §4.1 全部欄位（`decision_status="pending_confirm"` / `auto_executed=false` / `human_confirmed_by=null` / `human_confirmed_at=null` / `final_sizing_pct=raw.proposed_sizing_pct`（暫等於 proposed，下一個 change 才會被 Sizing Service 改寫） / `stop_loss_price=null`（待 ATR Service 計算） / `atr_at_entry=null`（同前） / `risk_regime_at_entry=null`（待 Risk Gate 計算） / SEPA 五欄從 raw 拷貝），`written_kind="entry"`。
+3. `vr.final_decision.decision == "enter"` → 寫 `kind=entry` payload 含 §4.1 全部欄位（`decision_status="pending_confirm"` / `auto_executed=false` / `human_confirmed_by=null` / `human_confirmed_at=null` / `final_sizing_pct=raw.proposed_sizing_pct`（暫等於 proposed，下一個 change 才會被 Sizing Service 改寫） / **`system_sizing_pct=10.0 if raw.stage == 3 else 25.0`**（新增；v0 stub 對應 §2.1 stage cap，未來改為 Volatility Targeting 公式輸出） / `stop_loss_price=null`（待 ATR Service 計算） / `atr_at_entry=null`（同前） / `risk_regime_at_entry=null`（待 Risk Gate 計算） / SEPA 五欄從 raw 拷貝），`written_kind="entry"`。
 4. `vr.final_decision.decision == "reject"` → 寫 `kind=reject` payload 含 §4.3 欄位（`reject_layer="llm"` / `reject_reason=vr.force_reject_reason` / `decision_status="rejected"`），`written_kind="reject"`。
 5. 寫一筆 `llm_costs`（`decision_id` / `model=usage.model` / `input_tokens=usage.input_tokens` / `output_tokens=usage.output_tokens` / `cost_usd=usage.cost_usd` / `created_at=clock.now_iso()`）。
 6. 回 `OrchestrationResult(decision_id, vr.final_decision, written_kind, LLMCost(usage), vr.force_reject_reason)`。
 
 整段 SHALL 在同一個 `conn.commit()` 之後 atomic 落盤（用 BEGIN/COMMIT 包起來）。若步驟 3/4/5 任一 raise → rollback 並 re-raise，`OrchestrationResult` 不回。
+
+`system_sizing_pct` 為 entry payload 的新增欄位，型別 `float`，**僅** 在 `kind=entry` row 寫入；`kind=reject` row 的 payload 不含此欄位。寫入規則：`stage == 3` → `10.0`；其餘 stage（1, 2，stage 4 已被 `validate_decider_output` 強制 reject 不會走到此分支）→ `25.0`。此欄位由 `auto-execute` capability 的 sizing-deviation breaker 讀取使用；未來引入 Volatility Targeting 計算後，本欄位將改為該計算結果，本 spec 的數值規則自動失效（屆時 `decide_entry` 與 `validate_decider_output` 將共同更新）。
 
 #### Scenario: enter 路徑寫一筆 journal_entries (kind=entry) + 一筆 llm_costs
 - **GIVEN** 一個 in-memory SQLite conn 已跑過 `init_schema(conn)`、一個 fake decider 回合法 enter raw、`entry_input.candidate.symbol="2330"`
@@ -215,7 +215,25 @@
 - **WHEN** `decide_entry(...)`
 - **THEN** raise `sqlite3.IntegrityError` ；`SELECT count(*) FROM journal_entries`、`SELECT count(*) FROM llm_costs` 均為 0（rollback 生效）
 
----
+#### Scenario: stage=2 entry payload 寫 system_sizing_pct=25.0
+- **GIVEN** fake decider 回合法 enter raw `stage=2 / proposed_sizing_pct=20.0`，candidate `stage=2`
+- **WHEN** `decide_entry(...)`
+- **THEN** `SELECT json_extract(payload_json, '$.system_sizing_pct') FROM journal_entries WHERE kind='entry'` 為 `25.0`
+
+#### Scenario: stage=3 entry payload 寫 system_sizing_pct=10.0
+- **GIVEN** fake decider 回合法 enter raw `stage=3 / proposed_sizing_pct=8.0`（≤ 10 不觸發 §2.1 cap），candidate `stage=3`
+- **WHEN** `decide_entry(...)`
+- **THEN** `SELECT json_extract(payload_json, '$.system_sizing_pct') FROM journal_entries WHERE kind='entry'` 為 `10.0`；`SELECT json_extract(payload_json, '$.final_sizing_pct') FROM journal_entries WHERE kind='entry'` 為 `8.0`（無 stage-3 cap 觸發）
+
+#### Scenario: stage=3 sizing capped 後 system_sizing_pct 仍為 10.0
+- **GIVEN** fake decider 回 `stage=3 / proposed_sizing_pct=18.0`（觸發 §2.1 stage-3 cap），candidate `stage=3`
+- **WHEN** `decide_entry(...)`
+- **THEN** `final_sizing_pct=10.0`（被 §2.1 cap）；`system_sizing_pct=10.0`；兩者相等代表此 entry 不會被 auto-execute sizing-clamp 觸發
+
+#### Scenario: reject row 不含 system_sizing_pct 欄位
+- **GIVEN** fake decider 回 `decision="reject"`
+- **WHEN** `decide_entry(...)`
+- **THEN** `written_kind="reject"`；`SELECT json_extract(payload_json, '$.system_sizing_pct') FROM journal_entries WHERE kind='reject'` 為 `NULL`（欄位不存在）
 
 ### Requirement: 模型成本表
 
@@ -232,3 +250,4 @@
 #### Scenario: 未知 model raise KeyError
 - **WHEN** `compute_cost_usd("claude-fake-99", 100, 50)`
 - **THEN** raise `KeyError`，message 含 `"claude-fake-99"`
+

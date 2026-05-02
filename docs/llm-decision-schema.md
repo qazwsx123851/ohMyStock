@@ -338,6 +338,46 @@ LLM 輸出 → 系統 Sizing Service / ATR Service / Risk Gate 處理後產出:
 }
 ```
 
+### 4.4.1 `kind=auto_execute_audit` (Phase 3.5 自動執行稽核)
+
+> 由 `ohmystock.safety.auto_execute.try_auto_execute(...)` 寫入。**每次呼叫**寫一筆，不論通過或被任一 breaker 擋下。`outcome` 欄位列舉 8 個值：`pass | sizing_clamped_then_pass | flag_off | live_broker | low_confidence | notional_limit | daily_limit | loss_lockout`。
+>
+> SSOT: `openspec/specs/auto-execute/spec.md`（archive 後）+ `src/ohmystock/safety/auto_execute.py`。
+
+```json
+{
+  "journal_id": "j_20260502_011",
+  "decision_id": "dec_2026-05-02T10-00-00_2330",
+  "kind": "auto_execute_audit",
+  "symbol": "2330",
+  "ts": "2026-05-02T10:15:00+08:00",
+  "decision_status": "auto_execute_audit",
+  "outcome": "low_confidence",
+  "decision_id_ref": "dec_2026-05-02T10-00-00_2330",
+  "audit_at": "2026-05-02T10:15:00+08:00",
+  "evidence": {
+    "llm_confidence": 0.62,
+    "min_confidence": 0.7
+  }
+}
+```
+
+`evidence` 內欄位依 outcome 而異（只填相關 key，避免 payload 膨脹）：
+
+| outcome | evidence keys |
+|---|---|
+| `flag_off` | `flag` |
+| `live_broker` | `broker_mode` |
+| `low_confidence` | `llm_confidence`, `min_confidence` |
+| `notional_limit` | `notional_twd`, `max_notional_twd` |
+| `daily_limit` | `auto_today_count`, `daily_limit` |
+| `loss_lockout` | `loss_streak_count`, `lockout_until` |
+| `pass` / `sizing_clamped_then_pass` | `llm_confidence`, `auto_today_count`, `notional_twd`, `system_sizing_pct`, `raw_sizing_pct`, `clamped_sizing_pct`, `broker_mode` |
+
+> **進場 payload 新增欄位**：Phase 3.5 起 `kind=entry` payload 多兩個欄位：
+> - `system_sizing_pct: float` — v0 stub 為 `10.0 if stage==3 else 25.0`，由 `decide_entry` 寫入。Auto-execute sizing-deviation breaker 讀此值判斷是否需要 clamp。未來 Volatility Targeting 公式落地後改寫此欄。
+> - `auto_executed: bool` — 由 `confirm()` 在 step 9 寫入；`False` 為人工 confirm，`True` 為 `try_auto_execute` 自動完成。
+
 ---
 
 ## 4.5 衍生 / Join 欄位（Phase 5 復盤需要）

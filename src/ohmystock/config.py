@@ -7,7 +7,9 @@ downstream code is responsible for asserting required values before use.
 
 from __future__ import annotations
 
-from pydantic import field_validator
+from typing import Literal
+
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,7 +31,6 @@ class Settings(BaseSettings):
 
     finmind_token: str | None = None
 
-    ohmystock_auto_execute: str | None = None
     ohmystock_llm_degrade: str | None = None
     ohmystock_db_path: str = "~/.ohmystock/journal.db"
     ohmystock_log_level: str = "INFO"
@@ -53,9 +54,30 @@ class Settings(BaseSettings):
     ohmystock_confirm_timeout_minutes: int = 30
     ohmystock_default_capital_twd: int = 1_000_000
 
+    # Broker mode. Defaults to shioaji-sim (matches docs/safety-and-simulation.md
+    # §2.2). Live mode requires explicit env override and the auto-execute
+    # validator below forbids it being combined with auto-execute=true.
+    ohmystock_broker: Literal["mock", "shioaji-sim", "shioaji-live"] = (
+        "shioaji-sim"
+    )
+
+    # Auto-execute Phase 3.5 — see openspec/specs/auto-execute/spec.md
+    # (after archive). All defaults match cheatsheet §6.7 and safety §2.9.
+    ohmystock_auto_execute: bool = False
+    ohmystock_auto_execute_daily_limit: int = 5
+    ohmystock_auto_execute_min_confidence: float = 0.7
+    ohmystock_auto_execute_max_notional_pct: float = 0.25
+    ohmystock_auto_execute_max_sizing_deviation: float = 0.30
+    ohmystock_auto_execute_loss_lockout_hours: int = 24
+    ohmystock_auto_execute_loss_pct_threshold: float = -0.05
+    ohmystock_auto_execute_account_equity_twd: int = 1_000_000
+
     @field_validator(
         "ohmystock_confirm_timeout_minutes",
         "ohmystock_default_capital_twd",
+        "ohmystock_auto_execute_daily_limit",
+        "ohmystock_auto_execute_loss_lockout_hours",
+        "ohmystock_auto_execute_account_equity_twd",
     )
     @classmethod
     def _must_be_positive(cls, value: int, info) -> int:  # noqa: ANN001
@@ -64,3 +86,21 @@ class Settings(BaseSettings):
                 f"{info.field_name} must be a positive integer, got {value}"
             )
         return value
+
+    @model_validator(mode="after")
+    def forbid_auto_execute_in_live(self) -> "Settings":
+        """Defense-in-depth: refuse to start with OHMYSTOCK_AUTO_EXECUTE=true
+        when OHMYSTOCK_BROKER=shioaji-live.
+
+        Live mode requires human confirm per docs/safety-and-simulation.md §2.9.
+        """
+        if (
+            self.ohmystock_auto_execute
+            and self.ohmystock_broker == "shioaji-live"
+        ):
+            raise RuntimeError(
+                "Refusing to start: OHMYSTOCK_AUTO_EXECUTE=true is not allowed "
+                "when OHMYSTOCK_BROKER=shioaji-live. Live mode requires human "
+                "confirm."
+            )
+        return self

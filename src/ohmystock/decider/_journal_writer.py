@@ -53,6 +53,7 @@ def write_entry_pending_confirm(
         "bonus_breakdown": [_bonus_dict(item) for item in raw.bonus_breakdown],
         "proposed_sizing_pct": raw.proposed_sizing_pct,
         "final_sizing_pct": final.proposed_sizing_pct,
+        "system_sizing_pct": 10.0 if raw.stage == 3 else 25.0,
         "expected_holding_days": raw.expected_holding_days,
         "thesis_invalidation": list(raw.invalidation_conditions),
         "risk_flags": list(raw.risk_flags),

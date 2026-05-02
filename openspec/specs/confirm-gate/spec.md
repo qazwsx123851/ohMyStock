@@ -26,7 +26,7 @@ TBD - created by archiving change confirm-gate-v0. Update Purpose after archive.
 
 ### Requirement: confirm() 函式：將 pending_confirm entry 變成 confirmed fill
 
-系統 SHALL 在 `ohmystock.safety.confirm_gate` 模組提供函式 `confirm(conn, *, decision_id, broker, default_capital_twd, user, clock) -> ConfirmResult`，行為如下：
+系統 SHALL 在 `ohmystock.safety.confirm_gate` 模組提供函式 `confirm(conn, *, decision_id, broker, default_capital_twd, user, auto_executed=False, clock) -> ConfirmResult`，行為如下：
 
 1. SHALL 以 `BEGIN IMMEDIATE` 開啟交易，避免並行 confirm 競爭。
 2. SHALL 查詢 `journal_entries WHERE decision_id=? AND kind='entry'`，取最新一筆。
@@ -38,10 +38,12 @@ TBD - created by archiving change confirm-gate-v0. Update Purpose after archive.
 8. **計算 ATR 與 stop_loss**（v0 normal-market case，per cheatsheet §6.6）：
    - `atr_at_entry = fill.fill_price * atr_14_pct / 100.0`（percent → TWD absolute）
    - `stop_loss_price = max(fill.fill_price * 0.94, fill.fill_price - 2.0 * atr_at_entry)`
-9. UPDATE 同一筆 row 的 `payload_json`：set `decision_status="confirmed"`、`actual_entry_price=fill.fill_price`、`actual_qty=fill.filled_qty`、`atr_at_entry=<computed>`、`stop_loss_price=<computed>`、`human_confirmed_by=user`、`human_confirmed_at=clock.now_iso()`。
+9. UPDATE 同一筆 row 的 `payload_json`：set `decision_status="confirmed"`、`actual_entry_price=fill.fill_price`、`actual_qty=fill.filled_qty`、`atr_at_entry=<computed>`、`stop_loss_price=<computed>`、`human_confirmed_by=user`、`human_confirmed_at=clock.now_iso()`、**`auto_executed=<auto_executed 參數值>`**（新增；預設 False 維持人工 confirm 既有行為）。
 10. COMMIT。回傳 `ConfirmResult(decision_id=..., fill=fill, qty=qty)`。
 
 `ConfirmResult` SHALL 為 frozen dataclass `(decision_id: str, fill: Fill, qty: int)`。`ConfirmGateError` SHALL 為 Exception 子類，attribute `code: Literal["not_found","not_pending","payload_invalid","broker_failed"]`、可選 `cause: Exception | None`。
+
+`auto_executed: bool = False` SHALL 為 keyword-only 參數，預設 `False`。當參數為 `False` 時 step 9 寫入 `auto_executed=False`，與 `confirm-gate-v0` 既有人工流程行為一致；當參數為 `True` 時 step 9 寫入 `auto_executed=True`，供 `auto-execute` capability 標記自動成交來源。
 
 #### Scenario: confirm 成功 — UPDATE entry row 並回傳 ConfirmResult
 - **GIVEN** in-memory SQLite 已跑 `init_schema(conn)` + `decide_entry(...)` 寫了一筆 `decision_id="dec_2026-05-02T10-00-00_2330"` 的 pending_confirm entry，payload `final_sizing_pct=16.5`、`current_price=832.0`、`atr_14_pct=2.85`
@@ -87,7 +89,15 @@ TBD - created by archiving change confirm-gate-v0. Update Purpose after archive.
 - **WHEN** confirm 成功
 - **THEN** `ConfirmResult.qty == 5000`
 
----
+#### Scenario: 預設 auto_executed 參數寫入 False
+- **GIVEN** pending entry，呼叫 `confirm(...)` 不傳 `auto_executed` 參數
+- **WHEN** confirm 成功
+- **THEN** 查 `SELECT json_extract(payload_json, '$.auto_executed') FROM journal_entries WHERE kind='entry'` 為 `0`（SQLite 把 JSON `false` 存為 `0`）
+
+#### Scenario: auto_executed=True 寫入 True
+- **GIVEN** pending entry，呼叫 `confirm(..., auto_executed=True, user="auto", ...)`
+- **WHEN** confirm 成功
+- **THEN** 查 `SELECT json_extract(payload_json, '$.auto_executed'), json_extract(payload_json, '$.human_confirmed_by') FROM journal_entries WHERE kind='entry'` 為 `(1, "auto")`
 
 ### Requirement: reject() 函式：人工拒絕寫 reject_layer=human + 翻 entry status
 

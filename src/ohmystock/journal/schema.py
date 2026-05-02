@@ -17,11 +17,15 @@ from __future__ import annotations
 
 import sqlite3
 
-_DDL_JOURNAL_ENTRIES = """
+_KIND_CHECK = (
+    "kind IN ('entry','exit','reject','expire','auto_execute_audit')"
+)
+
+_DDL_JOURNAL_ENTRIES = f"""
 CREATE TABLE IF NOT EXISTS journal_entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     decision_id TEXT NOT NULL,
-    kind TEXT NOT NULL CHECK(kind IN ('entry','exit','reject','expire')),
+    kind TEXT NOT NULL CHECK({_KIND_CHECK}),
     symbol TEXT NOT NULL,
     created_at TEXT NOT NULL,
     payload_json TEXT NOT NULL
@@ -124,6 +128,51 @@ def _probe_fts5(conn: sqlite3.Connection) -> None:
         ) from exc
 
 
+def _migrate_kind_check_if_legacy(conn: sqlite3.Connection) -> None:
+    """One-shot migration: if the journal_entries CHECK is the legacy 4-kind
+    list (no auto_execute_audit), rebuild the table preserving rows.
+
+    No-op for fresh DBs (table doesn't exist yet) or already-migrated DBs.
+    Skips quietly if the table is empty and the constraint will be replaced
+    by a fresh CREATE on the next DDL pass — but to be safe we always
+    rebuild when legacy constraint is detected.
+    """
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master "
+        "WHERE type='table' AND name='journal_entries'"
+    ).fetchone()
+    if row is None:
+        return  # fresh DB; CREATE will use new constraint
+    existing_sql = row[0] or ""
+    if "auto_execute_audit" in existing_sql:
+        return  # already migrated
+    if "CHECK(kind IN" not in existing_sql and "CHECK (kind IN" not in existing_sql:
+        return  # constraint shape unrecognised; leave alone
+    # Rebuild table preserving rows. Triggers / FTS are recreated by the
+    # main init_schema flow that runs after this helper.
+    conn.executescript(
+        f"""
+        DROP TRIGGER IF EXISTS journal_entries_ai;
+        DROP TRIGGER IF EXISTS journal_entries_au;
+        DROP TRIGGER IF EXISTS journal_entries_ad;
+        ALTER TABLE journal_entries RENAME TO _journal_entries_legacy;
+        CREATE TABLE journal_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            decision_id TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK({_KIND_CHECK}),
+            symbol TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL
+        );
+        INSERT INTO journal_entries
+            (id, decision_id, kind, symbol, created_at, payload_json)
+        SELECT id, decision_id, kind, symbol, created_at, payload_json
+        FROM _journal_entries_legacy;
+        DROP TABLE _journal_entries_legacy;
+        """
+    )
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create Trade Journal tables / indexes / triggers idempotently.
 
@@ -131,6 +180,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
     """
     _probe_fts5(conn)
     with conn:
+        _migrate_kind_check_if_legacy(conn)
         conn.execute(_DDL_JOURNAL_ENTRIES)
         conn.execute(_DDL_INDEX_DECISION_ID)
         conn.execute(_DDL_INDEX_KIND_CREATED_AT)

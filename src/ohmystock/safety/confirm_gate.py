@@ -110,9 +110,16 @@ def confirm(
     broker: PaperBroker,
     default_capital_twd: int,
     user: str,
+    auto_executed: bool = False,
     clock: Clock = system_clock,
 ) -> ConfirmResult:
-    """Promote a pending_confirm entry to confirmed via the paper broker."""
+    """Promote a pending_confirm entry to confirmed via the paper broker.
+
+    ``auto_executed=False`` (default) marks the row as a human confirm.
+    ``auto_executed=True`` marks the row as the auto-execute path
+    (``ohmystock.safety.auto_execute.try_auto_execute``); breakers must have
+    been checked by that caller before invoking this with ``True``.
+    """
 
     _begin_immediate(conn)
     try:
@@ -177,6 +184,7 @@ def confirm(
                 "stop_loss_price": stop_loss_price,
                 "human_confirmed_by": user,
                 "human_confirmed_at": confirmed_at,
+                "auto_executed": auto_executed,
             },
         )
     except BaseException:

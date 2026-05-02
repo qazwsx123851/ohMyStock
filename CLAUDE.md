@@ -111,6 +111,7 @@ Agent 核心層（Claude Agent SDK + PreToolUse/PostToolUse Hooks 稽核）
 | LLM Decider PM 節點 + §2.1 系統覆寫驗證 | `openspec/specs/entry-decider/spec.md`（archive 後）+ `src/ohmystock/decider/validator.py` |
 | Confirm Gate v0 行為（human-only：confirm/reject/sweep_expired/list_pending）| `openspec/specs/confirm-gate/spec.md`（archive 後）+ `src/ohmystock/safety/confirm_gate.py` |
 | Exit Engine v0 行為（daily, full-position close on stop_loss/T1/time_stop）| `openspec/specs/exit-engine/spec.md`（archive 後）+ `src/ohmystock/exit_engine/evaluator.py` |
+| Auto-execute Phase 3.5 — breaker thresholds + audit row format（5 hard breakers + sizing clamp + flag/live defense-in-depth）| `openspec/specs/auto-execute/spec.md`（archive 後）+ `src/ohmystock/safety/auto_execute.py` + `OHMYSTOCK_AUTO_EXECUTE_*` 於 `src/ohmystock/config.py` |
 
 完整版（含「不要在這裡改」欄位）見 `docs/README.md` §2。
 
