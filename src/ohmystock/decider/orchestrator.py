@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Callable, Literal, Protocol
 
+from ohmystock.config import Settings
 from ohmystock.decider._journal_writer import (
     write_entry_pending_confirm,
     write_llm_cost,
@@ -34,6 +35,8 @@ from ohmystock.decider.node import (
     PMConclusionNode,
 )
 from ohmystock.decider.validator import validate_decider_output
+from ohmystock.eventbus import Agent, Event, EventType, safe_emit_sync
+from ohmystock.journal import emit_journal_written
 from ohmystock.swarm.models import EntryDecisionInput
 
 
@@ -92,6 +95,17 @@ def decide_entry(
     decision_id = decision_id_factory(entry_input)
     created_at = clock.now_iso()
 
+    safe_emit_sync(
+        Event(
+            event_type=EventType.DECIDER_THINKING,
+            agent=Agent.DECIDER,
+            payload={
+                "symbol": entry_input.candidate.symbol,
+                "confidence_so_far": 0.0,
+            },
+        )
+    )
+
     try:
         raw, usage = decider.decide(entry_input)
     except DeciderOutputParseError as exc:
@@ -112,6 +126,7 @@ def decide_entry(
                 usage=None,
                 created_at=created_at,
             )
+        emit_journal_written("reject", entry_input.candidate.symbol)
         raise
 
     vr = validate_decider_output(raw, entry_input.candidate)
@@ -149,6 +164,35 @@ def decide_entry(
             created_at=created_at,
         )
 
+    emit_journal_written(written_kind, entry_input.candidate.symbol)
+
+    safe_emit_sync(
+        Event(
+            event_type=EventType.DECISION_MADE,
+            agent=Agent.DECIDER,
+            payload={
+                "symbol": entry_input.candidate.symbol,
+                "confidence": float(raw.confidence),
+                "reasoning": raw.reasoning,
+                "action": "entry" if written_kind == "entry" else "skip",
+            },
+        )
+    )
+
+    if written_kind == "entry":
+        timeout_at = _compute_timeout_at(created_at)
+        safe_emit_sync(
+            Event(
+                event_type=EventType.AWAITING_CONFIRM,
+                agent=Agent.TRADER,
+                payload={
+                    "symbol": entry_input.candidate.symbol,
+                    "timeout_at": timeout_at,
+                    "expected_price": entry_input.candidate.current_price,
+                },
+            )
+        )
+
     return OrchestrationResult(
         decision_id=decision_id,
         final=vr.final_decision,
@@ -178,6 +222,13 @@ class _atomic:
 def _parse_error_reason(exc: DeciderOutputParseError) -> str:
     raw = (exc.raw_text or "")[:_PARSE_ERROR_REASON_MAX_CHARS]
     return f"json_parse_error: {raw}"
+
+
+def _compute_timeout_at(created_at: str) -> str:
+    """``created_at`` (ISO-8601 +08:00) + Settings confirm timeout, ISO-8601."""
+    settings = Settings()
+    delta = timedelta(minutes=settings.ohmystock_confirm_timeout_minutes)
+    return (datetime.fromisoformat(created_at) + delta).isoformat(timespec="seconds")
 
 
 def _llm_reject_reason(raw: DeciderOutput) -> str:

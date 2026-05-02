@@ -33,6 +33,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal, Protocol
 
+from ohmystock.eventbus import Agent, Event, EventType, safe_emit_sync
+from ohmystock.journal import emit_journal_written
 from ohmystock.safety.confirm_gate import (
     ConfirmGateError,
     ConfirmResult,
@@ -154,6 +156,7 @@ def try_auto_execute(
             evidence=evidence,
             clock=clock,
         )
+        _emit_risk_off("flag_off")
         return AutoExecuteResult(
             decision_id=decision_id,
             outcome="flag_off",
@@ -172,6 +175,7 @@ def try_auto_execute(
             evidence=evidence,
             clock=clock,
         )
+        _emit_risk_off("live_broker")
         return AutoExecuteResult(
             decision_id=decision_id,
             outcome="live_broker",
@@ -195,6 +199,7 @@ def try_auto_execute(
             evidence=evidence,
             clock=clock,
         )
+        _emit_risk_off("low_confidence")
         return AutoExecuteResult(
             decision_id=decision_id,
             outcome="low_confidence",
@@ -222,6 +227,7 @@ def try_auto_execute(
             evidence=evidence,
             clock=clock,
         )
+        _emit_risk_off("notional_limit")
         return AutoExecuteResult(
             decision_id=decision_id,
             outcome="notional_limit",
@@ -245,6 +251,7 @@ def try_auto_execute(
             evidence=evidence,
             clock=clock,
         )
+        _emit_risk_off("daily_limit")
         return AutoExecuteResult(
             decision_id=decision_id,
             outcome="daily_limit",
@@ -267,6 +274,7 @@ def try_auto_execute(
             evidence=evidence,
             clock=clock,
         )
+        _emit_risk_off("loss_lockout")
         return AutoExecuteResult(
             decision_id=decision_id,
             outcome="loss_lockout",
@@ -551,6 +559,32 @@ def _write_audit(
             ts,
             json.dumps(payload, ensure_ascii=False),
         ),
+    )
+    conn.commit()
+    emit_journal_written("auto_execute_audit", symbol)
+
+
+_RISK_OFF_SEVERITY: dict[str, str] = {
+    "flag_off": "warn",
+    "low_confidence": "warn",
+    "live_broker": "halt",
+    "notional_limit": "halt",
+    "daily_limit": "halt",
+    "loss_lockout": "halt",
+}
+
+
+def _emit_risk_off(reason_category: str) -> None:
+    """Emit risk_off_triggered for breaker outcomes only (not pass / clamp)."""
+    severity = _RISK_OFF_SEVERITY.get(reason_category)
+    if severity is None:
+        return
+    safe_emit_sync(
+        Event(
+            event_type=EventType.RISK_OFF_TRIGGERED,
+            agent=Agent.GUARD,
+            payload={"reason_category": reason_category, "severity": severity},
+        )
     )
 
 

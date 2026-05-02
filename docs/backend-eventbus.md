@@ -113,6 +113,8 @@ class Event:
     timestamp: datetime = field(default_factory=lambda: datetime.now(TPE))
 ```
 
+> **v0 wiring status (eventbus-emitters-v0)**: 9 of the 16 event_types below are emitted by already-shipped services (`screener_started`, `screener_completed`, `decider_thinking`, `decision_made`, `awaiting_confirm`, `order_sent`, `journal_written`, `risk_off_triggered`). The 7 deferred — `pattern_detected`, `journal_queried`, `review_node_started`, `review_completed`, `proposal_created`, `wfa_started`, `wfa_passed`, `wfa_failed` — wait for their respective producers (pattern detector, FTS5 query path, Phase 5 reviewer / proposer / WFA validator) to ship.
+
 ### 3.2 EVENT_TYPES 清單（v1 範圍 = 14 項）
 
 | event_type | agent | 觸發時機 | 完整 payload 欄位 |

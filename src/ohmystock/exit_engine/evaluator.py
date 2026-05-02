@@ -28,6 +28,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Literal, Protocol
 
+from ohmystock.journal import emit_journal_written
+
 
 ExitTag = Literal["hit_stop_loss", "hit_t1", "time_stop"]
 
@@ -277,6 +279,8 @@ def _close_position_atomic(
         raise
     else:
         conn.commit()
+
+    emit_journal_written("exit", symbol)
 
 
 def _flip_entry_to_closed(conn: sqlite3.Connection, decision_id: str) -> None:

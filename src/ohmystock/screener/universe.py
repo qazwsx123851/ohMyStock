@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from ohmystock.config import Settings
+from ohmystock.eventbus import Agent, Event, EventType, safe_emit_sync
 from ohmystock.screener.cache import (
     aggregate_universe_rows,
     init_universe_schema,
@@ -100,6 +101,14 @@ def screen_universe(
                 wanted = set(custom_symbols or [])
                 rows = [r for r in rows if r["symbol"] in wanted]
 
+            safe_emit_sync(
+                Event(
+                    event_type=EventType.SCREENER_STARTED,
+                    agent=Agent.SCANNER,
+                    payload={"universe_size": len(rows)},
+                )
+            )
+
             try:
                 rows = _apply_filters(rows, filters or [], conn, asof_used)
             except _FilterError as fe:
@@ -116,6 +125,17 @@ def screen_universe(
                     for r in rows
                 ),
                 key=lambda c: c["symbol"],
+            )
+
+            safe_emit_sync(
+                Event(
+                    event_type=EventType.SCREENER_COMPLETED,
+                    agent=Agent.SCANNER,
+                    payload={
+                        "candidate_count": len(candidates),
+                        "symbols": [c["symbol"] for c in candidates],
+                    },
+                )
             )
 
             return {

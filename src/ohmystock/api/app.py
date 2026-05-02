@@ -1,12 +1,19 @@
 """FastAPI app factory.
 
-create_app() returns a fresh FastAPI instance with /healthz and
-/api/admin/events. The bootstrap change emits a 15-second heartbeat on
-the SSE stream and does NOT wire EventBus into it — that lands in a
-later change. Factory mode (no module-level `app`) is enforced so
-uvicorn --reload and tests both build clean instances.
+``create_app()`` returns a fresh FastAPI instance exposing:
 
-Spec: openspec/changes/fastapi-bootstrap/specs/backend-api-and-eventbus/spec.md
+* ``GET /healthz`` — liveness/version probe (no auth, no downstream calls).
+* ``GET /api/admin/events`` — SSE stream that subscribes to the in-process
+  ``EventBus`` and broadcasts every ``Event`` in the admin JSON shape from
+  ``AdminEventSerializer``. When idle, the handler yields a comment
+  ``: keepalive`` frame every 15 s so HTTP proxies (nginx default 60 s,
+  Cloudflare default 100 s) do not drop the connection. On disconnect,
+  ``bus.unsubscribe(q)`` runs in ``finally`` so dead queues do not leak.
+
+This file remains *no-auth*: Bearer auth lands in a Phase 4 change.
+
+Spec: openspec/specs/backend-api-and-eventbus/spec.md
+      openspec/specs/eventbus-emitters/spec.md
 """
 
 from __future__ import annotations
@@ -14,26 +21,34 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncGenerator
-from datetime import datetime
 from importlib.metadata import version as _pkg_version
 
 from fastapi import FastAPI
-from sse_starlette.sse import EventSourceResponse
+from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
-from ohmystock.eventbus.events import TPE
+from ohmystock.eventbus import AdminEventSerializer, bus
+
+_KEEPALIVE_TIMEOUT_SECONDS = 15.0
 
 
-async def _admin_event_stream() -> AsyncGenerator[dict[str, str], None]:
+async def _admin_event_stream() -> AsyncGenerator[ServerSentEvent | dict[str, str], None]:
+    q = bus.subscribe()
     try:
         while True:
+            try:
+                event = await asyncio.wait_for(q.get(), timeout=_KEEPALIVE_TIMEOUT_SECONDS)
+            except asyncio.TimeoutError:
+                yield ServerSentEvent(comment="keepalive")
+                continue
+
             yield {
-                "event": "heartbeat",
-                "data": json.dumps({"ts": datetime.now(TPE).isoformat()}),
+                "event": str(event.event_type),
+                "data": json.dumps(
+                    AdminEventSerializer.serialize(event), ensure_ascii=False
+                ),
             }
-            await asyncio.sleep(15)
     finally:
-        # Phase 1 will replace this with bus.unsubscribe(q) once EventBus is wired in.
-        pass
+        bus.unsubscribe(q)
 
 
 def create_app() -> FastAPI:

@@ -49,15 +49,39 @@ def test_admin_events_route_registered() -> None:
     assert "/api/admin/events" in paths
 
 
-async def test_admin_event_stream_yields_heartbeat() -> None:
+async def test_admin_event_stream_broadcasts_emitted_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import sys
+
+    import ohmystock.api.app as app_module
+    import ohmystock.eventbus as eventbus_pkg
+
+    bus_module = sys.modules["ohmystock.eventbus.bus"]
+
+    fresh = EventBus()
+    monkeypatch.setattr(eventbus_pkg, "bus", fresh)
+    monkeypatch.setattr(bus_module, "bus", fresh)
+    monkeypatch.setattr(app_module, "bus", fresh)
+
     gen = _admin_event_stream()
     try:
-        msg = await asyncio.wait_for(gen.__anext__(), timeout=1.0)
+        # Yield once so the generator subscribes before we emit.
+        msg_task = asyncio.create_task(gen.__anext__())
+        await asyncio.sleep(0)
+        await fresh.emit(
+            Event(event_type="decision_made", agent="decider", payload={"symbol": "2330"})
+        )
+        msg = await asyncio.wait_for(msg_task, timeout=1.0)
     finally:
         await gen.aclose()
-    assert msg["event"] == "heartbeat"
+
+    assert msg["event"] == "decision_made"
     payload = json.loads(msg["data"])
-    assert "ts" in payload and isinstance(payload["ts"], str)
+    assert payload["event_type"] == "decision_made"
+    assert payload["agent"] == "decider"
+    assert payload["payload"] == {"symbol": "2330"}
+    assert "+08:00" in payload["timestamp"]
 
 
 def test_get_connection_pragmas(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Protocol
 
+from ohmystock.eventbus import Agent, Event, EventType, safe_emit_sync
+from ohmystock.journal import emit_journal_written
 from ohmystock.paper.broker import BrokerError, Fill, PaperBroker
 
 
@@ -193,6 +195,19 @@ def confirm(
     else:
         conn.commit()
 
+    safe_emit_sync(
+        Event(
+            event_type=EventType.ORDER_SENT,
+            agent=Agent.TRADER,
+            payload={
+                "symbol": symbol,
+                "price": fill.fill_price,
+                "quantity": fill.filled_qty,
+                "broker_order_id": fill.fill_ts,
+            },
+        )
+    )
+
     return ConfirmResult(decision_id=decision_id, fill=fill, qty=qty)
 
 
@@ -276,6 +291,8 @@ def reject(
     else:
         conn.commit()
 
+    emit_journal_written("reject", symbol)
+
     return RejectResult(decision_id=decision_id, reject_row_id=reject_row_id)
 
 
@@ -311,6 +328,7 @@ def sweep_expired(
         ).fetchall()
 
         swept: list[str] = []
+        swept_pairs: list[tuple[str, str]] = []
         ts = clock.now_iso()
         expire_reason = f"confirm timeout after {timeout_minutes} minutes"
 
@@ -341,11 +359,15 @@ def sweep_expired(
                 updates={"decision_status": "expired"},
             )
             swept.append(decision_id)
+            swept_pairs.append((decision_id, symbol))
     except BaseException:
         conn.rollback()
         raise
     else:
         conn.commit()
+
+    for _, sym in swept_pairs:
+        emit_journal_written("expire", sym)
 
     return swept
 
