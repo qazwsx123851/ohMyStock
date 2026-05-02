@@ -53,12 +53,16 @@ def test_settings_constructible_without_env(monkeypatch: pytest.MonkeyPatch) -> 
         monkeypatch.delenv(key, raising=False)
     monkeypatch.delenv("OHMYSTOCK_DECIDER_MODEL", raising=False)
     monkeypatch.delenv("OHMYSTOCK_ALLOW_FAKE_DECIDER", raising=False)
+    monkeypatch.delenv("OHMYSTOCK_CONFIRM_TIMEOUT_MINUTES", raising=False)
+    monkeypatch.delenv("OHMYSTOCK_DEFAULT_CAPITAL_TWD", raising=False)
     s = Settings(_env_file=None)
     assert s.anthropic_api_key is None
     assert s.ohmystock_log_level == "INFO"
     assert s.ohmystock_db_path == "~/.ohmystock/journal.db"
     assert s.ohmystock_decider_model == "claude-opus-4-7"
     assert s.ohmystock_allow_fake_decider is False
+    assert s.ohmystock_confirm_timeout_minutes == 30
+    assert s.ohmystock_default_capital_twd == 1_000_000
 
 
 def test_settings_decider_model_override(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -75,3 +79,49 @@ def test_settings_allow_fake_decider_truthy(
     monkeypatch.setenv("OHMYSTOCK_ALLOW_FAKE_DECIDER", "true")
     s = Settings(_env_file=None)
     assert s.ohmystock_allow_fake_decider is True
+
+
+def test_settings_confirm_timeout_minutes_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OHMYSTOCK_CONFIRM_TIMEOUT_MINUTES", "60")
+    s = Settings(_env_file=None)
+    assert s.ohmystock_confirm_timeout_minutes == 60
+
+
+def test_settings_default_capital_twd_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OHMYSTOCK_DEFAULT_CAPITAL_TWD", "2500000")
+    s = Settings(_env_file=None)
+    assert s.ohmystock_default_capital_twd == 2_500_000
+
+
+def test_settings_confirm_timeout_zero_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic import ValidationError
+
+    monkeypatch.setenv("OHMYSTOCK_CONFIRM_TIMEOUT_MINUTES", "0")
+    with pytest.raises(ValidationError, match="ohmystock_confirm_timeout_minutes"):
+        Settings(_env_file=None)
+
+
+def test_settings_confirm_timeout_negative_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic import ValidationError
+
+    monkeypatch.setenv("OHMYSTOCK_CONFIRM_TIMEOUT_MINUTES", "-5")
+    with pytest.raises(ValidationError, match="ohmystock_confirm_timeout_minutes"):
+        Settings(_env_file=None)
+
+
+def test_settings_default_capital_negative_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from pydantic import ValidationError
+
+    monkeypatch.setenv("OHMYSTOCK_DEFAULT_CAPITAL_TWD", "-1")
+    with pytest.raises(ValidationError, match="ohmystock_default_capital_twd"):
+        Settings(_env_file=None)

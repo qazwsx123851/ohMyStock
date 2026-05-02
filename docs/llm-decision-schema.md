@@ -277,6 +277,8 @@ LLM 輸出 → 系統 Sizing Service / ATR Service / Risk Gate 處理後產出:
 
 > **v3 決策 #15**：所有 `kind=*` 紀錄中**只要該決策呼叫過 LLM**，都必含 `llm_input_tokens` / `llm_output_tokens` / `llm_cost_usd` 三欄；單純由系統規則觸發的 `kind=reject`（如 Risk Gate 硬擋）不含 LLM 成本欄。月成本由 Admin Dashboard 即時聚合（詳 [`frontend.md`](frontend.md) §17.B），達 80% 預算（USD $40）警示、達 100% 觸發軟熔斷（詳 [`safety-and-simulation.md`](safety-and-simulation.md) §2.11）。
 
+> **Confirm Gate v0（2026-05-02 實作）**：`actual_entry_price` / `actual_qty` / `human_confirmed_by` / `human_confirmed_at` 四欄由 `ohmystock.safety.confirm_gate.confirm()` 在 paper broker fill 後寫入；`decision_status` 由 v0 的 `confirm` / `reject` / `sweep_expired` 三函式翻為 `confirmed` / `rejected` / `expired`。`current_price` 由 `decide_entry` 在寫入 pending_confirm 時 snapshot，作為後續 broker `reference_price`。
+
 ### 4.2 `kind=exit` (Phase 4 出場後)
 
 ```json

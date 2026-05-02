@@ -158,5 +158,18 @@ app.command(
 )(decide)
 
 
+from ohmystock.cli._confirm import confirm_command  # noqa: E402
+
+app.command(
+    "confirm",
+    help=(
+        "Confirm Gate v0 (human-only) — drive pending_confirm entries to "
+        "confirmed/rejected/expired. Modes: --list, <decision_id> [--reject], "
+        "--sweep-expired. Auto mode requires the Phase 3.5 breaker; this "
+        "command always runs human-mode and warns if OHMYSTOCK_AUTO_EXECUTE=true."
+    ),
+)(confirm_command)
+
+
 def main() -> None:
     app()

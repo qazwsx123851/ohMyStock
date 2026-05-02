@@ -7,6 +7,7 @@ downstream code is responsible for asserting required values before use.
 
 from __future__ import annotations
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,3 +45,22 @@ class Settings(BaseSettings):
     # exposure_pct and monthly_pnl_pct. Default matches docs/frontend.md §17 and
     # tools-contracts.md §backtest defaults.
     starting_equity_twd: int = 1_000_000
+
+    # Confirm Gate v0 — see openspec/specs/confirm-gate/spec.md (after archive).
+    # Timeout for pending_confirm entries (sweep_expired uses this). Default 30
+    # min mirrors v3-decisions #11. Capital used by gate to compute qty until
+    # Sizing Service ships.
+    ohmystock_confirm_timeout_minutes: int = 30
+    ohmystock_default_capital_twd: int = 1_000_000
+
+    @field_validator(
+        "ohmystock_confirm_timeout_minutes",
+        "ohmystock_default_capital_twd",
+    )
+    @classmethod
+    def _must_be_positive(cls, value: int, info) -> int:  # noqa: ANN001
+        if value <= 0:
+            raise ValueError(
+                f"{info.field_name} must be a positive integer, got {value}"
+            )
+        return value

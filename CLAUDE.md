@@ -109,6 +109,7 @@ Agent 核心層（Claude Agent SDK + PreToolUse/PostToolUse Hooks 稽核）
 | Phase 2B Swarm Input Assembler | `docs/design-zh-TW.md` §4.7.0 |
 | Live provider error codes / freshness policy | `openspec/specs/live-providers/spec.md` |
 | LLM Decider PM 節點 + §2.1 系統覆寫驗證 | `openspec/specs/entry-decider/spec.md`（archive 後）+ `src/ohmystock/decider/validator.py` |
+| Confirm Gate v0 行為（human-only：confirm/reject/sweep_expired/list_pending）| `openspec/specs/confirm-gate/spec.md`（archive 後）+ `src/ohmystock/safety/confirm_gate.py` |
 
 完整版（含「不要在這裡改」欄位）見 `docs/README.md` §2。
 

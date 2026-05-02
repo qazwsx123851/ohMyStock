@@ -859,6 +859,7 @@ class Strategy(Protocol):
 - **Sizing Policy**（`strategies/sizing.py`）：實作 [`workflow-cheatsheet.md` §6.6 Volatility Targeting 公式](workflow-cheatsheet.md#position-sizingvolatility-targeting系統公式)（**唯一權威**）；LLM 提案 vs 公式取**較小**者(LLM 不可放大)；ATR 停損價系統強算 LLM 不可覆寫（公式同上 §6.6）。
 - **Risk Gate**（`strategies/risk_gate.py`）：硬性過濾——處置股 / 警示股 / 全額交割股 / 漲跌停無法成交 / 違反單檔上限 / 違反總槓桿上限 → **直接拒單,原因寫 audit log + Trade Journal**。LLM 無法覆蓋。
 - **Confirm Gate**(v3 新增)：依 `OHMYSTOCK_AUTO_EXECUTE` 切換。false 寫入 pending decisions 佇列等人工 confirm;true 過 §4.5 防線 9 熔斷後直接送單。Live 模式強制 false。
+  > **實作狀態（2026-05-02）**：Confirm Gate v0 (human-only) 已實作於 `ohmystock.safety.confirm_gate`（`confirm` / `reject` / `sweep_expired` / `list_pending` 四函式 + `ohmystock confirm` CLI 子命令）；auto 模式 + 防線 9 熔斷待 Phase 3.5。
 - **Broker Adapter**：Paper（Shioaji simulation）或 Backtest（回測引擎內建撮合）。同一支策略**毋須改碼**即可在回測 / 模擬 / 實單之間切換。
 - **Trade Journal Service**(v3 新增,§4.6.1)：每階段都寫 SQLite + FTS5,供 §4.7.2 復盤 swarm 回查。
 

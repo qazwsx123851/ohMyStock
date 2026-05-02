@@ -61,6 +61,7 @@ def write_entry_pending_confirm(
         "trend_template_passed": raw.trend_template_passed,
         "vcp_quality": raw.vcp_quality,
         "pivot_price": raw.pivot_price,
+        "current_price": entry_input.candidate.current_price,
         "llm_input_tokens": usage.input_tokens,
         "llm_output_tokens": usage.output_tokens,
         "llm_cost_usd": usage.cost_usd,
@@ -71,6 +72,8 @@ def write_entry_pending_confirm(
         "auto_executed": False,
         "human_confirmed_by": None,
         "human_confirmed_at": None,
+        "actual_entry_price": None,
+        "actual_qty": None,
     }
     conn.execute(
         "INSERT INTO journal_entries"
