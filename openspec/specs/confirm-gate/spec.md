@@ -32,18 +32,31 @@ TBD - created by archiving change confirm-gate-v0. Update Purpose after archive.
 2. SHALL 查詢 `journal_entries WHERE decision_id=? AND kind='entry'`，取最新一筆。
 3. 若查無資料 → ROLLBACK，raise `ConfirmGateError`，attribute `code="not_found"`。
 4. 若 `payload_json.decision_status != "pending_confirm"` → ROLLBACK，raise `ConfirmGateError`，`code="not_pending"`，message 含實際的 status 字串。
-5. 從 payload 取 `final_sizing_pct`、`current_price`（從 entry payload 中的快照欄位，由 `decide_entry` 寫入）。若 payload 缺欄位 → ROLLBACK，raise `ConfirmGateError`，`code="payload_invalid"`。
+5. 從 payload 取 `final_sizing_pct`、`current_price`、`atr_14_pct`（皆從 entry payload 中的快照欄位，由 `decide_entry` 寫入）。若 payload 缺欄位 → ROLLBACK，raise `ConfirmGateError`，`code="payload_invalid"`。
 6. 計算 `qty = max(1000, floor(default_capital_twd * (final_sizing_pct / 100) / current_price / 1000) * 1000)`。
 7. 呼叫 `broker.submit_market_order(symbol=..., qty=qty, side="buy", reference_price=current_price)`。若 raise `BrokerError` → ROLLBACK，封裝為 `ConfirmGateError(code="broker_failed", cause=e)` re-raise。
-8. UPDATE 同一筆 row 的 `payload_json`：set `decision_status="confirmed"`、`actual_entry_price=fill.fill_price`、`actual_qty=fill.filled_qty`、`human_confirmed_by=user`、`human_confirmed_at=clock.now_iso()`。
-9. COMMIT。回傳 `ConfirmResult(decision_id=..., fill=fill, qty=qty)`。
+8. **計算 ATR 與 stop_loss**（v0 normal-market case，per cheatsheet §6.6）：
+   - `atr_at_entry = fill.fill_price * atr_14_pct / 100.0`（percent → TWD absolute）
+   - `stop_loss_price = max(fill.fill_price * 0.94, fill.fill_price - 2.0 * atr_at_entry)`
+9. UPDATE 同一筆 row 的 `payload_json`：set `decision_status="confirmed"`、`actual_entry_price=fill.fill_price`、`actual_qty=fill.filled_qty`、`atr_at_entry=<computed>`、`stop_loss_price=<computed>`、`human_confirmed_by=user`、`human_confirmed_at=clock.now_iso()`。
+10. COMMIT。回傳 `ConfirmResult(decision_id=..., fill=fill, qty=qty)`。
 
 `ConfirmResult` SHALL 為 frozen dataclass `(decision_id: str, fill: Fill, qty: int)`。`ConfirmGateError` SHALL 為 Exception 子類，attribute `code: Literal["not_found","not_pending","payload_invalid","broker_failed"]`、可選 `cause: Exception | None`。
 
 #### Scenario: confirm 成功 — UPDATE entry row 並回傳 ConfirmResult
-- **GIVEN** in-memory SQLite 已跑 `init_schema(conn)` + `decide_entry(...)` 寫了一筆 `decision_id="dec_2026-05-02T10-00-00_2330"` 的 pending_confirm entry，payload `final_sizing_pct=16.5`、`current_price=832.0`
+- **GIVEN** in-memory SQLite 已跑 `init_schema(conn)` + `decide_entry(...)` 寫了一筆 `decision_id="dec_2026-05-02T10-00-00_2330"` 的 pending_confirm entry，payload `final_sizing_pct=16.5`、`current_price=832.0`、`atr_14_pct=2.85`
 - **WHEN** 呼叫 `confirm(conn, decision_id="dec_2026-05-02T10-00-00_2330", broker=FakePaperBroker(clock=FakeClock("2026-05-02T10:15:00+08:00")), default_capital_twd=1_000_000, user="mark@local", clock=FakeClock("2026-05-02T10:15:00+08:00"))`
 - **THEN** 回傳 `ConfirmResult(decision_id="dec_2026-05-02T10-00-00_2330", fill=Fill(symbol="2330", filled_qty=1000, fill_price=832.0, ...), qty=1000)`；查 `SELECT json_extract(payload_json, '$.decision_status'), json_extract(payload_json, '$.actual_entry_price'), json_extract(payload_json, '$.actual_qty'), json_extract(payload_json, '$.human_confirmed_by') FROM journal_entries WHERE decision_id=...` 結果為 `("confirmed", 832.0, 1000, "mark@local")`
+
+#### Scenario: confirm 成功 — atr_at_entry 與 stop_loss_price 已計算填入
+- **GIVEN** 同前 GIVEN（`fill.fill_price=832.0`、`atr_14_pct=2.85`）
+- **WHEN** confirm 成功
+- **THEN** 查 `SELECT json_extract(payload_json, '$.atr_at_entry'), json_extract(payload_json, '$.stop_loss_price') FROM journal_entries WHERE kind='entry'` 結果接近 `(23.712, 784.576)`（atr=832×2.85/100=23.712；stop=max(832×0.94, 832-2×23.712)=max(782.08, 784.576)=784.576）
+
+#### Scenario: confirm 失敗 — payload 缺 atr_14_pct raise payload_invalid
+- **GIVEN** entry payload 缺 `atr_14_pct` 欄位
+- **WHEN** 呼叫 `confirm(...)`
+- **THEN** raise `ConfirmGateError`，`exc.code == "payload_invalid"`，message 含 `"atr_14_pct"`；DB 中該 entry 仍為 pending_confirm
 
 #### Scenario: confirm 失敗 — decision_id 不存在 raise not_found
 - **WHEN** 呼叫 `confirm(conn, decision_id="dec_does_not_exist", ...)`
