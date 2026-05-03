@@ -26,6 +26,7 @@ from ohmystock.api.app import _admin_event_stream, create_app
 from ohmystock.api.routes._deps import get_db
 from ohmystock.eventbus import EventBus
 from ohmystock.journal.schema import init_schema
+from tests.conftest import VALID_ADMIN_TOKEN
 
 
 bus_module = sys.modules["ohmystock.eventbus.bus"]
@@ -89,7 +90,11 @@ def _build_client(conn: sqlite3.Connection) -> AsyncClient:
 
     app.dependency_overrides[get_db] = _override_get_db
     transport = ASGITransport(app=app)
-    return AsyncClient(transport=transport, base_url="http://test")
+    return AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {VALID_ADMIN_TOKEN}"},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -144,15 +149,6 @@ async def test_pending_timeout_zero_returns_400(
         )
     assert r.status_code == 400
     assert r.json()["error"]["code"] == "invalid_input"
-
-
-async def test_pending_no_authorization_header_returns_200(
-    conn: sqlite3.Connection, fresh_bus: EventBus
-) -> None:
-    async with _build_client(conn) as client:
-        r = await client.get("/api/admin/confirm-gate/pending", headers={})
-    assert r.status_code == 200
-    assert r.status_code not in (401, 403)
 
 
 # ---------------------------------------------------------------------------
@@ -215,20 +211,6 @@ async def test_confirm_empty_user_returns_400_or_422(
     # ValueError would land 400. Either is acceptable per the no-auth spec
     # (the key invariant is non-401/403).
     assert r.status_code in (400, 422)
-
-
-async def test_confirm_no_authorization_header_returns_200(
-    conn: sqlite3.Connection, fresh_bus: EventBus
-) -> None:
-    _seed_pending(conn)
-    async with _build_client(conn) as client:
-        r = await client.post(
-            "/api/admin/confirm-gate/confirm",
-            json={"decision_id": _DECISION_ID, "user": "mark"},
-            headers={},
-        )
-    assert r.status_code == 200
-    assert r.status_code not in (401, 403)
 
 
 async def test_confirm_emits_order_sent_via_sse(

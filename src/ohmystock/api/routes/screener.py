@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from ohmystock.api.auth import require_admin
 from ohmystock.api.routes._deps import get_db
 from ohmystock.api.routes._envelope import (
     map_exception_to_envelope,
@@ -26,7 +27,7 @@ from ohmystock.api.routes._envelope import (
 from ohmystock.screener.universe import screen_universe
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 class ScreenerRunRequest(BaseModel):

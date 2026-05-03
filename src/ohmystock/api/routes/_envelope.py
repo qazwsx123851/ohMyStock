@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ohmystock.api.auth import AuthError
 from ohmystock.exit_engine.evaluator import ExitEngineError
 from ohmystock.safety.confirm_gate import ConfirmGateError
 
@@ -47,6 +48,9 @@ def map_exception_to_envelope(exc: BaseException) -> tuple[int, dict[str, Any]]:
     the original message — see spec scenarios about path/SQL/traceback
     redaction.
     """
+
+    if isinstance(exc, AuthError):
+        return 401, to_error(exc.code, exc.message)
 
     if isinstance(exc, ConfirmGateError):
         if exc.code == "not_found":

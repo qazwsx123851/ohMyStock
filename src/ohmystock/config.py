@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     ohmystock_db_path: str = "~/.ohmystock/journal.db"
     ohmystock_log_level: str = "INFO"
 
+    # web-admin Bearer auth — see openspec/specs/web-admin-bearer-auth/spec.md
+    # (after archive). Default None lets Settings() construct without env;
+    # ohmystock.api.auth._validate_admin_token() enforces presence + length
+    # at app startup so CLI / tests that import Settings remain unaffected.
+    ohmystock_admin_token: str | None = None
+
     # Phase 3 LLM Decider PM node configuration. Defaults to opus-4-7 for
     # production decisions; tests / dev can override with a fake:// scheme
     # (allowed only when ohmystock_allow_fake_decider=true). Env keys are

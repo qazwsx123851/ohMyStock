@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from ohmystock.api.auth import require_admin
 from ohmystock.api.routes._deps import get_db
 from ohmystock.api.routes._envelope import (
     map_exception_to_envelope,
@@ -31,7 +32,7 @@ from ohmystock.exit_engine.evaluator import (
 from ohmystock.safety.confirm_gate import system_clock
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 _TPE_TZ = timezone(timedelta(hours=8))
 

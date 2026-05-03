@@ -5,7 +5,10 @@ Spec scenarios covered:
 * Success path: 200 + ``asof_date_used`` + ``candidates`` + ``elapsed_ms``.
 * Invalid universe: 400 ``invalid_input``.
 * SSE consumer receives ``screener_started`` + ``screener_completed``.
-* No ``Authorization`` header still works.
+
+Auth coverage (web-admin-bearer-auth) lives in tests/test_api_auth.py;
+this file always sends the synthetic Bearer token from
+tests/conftest.py via ``_build_client``.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ from ohmystock.api.app import _admin_event_stream, create_app
 from ohmystock.api.routes._deps import get_db
 from ohmystock.eventbus import EventBus
 from ohmystock.screener.cache import init_universe_schema, insert_universe_rows
+from tests.conftest import VALID_ADMIN_TOKEN
 
 
 bus_module = sys.modules["ohmystock.eventbus.bus"]
@@ -84,7 +88,11 @@ def _build_client(seeded_conn: sqlite3.Connection) -> AsyncClient:
 
     app.dependency_overrides[get_db] = _override_get_db
     transport = ASGITransport(app=app)
-    return AsyncClient(transport=transport, base_url="http://test")
+    return AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {VALID_ADMIN_TOKEN}"},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -148,25 +156,6 @@ async def test_screener_run_missing_universe_not_auth_error(
         r = await client.post("/api/admin/screener/run", json={})
 
     assert r.status_code not in (401, 403)
-
-
-# ---------------------------------------------------------------------------
-# No Authorization header → still 200 (no-auth invariant)
-# ---------------------------------------------------------------------------
-
-
-async def test_screener_run_works_without_authorization_header(
-    seeded_conn: sqlite3.Connection, fresh_bus: EventBus
-) -> None:
-    async with _build_client(seeded_conn) as client:
-        r = await client.post(
-            "/api/admin/screener/run",
-            json={"universe": "TWSE+OTC", "asof_date": "2026-04-30"},
-            headers={},
-        )
-
-    assert r.status_code == 200
-    assert "WWW-Authenticate" not in r.headers
 
 
 # ---------------------------------------------------------------------------

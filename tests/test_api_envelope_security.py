@@ -23,6 +23,7 @@ from ohmystock.api.routes._deps import get_db
 from ohmystock.api.routes.exit_engine import get_market_data
 from ohmystock.exit_engine.evaluator import MarketDataLookup
 from ohmystock.journal.schema import init_schema
+from tests.conftest import VALID_ADMIN_TOKEN
 
 
 _FORBIDDEN_SUBSTRINGS = (
@@ -67,7 +68,11 @@ def _build_client(
     if market is not None:
         app.dependency_overrides[get_market_data] = lambda: market
     transport = ASGITransport(app=app)
-    return AsyncClient(transport=transport, base_url="http://test")
+    return AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {VALID_ADMIN_TOKEN}"},
+    )
 
 
 def _assert_clean(body: dict) -> None:

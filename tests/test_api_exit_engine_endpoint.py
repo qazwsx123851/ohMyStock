@@ -24,6 +24,7 @@ from ohmystock.api.routes._deps import get_db
 from ohmystock.api.routes.exit_engine import get_market_data
 from ohmystock.exit_engine.evaluator import MarketDataLookup
 from ohmystock.journal.schema import init_schema
+from tests.conftest import VALID_ADMIN_TOKEN
 
 
 _DECISION_ID = "dec_X"
@@ -98,7 +99,11 @@ def _build_client(
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_market_data] = _override_get_market_data
     transport = ASGITransport(app=app)
-    return AsyncClient(transport=transport, base_url="http://test")
+    return AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {VALID_ADMIN_TOKEN}"},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -217,20 +222,3 @@ async def test_exit_engine_symbol_filter_limits_scope(
     assert data["results"][0]["decision_id"] == "dec_2330"
 
 
-# ---------------------------------------------------------------------------
-# No Authorization header → still 200 (no-auth invariant)
-# ---------------------------------------------------------------------------
-
-
-async def test_exit_engine_works_without_authorization(
-    conn: sqlite3.Connection,
-) -> None:
-    market = _DictMarketData({})
-    async with _build_client(conn, market) as client:
-        r = await client.post(
-            "/api/admin/exit-engine/run",
-            json={"asof_date": "2026-05-07"},
-            headers={},
-        )
-    assert r.status_code == 200
-    assert r.status_code not in (401, 403)

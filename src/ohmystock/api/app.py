@@ -23,12 +23,16 @@ import json
 from collections.abc import AsyncGenerator
 from importlib.metadata import version as _pkg_version
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Request
+from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
+from ohmystock.api.auth import AuthError, _validate_admin_token, require_admin
+from ohmystock.api.routes._envelope import to_error
 from ohmystock.api.routes.confirm_gate import router as confirm_gate_router
 from ohmystock.api.routes.exit_engine import router as exit_engine_router
 from ohmystock.api.routes.screener import router as screener_router
+from ohmystock.config import Settings
 from ohmystock.eventbus import AdminEventSerializer, bus
 
 _KEEPALIVE_TIMEOUT_SECONDS = 15.0
@@ -55,13 +59,30 @@ async def _admin_event_stream() -> AsyncGenerator[ServerSentEvent | dict[str, st
 
 
 def create_app() -> FastAPI:
+    # Fail-fast: refuse to construct the app if OHMYSTOCK_ADMIN_TOKEN is
+    # missing or shorter than 32 chars. Performed BEFORE any router is
+    # registered so a misconfigured deploy can never serve admin routes
+    # (web-admin-bearer-auth spec §「啟動時驗證 OHMYSTOCK_ADMIN_TOKEN」).
+    _validate_admin_token(Settings())
+
     app = FastAPI(title="ohMyStock API", version=_pkg_version("ohmystock"))
+
+    # Map AuthError raised by `require_admin` into the unified envelope.
+    # `Depends` runs before route handlers, so the inline try/except inside
+    # individual handlers cannot catch it — we need an app-level handler.
+    @app.exception_handler(AuthError)
+    async def _auth_error_handler(
+        request: Request, exc: AuthError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=401, content=to_error(exc.code, exc.message)
+        )
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok", "version": _pkg_version("ohmystock")}
 
-    @app.get("/api/admin/events")
+    @app.get("/api/admin/events", dependencies=[Depends(require_admin)])
     async def admin_events() -> EventSourceResponse:
         return EventSourceResponse(_admin_event_stream())
 
