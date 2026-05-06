@@ -51,58 +51,45 @@ entrypoint and reset with `reset_providers()` after.
 - **THEN** no direct `FinMindClient`, `Shioaji`, or `yfinance` call is issued
   by the loader itself
 
-### Requirement: Disposition list is fetched daily, cached, and degrades gracefully on scrape failure
+### Requirement: Disposition list interface and cache table ship; live TWSE/OTC scrape is deferred
 
 `fetch_disposition_set(asof: date) -> set[str]` SHALL be the single producer
-of the `disposition_set` argument to `_build_universe`. It SHALL:
+of the `disposition_set` argument used by the universe-closes loader. The
+`disposition_list_cache(asof_date TEXT, symbol TEXT, fetched_at TEXT, PRIMARY KEY (asof_date, symbol))`
+table SHALL exist with `asof_date` ISO `YYYY-MM-DD` and `fetched_at` ISO 8601 UTC.
 
-- On a cache miss for `asof`, scrape the TWSE 處置股 list and OTC 全額交割
-  list and merge them into a `set[str]` of symbols.
-- Persist the result in `disposition_list_cache(asof_date TEXT, symbol TEXT, fetched_at TEXT, PRIMARY KEY (asof_date, symbol))`.
-  `asof_date` uses ISO `YYYY-MM-DD`; `fetched_at` uses ISO 8601 UTC.
-- On a cache hit, return the cached set without re-scraping.
-- On scrape failure (network error, HTTP non-2xx, parse error), log a warning
-  and return the most recent cached set whose `asof_date <= asof`, or
-  `set()` if no prior cache entry exists. The function SHALL NOT raise on
-  scrape failure; it returns a possibly-stale set instead.
+`fetch_disposition_set` SHALL:
 
-A daily empty result (legitimately no disposition stocks today) SHALL still
-write a sentinel row so the next call counts as a cache hit and does not
-re-scrape; the chosen sentinel format is implementation-defined but MUST be
-distinguishable from a cold-cache miss.
+- On a cache hit for `asof`, return the cached set without further work.
+- On a cache miss, return `set()` and SHALL NOT raise. **In this change**, no
+  upstream scrape is attempted — the function is a stub that exists so the
+  rest of the wiring (loader filter, lifespan default, backfill) can be built
+  against a stable interface. A follow-up change `rs-percentile-disposition-scrape-impl`
+  SHALL replace the stub with TWSE 處置股 + OTC 全額交割 scraping plus
+  graceful-degrade-to-last-known-set; that follow-up MUST preserve the
+  no-raise contract documented here.
 
-#### Scenario: First call on a day scrapes and caches
+The function SHALL NOT raise under any condition reachable in this change.
 
-- **GIVEN** `disposition_list_cache` has no rows for `asof_date = 2026-04-30`
-- **AND** the TWSE/OTC scrape returns symbols `{"5678", "1234"}`
-- **WHEN** `fetch_disposition_set("2026-04-30")` is called
-- **THEN** the returned set is `{"5678", "1234"}`
-- **AND** rows for both symbols are present in `disposition_list_cache` with
+#### Scenario: Cache hit returns cached set
+
+- **GIVEN** `disposition_list_cache` has rows `{"5678", "1234"}` for
   `asof_date = "2026-04-30"`
-
-#### Scenario: Second call same day hits cache
-
-- **GIVEN** `disposition_list_cache` has rows for `asof_date = 2026-04-30`
-- **WHEN** `fetch_disposition_set("2026-04-30")` is called again
-- **THEN** the cached set is returned
-- **AND** no HTTP request is made to TWSE/OTC
-
-#### Scenario: Scrape failure with prior cache returns last-known set
-
-- **GIVEN** the TWSE/OTC scrape raises a network error for `2026-04-30`
-- **AND** `disposition_list_cache` has `{"5678"}` cached for `2026-04-29`
 - **WHEN** `fetch_disposition_set("2026-04-30")` is called
-- **THEN** the result is `{"5678"}`
-- **AND** a warning is logged
-- **AND** no exception propagates to the caller
+- **THEN** the result is `{"5678", "1234"}`
 
-#### Scenario: Scrape failure with cold cache returns empty set
+#### Scenario: Cache miss returns empty set without raising
 
-- **GIVEN** the TWSE/OTC scrape raises a network error for `2026-04-30`
-- **AND** `disposition_list_cache` has zero rows for any `asof_date`
+- **GIVEN** `disposition_list_cache` has no rows for `asof_date = "2026-04-30"`
 - **WHEN** `fetch_disposition_set("2026-04-30")` is called
 - **THEN** the result is `set()`
-- **AND** a warning is logged
+- **AND** no exception propagates to the caller
+
+#### Scenario: Cache table exists with documented schema
+
+- **WHEN** `init_schema(conn)` is called on a fresh SQLite connection
+- **THEN** the `disposition_list_cache` table exists
+- **AND** its primary key is `(asof_date, symbol)`
 
 ### Requirement: Backfill entrypoint is range-bounded, idempotent, and verifies row count
 
@@ -120,9 +107,8 @@ distinguishable from a cold-cache miss.
 - After the loop, runs `SELECT COUNT(*) FROM rs_rating_cache WHERE asof_date BETWEEN ? AND ?`
   and asserts the count is `>= N * 100` (sanity floor — real value is closer
   to `N * ~1500`). On assertion failure, exits non-zero with the actual count.
-- Re-runs over the same range SHALL leave row counts unchanged and update
-  only `computed_at` (driven by `INSERT OR REPLACE` semantics already in
-  `_write_cache`).
+- Re-runs over the same range SHALL leave the row count unchanged
+  (`compute_rs_rating` short-circuits on cache hit before any write).
 
 #### Scenario: Backfill populates cache for the requested range
 
@@ -141,8 +127,6 @@ distinguishable from a cold-cache miss.
   from a prior run
 - **WHEN** the same backfill command is re-run
 - **THEN** the row count for that range is unchanged
-- **AND** the `computed_at` column for those rows is updated to a later UTC
-  timestamp
 - **AND** the process exit code is `0`
 
 #### Scenario: Backfill fails loudly when row-count floor is not met

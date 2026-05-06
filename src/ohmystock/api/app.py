@@ -37,6 +37,7 @@ from ohmystock.api.routes.positions import router as positions_router
 from ohmystock.api.routes.screener import router as screener_router
 from ohmystock.api.routes.stats import router as stats_router
 from ohmystock.config import Settings
+from ohmystock.data.disposition import fetch_disposition_set
 from ohmystock.eventbus import AdminEventSerializer, bus
 from ohmystock.sepa.rs import reset_providers, set_universe_closes_loader
 from ohmystock.sepa.rs_loader import build_universe_closes_loader
@@ -51,7 +52,9 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     Spec: openspec/changes/rs-percentile-finmind-wiring/specs/rs-percentile/spec.md
     ("Production universe-closes loader …")
     """
-    set_universe_closes_loader(build_universe_closes_loader())
+    set_universe_closes_loader(
+        build_universe_closes_loader(disposition_fetcher=fetch_disposition_set)
+    )
     try:
         yield
     finally:
