@@ -20,7 +20,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import asynccontextmanager
 from importlib.metadata import version as _pkg_version
 
 from fastapi import Depends, FastAPI, Request
@@ -37,8 +38,24 @@ from ohmystock.api.routes.screener import router as screener_router
 from ohmystock.api.routes.stats import router as stats_router
 from ohmystock.config import Settings
 from ohmystock.eventbus import AdminEventSerializer, bus
+from ohmystock.sepa.rs import reset_providers, set_universe_closes_loader
+from ohmystock.sepa.rs_loader import build_universe_closes_loader
 
 _KEEPALIVE_TIMEOUT_SECONDS = 15.0
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Wire the rs-percentile universe-closes loader for the app's lifetime.
+
+    Spec: openspec/changes/rs-percentile-finmind-wiring/specs/rs-percentile/spec.md
+    ("Production universe-closes loader …")
+    """
+    set_universe_closes_loader(build_universe_closes_loader())
+    try:
+        yield
+    finally:
+        reset_providers()
 
 
 async def _admin_event_stream() -> AsyncGenerator[ServerSentEvent | dict[str, str], None]:
@@ -68,7 +85,11 @@ def create_app() -> FastAPI:
     # (web-admin-bearer-auth spec §「啟動時驗證 OHMYSTOCK_ADMIN_TOKEN」).
     _validate_admin_token(Settings())
 
-    app = FastAPI(title="ohMyStock API", version=_pkg_version("ohmystock"))
+    app = FastAPI(
+        title="ohMyStock API",
+        version=_pkg_version("ohmystock"),
+        lifespan=_lifespan,
+    )
 
     # Map AuthError raised by `require_admin` into the unified envelope.
     # `Depends` runs before route handlers, so the inline try/except inside
