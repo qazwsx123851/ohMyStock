@@ -41,7 +41,13 @@ def _make_uptrend_bars() -> list[dict]:
     ]
 
 
-def _patch_engine(bars: list[dict]) -> tuple:
+def _patch_engine(bars: list[dict], *, rs_rating: int | None = 80) -> tuple:
+    """Patch engine fetches plus the rs_percentile delegate.
+
+    Decision 6 (openspec/changes/rs-percentile-skill/design.md) consolidated
+    the rs_percentile sub-scorer onto ``ohmystock.sepa.rs.compute_rs_rating``;
+    engine-level tests stub it so they don't need a real universe loader.
+    """
     return (
         patch(
             "ohmystock.scoring._engine.get_kline",
@@ -55,13 +61,17 @@ def _patch_engine(bars: list[dict]) -> tuple:
             "ohmystock.scoring._engine.get_margin_short",
             return_value=_envelope({"rows": []}),
         ),
+        patch(
+            "ohmystock.scoring.subscorers.rs_percentile.compute_rs_rating",
+            return_value=rs_rating,
+        ),
     )
 
 
 def test_sufficient_bars_produce_non_none_sepa_fields() -> None:
     bars = _make_uptrend_bars()
-    p1, p2, p3 = _patch_engine(bars)
-    with p1, p2, p3:
+    p1, p2, p3, p4 = _patch_engine(bars)
+    with p1, p2, p3, p4:
         from ohmystock.scoring import score_watchlist
 
         env = score_watchlist("2026-04-30", ["2330"])
@@ -86,8 +96,8 @@ def test_sepa_fields_have_correct_types_and_ranges() -> None:
     """Beyond non-None, SEPA fields must satisfy the Phase2BCandidate
     schema constraints (Field(ge=0, le=99) etc.)."""
     bars = _make_uptrend_bars()
-    p1, p2, p3 = _patch_engine(bars)
-    with p1, p2, p3:
+    p1, p2, p3, p4 = _patch_engine(bars)
+    with p1, p2, p3, p4:
         from ohmystock.scoring import score_watchlist
 
         env = score_watchlist("2026-04-30", ["2330"])

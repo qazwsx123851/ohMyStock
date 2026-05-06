@@ -68,7 +68,20 @@ def _envelope(payload: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "elapsed_ms": 0, "data": payload, "error": None}
 
 
-def _patch_engine(bars: list[dict], chip_rows: list[dict], margin_rows: list[dict]) -> tuple:
+def _patch_engine(
+    bars: list[dict],
+    chip_rows: list[dict],
+    margin_rows: list[dict],
+    *,
+    rs_rating: int | None = 99,
+) -> tuple:
+    """Patch engine-level fetches plus the rs_percentile delegate.
+
+    The consolidated rs_percentile sub-scorer now calls
+    ``ohmystock.sepa.rs.compute_rs_rating`` (Decision 6 in
+    ``openspec/changes/rs-percentile-skill/design.md``); engine tests stub it
+    so they don't need a real universe loader configured.
+    """
     return (
         patch(
             "ohmystock.scoring._engine.get_kline",
@@ -82,13 +95,17 @@ def _patch_engine(bars: list[dict], chip_rows: list[dict], margin_rows: list[dic
             "ohmystock.scoring._engine.get_margin_short",
             return_value=_envelope({"rows": margin_rows}),
         ),
+        patch(
+            "ohmystock.scoring.subscorers.rs_percentile.compute_rs_rating",
+            return_value=rs_rating,
+        ),
     )
 
 
 def test_full_max_score_with_real_subscorers() -> None:
     bars, chip_rows, margin_rows = _make_max_score_data()
-    p1, p2, p3 = _patch_engine(bars, chip_rows, margin_rows)
-    with p1, p2, p3:
+    p1, p2, p3, p4 = _patch_engine(bars, chip_rows, margin_rows, rs_rating=99)
+    with p1, p2, p3, p4:
         from ohmystock.scoring import score_watchlist
 
         env = score_watchlist("2026-04-30", ["2330"])
@@ -143,8 +160,8 @@ def test_mixed_status_with_short_history() -> None:
     ]
     margin_rows: list[dict] = []
 
-    p1, p2, p3 = _patch_engine(bars, chip_rows, margin_rows)
-    with p1, p2, p3:
+    p1, p2, p3, p4 = _patch_engine(bars, chip_rows, margin_rows, rs_rating=None)
+    with p1, p2, p3, p4:
         from ohmystock.scoring import score_watchlist
 
         env = score_watchlist("2026-04-30", ["2330"])

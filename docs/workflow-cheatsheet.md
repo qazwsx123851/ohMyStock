@@ -928,5 +928,6 @@ created_at: 2026-04-30T19:30:00+08:00
 - **`reviews/README.md`**(v3 新增):§15.3 復盤輸出格式與歷史索引
 - **`src/ohmystock/strategies/`**:本文件的程式碼實作。每支策略檔案頂端註解需標示「實作 workflow-cheatsheet.md §X(v3.x)」(版本號隨 §16 合併動作 bump)。
 - **`src/ohmystock/skills/technical/` 等**:給 LLM 的策略「使用說明」,也以本文件為單一事實來源。
+- **`src/ohmystock/sepa/rs.py`** (v3.1 SEPA 新增):c8(RS Rank)與 §6.3/§6.4 RS Percentile 評分的唯一產生器。`compute_rs_rating(symbol, asof) -> int|None` 採本文件指定的等權 `0.25*R63 + 0.25*R126 + 0.25*R189 + 0.25*R252` 公式,結果在 SQLite `rs_rating_cache` 內逐日快取;`scoring/subscorers/rs_percentile.py` 透過此函式取分,確保 c8 與 7 分子分數共用同一個百分位。
 
 > **修訂須知**:本文件變動 → 同步更新版本號 + Changelog;對應修改 `strategies/` 程式碼與 `skills/` 說明;**§6 / §15 / §16 邏輯變動必須走 §16.3 驗證閘 + 人工 PR review**(LLM 不可直接 commit);重大邏輯變動需重跑回測(§12 規範)。
