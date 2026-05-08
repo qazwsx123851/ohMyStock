@@ -28,13 +28,13 @@
 
 ## 5. Composite 元件 — `DataTable`
 
-- [ ] 5.1 建立 `web-admin/src/components/data-table.tsx`：泛型 `<T>`，props 依 spec.md「DataTable composite 元件」requirement；底層用 shadcn `Table`，loading 用 `Skeleton`，empty/error 用 `Card` + 文案
-- [ ] 5.2 實作分頁：`pageSize`、`page`、`total` → 渲染下一頁 / 上一頁按鈕（用 shadcn `Button`）+ `第 N / M 頁` 顯示；無 `total` 時隱藏分頁列
-- [ ] 5.3 實作 column-sort：`sortable: true` 的欄位 header 可 click，state 為 component 內部 (`asc` → `desc` → `unsorted` 三循環)，emit 透過 `onSortChange?` callback（先預留 prop，本 change 不接外部 sort）
-- [ ] 5.4 實作鍵盤可達性：每個 row 加 `tabIndex={0}` + Enter 觸發 `onRowClick`；sortable header 加 `aria-sort="ascending|descending|none"`
-- [ ] 5.5 實作 density prop：`density="compact"` → row `min-height: var(--density-row-h-compact)`；預設 `comfortable`
-- [ ] 5.6 建立 `web-admin/src/components/__tests__/data-table.test.tsx`：loading skeleton、empty message、row click（mouse + Enter）、sort 三循環 + `aria-sort` 值切換、compact density 高度、numeric `align="right"` 欄位有 `tabular-nums`
-- [ ] 5.7 跑 `corepack pnpm test data-table` 確認 pass
+- [x] 5.1 建立 `web-admin/src/components/data-table.tsx`：泛型 `<T>`，props 依 spec.md「DataTable composite 元件」requirement；底層用 shadcn `Table`，loading 用 `Skeleton`，empty/error 用 `Card` + 文案
+- [x] 5.2 實作分頁：`pageSize`、`page`、`total` → 渲染下一頁 / 上一頁按鈕（用 shadcn `Button`）+ `第 N / M 頁` 顯示；無 `total` 時隱藏分頁列
+- [x] 5.3 實作 column-sort：`sortable: true` 的欄位 header 可 click，state 為 component 內部 (`asc` → `desc` → `unsorted` 三循環)，emit 透過 `onSortChange?` callback（先預留 prop，本 change 不接外部 sort）
+- [x] 5.4 實作鍵盤可達性：每個 row 加 `tabIndex={0}` + Enter 觸發 `onRowClick`；sortable header 加 `aria-sort="ascending|descending|none"`
+- [x] 5.5 實作 density prop：`density="compact"` → row `min-height: var(--density-row-h-compact)`；預設 `comfortable`
+- [x] 5.6 建立 `web-admin/src/components/__tests__/data-table.test.tsx`：loading skeleton、empty message、row click（mouse + Enter）、sort 三循環 + `aria-sort` 值切換、compact density 高度、numeric `align="right"` 欄位有 `tabular-nums`
+- [x] 5.7 跑 `corepack pnpm test data-table` 確認 pass
 
 ## 6. Density token + index.css
 
