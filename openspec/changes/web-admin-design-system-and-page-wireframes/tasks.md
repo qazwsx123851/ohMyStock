@@ -42,13 +42,13 @@
 
 ## 7. SSOT / 文件 / README 同步
 
-- [ ] 7.1 更新 `web-admin/README.md`：新增「Components」章節，列出 ui/ 5 個 primitive + 3 個 composite；附「下一個 primitive 怎麼加」3 行流程說明（提到 FilterBar / ConfirmDialog / useSseStream 通用化是 deferred，等實際 per-page change 需要再做）
-- [ ] 7.2 在 `docs/web-admin-page-designs.md` 文末加 cross-ref 區塊：指回 `frontend.md`、`backend-eventbus.md`、`auth-and-mask.md`，標明本檔為 SSOT、其他檔為延伸閱讀
+- [x] 7.1 更新 `web-admin/README.md`：新增「Components」章節，列出 ui/ 5 個 primitive + 3 個 composite；附「下一個 primitive 怎麼加」3 行流程說明（提到 FilterBar / ConfirmDialog / useSseStream 通用化是 deferred，等實際 per-page change 需要再做）
+- [x] 7.2 在 `docs/web-admin-page-designs.md` 文末加 cross-ref 區塊：指回 `frontend.md`、`backend-eventbus.md`、`auth-and-mask.md`，標明本檔為 SSOT、其他檔為延伸閱讀
 
 ## 8. End-to-end 驗收
 
-- [ ] 8.1 跑 `corepack pnpm typecheck` 全綠
-- [ ] 8.2 跑 `corepack pnpm test` 全綠（>= 3 個 component test + 1 個 dashboard-page smoke test）
-- [ ] 8.3 跑 `corepack pnpm build` 全綠，確認 `web-admin/dist/` 產生
-- [ ] 8.4 跑 `corepack pnpm dev` 在 `http://localhost:5173`，手動確認 Dashboard 視覺與 Phase 4 第一刀 ship 時相同（KPI 顏色、Live feed 推送、Sidebar/TopBar/footer 不變）
-- [ ] 8.5 `openspec validate web-admin-design-system-and-page-wireframes --strict`，輸出無 error
+- [x] 8.1 跑 `corepack pnpm typecheck` 全綠
+- [x] 8.2 跑 `corepack pnpm test` 全綠（>= 3 個 component test + 1 個 dashboard-page smoke test）
+- [x] 8.3 跑 `corepack pnpm build` 全綠，確認 `web-admin/dist/` 產生
+- [ ] 8.4 跑 `corepack pnpm dev` 在 `http://localhost:5173`，手動確認 Dashboard 視覺與 Phase 4 第一刀 ship 時相同（KPI 顏色、Live feed 推送、Sidebar/TopBar/footer 不變） — **deferred to Mark; sandbox here cannot bind TCP ports (EACCES on all ports). Build passes (8.3) and `pages/__tests__/dashboard-page.test.tsx` covers the data-path regressions (sign-formatted +12,345 + text-up + ArrowUp svg + LiveFeed SSE row).**
+- [x] 8.5 `openspec validate web-admin-design-system-and-page-wireframes --strict`，輸出無 error
