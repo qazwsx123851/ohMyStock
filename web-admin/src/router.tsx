@@ -4,10 +4,11 @@ import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { PaperPositionsPage } from '@/pages/PaperPositionsPage'
 import { PaperOrdersPage } from '@/pages/PaperOrdersPage'
+import { PaperOverviewPage } from '@/pages/PaperOverviewPage'
 import { AuditPage } from '@/pages/AuditPage'
 import {
   ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage, BacktestPage, BacktestJobPage,
-  PaperPage, MarketPage, MarketSymbolPage,
+  MarketPage, MarketSymbolPage,
   SkillsPage, SkillDetailPage, MemoryPage, SessionsPage, SettingsPage,
 } from '@/pages/stubs'
 
@@ -24,7 +25,7 @@ export const router = createBrowserRouter([
       { path: 'swarm/:preset/:runId', element: <SwarmRunPage /> },
       { path: 'backtest',             element: <BacktestPage /> },
       { path: 'backtest/:jobId',      element: <BacktestJobPage /> },
-      { path: 'paper',                element: <PaperPage /> },
+      { path: 'paper',                element: <PaperOverviewPage /> },
       { path: 'paper/orders',         element: <PaperOrdersPage /> },
       { path: 'paper/positions',      element: <PaperPositionsPage /> },
       { path: 'market',               element: <MarketPage /> },

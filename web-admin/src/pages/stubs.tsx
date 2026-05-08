@@ -9,7 +9,6 @@ export const SwarmPage          = make('Swarm 入口',   '10 個 preset 卡片�
 export const SwarmRunPage       = make('Swarm 執行',   'DAG 即時更新與節點輸出')
 export const BacktestPage       = make('回測入口',     '策略表單 + 歷史 job 列表')
 export const BacktestJobPage    = make('回測結果',     '資金曲線 / 回撤 / 交易明細 / 診斷')
-export const PaperPage          = make('模擬交易',     '下單、部位、委託、權益')
 export const MarketPage         = make('市場掃描',     '即時行情、籌碼、強弱排行')
 export const MarketSymbolPage   = make('個股頁',       'K 線 + 三大法人 + 融資融券 + 籌碼分點')
 export const SkillsPage         = make('Skills 瀏覽', '已註冊 skill 清單與啟停')
