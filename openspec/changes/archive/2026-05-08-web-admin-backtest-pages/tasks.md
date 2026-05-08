@@ -64,9 +64,9 @@
 - [x] 8.4 `python -m pytest tests/ -x` → all green (962 / 962)
 - [ ] 8.5 Manual smoke on `localhost:5173`: log in, navigate `/backtest`, run sma_cross over 2024 H1 with `2330` (assumes `bars_daily` has 2330 backfilled), verify history row appears, click into detail, verify KPIs + trades render, equity-curve placeholder visible
 - [x] 8.6 `openspec validate web-admin-backtest-pages --strict` → passes
-- [ ] 8.7 Update `CLAUDE.md` §5 SSOT table (post-archive entry pointing to `openspec/specs/web-admin-backtest-pages/spec.md`, `openspec/specs/admin-backtest-endpoints/spec.md`, `src/ohmystock/api/routes/backtest.py`, `src/ohmystock/backtest/storage.py`, `src/ohmystock/backtest/strategy/registry.py`, `web-admin/src/pages/BacktestPage.tsx`, `web-admin/src/pages/BacktestJobPage.tsx`)
+- [x] 8.7 Update `CLAUDE.md` §5 SSOT table (post-archive entry pointing to `openspec/specs/web-admin-backtest-pages/spec.md`, `openspec/specs/admin-backtest-endpoints/spec.md`, `src/ohmystock/api/routes/backtest.py`, `src/ohmystock/backtest/storage.py`, `src/ohmystock/backtest/strategy/registry.py`, `web-admin/src/pages/BacktestPage.tsx`, `web-admin/src/pages/BacktestJobPage.tsx`)
 
 ## 9. Archive
 
-- [ ] 9.1 `git add` + commit per CLAUDE.md style; push to `main` directly
-- [ ] 9.2 Run `/opsx:archive web-admin-backtest-pages` to move change → `openspec/changes/archive/<date>-web-admin-backtest-pages/` and sync delta into `openspec/specs/`
+- [x] 9.1 `git add` + commit per CLAUDE.md style; push to `main` directly
+- [x] 9.2 Run `/opsx:archive web-admin-backtest-pages` to move change → `openspec/changes/archive/<date>-web-admin-backtest-pages/` and sync delta into `openspec/specs/`
