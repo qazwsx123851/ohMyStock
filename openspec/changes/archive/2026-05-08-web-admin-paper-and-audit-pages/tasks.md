@@ -64,5 +64,5 @@
    - `/paper/orders`：filter 改 → 套用 → URL 變 → 結果變；CSV 下載
    - `/audit`：density toggle 切換生效；JSONL 下載
 - [x] 6.3 `openspec validate --change web-admin-paper-and-audit-pages --strict` 通過（CLI 旗標：`openspec validate web-admin-paper-and-audit-pages --type change --strict`）
-- [ ] 6.4 commit 6（archive）：執行 `/opsx:archive web-admin-paper-and-audit-pages` 由該 skill 處理 archive + delta sync + commit
+- [x] 6.4 commit 6（archive）：執行 `/opsx:archive web-admin-paper-and-audit-pages` 由該 skill 處理 archive + delta sync + commit
 - [ ] 6.5 `git push origin main`
