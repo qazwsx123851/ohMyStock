@@ -17,4 +17,3 @@ export const SkillDetailPage    = make('Skill 詳情',  'YAML + Markdown 預覽 
 export const MemoryPage         = make('長期記憶',     'FTS5 全文索引、tag 過濾')
 export const SessionsPage       = make('對話歷史',     '所有 session 列表與全文搜尋')
 export const SettingsPage       = make('設定',         'API Key、Shioaji、FinMind、主題、合規開關')
-export const AuditPage          = make('稽核日誌',     'Hook 執行記錄、auto-execute 審計')

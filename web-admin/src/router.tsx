@@ -4,10 +4,11 @@ import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { PaperPositionsPage } from '@/pages/PaperPositionsPage'
 import { PaperOrdersPage } from '@/pages/PaperOrdersPage'
+import { AuditPage } from '@/pages/AuditPage'
 import {
   ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage, BacktestPage, BacktestJobPage,
   PaperPage, MarketPage, MarketSymbolPage,
-  SkillsPage, SkillDetailPage, MemoryPage, SessionsPage, SettingsPage, AuditPage,
+  SkillsPage, SkillDetailPage, MemoryPage, SessionsPage, SettingsPage,
 } from '@/pages/stubs'
 
 export const router = createBrowserRouter([

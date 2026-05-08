@@ -44,17 +44,17 @@
 
 ## 5. `/audit` 實作
 
-- [ ] 5.1 新檔 `web-admin/src/pages/AuditPage.tsx`：與 PaperOrdersPage 相同的 `useSearchParams` 模式；額外讀寫 `decision_id` 與 `density`
-- [ ] 5.2 Filter bar：依 `JOURNAL_KIND_ALL` 渲染 N 個 checkbox、symbol input、decision_id input、date range x2、套用 / 清空 / 「匯出本頁 N 列 JSONL」、density toggle button
-- [ ] 5.3 useQuery 對 `/api/admin/journal/rows?...&decision_id=...`；`limit=50`、`refetchInterval: 60_000`、`keepPreviousData: true`
-- [ ] 5.4 `<DataTable density={density}>` 6 欄：時間 / Kind / Symbol / Decision id / 狀態（`<StatusBadge>`） / 摘要（payload 取 1–2 關鍵欄位）；`expandedRowRender` 同 PaperOrdersPage
-- [ ] 5.5 分頁列右側顯示 `共 {Intl.NumberFormat('zh-TW').format(total)} 列`
-- [ ] 5.6 「匯出本頁 N 列 JSONL」：items 逐筆 `JSON.stringify` 用 `\n` 接 → blob 下載
-- [ ] 5.7 三態：與 PaperOrdersPage 相同
-- [ ] 5.8 從 `stubs.tsx` 移除 `AuditPage` export；router import 切換
-- [ ] 5.9 新檔 `audit-page.test.tsx`：4 個三態 + 1 個 filter→fetch query 對齊 test（含 decision_id）+ 1 個 density toggle test（共 6 test）
-- [ ] 5.10 `pnpm tsc --noEmit && pnpm test` 全綠
-- [ ] 5.11 commit 5：`feat(web-admin): AuditPage real implementation + tests`
+- [x] 5.1 新檔 `web-admin/src/pages/AuditPage.tsx`：與 PaperOrdersPage 相同的 `useSearchParams` 模式；額外讀寫 `decision_id` 與 `density`
+- [x] 5.2 Filter bar：依 `JOURNAL_KIND_ALL` 渲染 N 個 checkbox、symbol input、decision_id input、date range x2、套用 / 清空 / 「匯出本頁 N 列 JSONL」、density toggle button
+- [x] 5.3 useQuery 對 `/api/admin/journal/rows?...&decision_id=...`；`limit=50`、`refetchInterval: 60_000`、`keepPreviousData: true`
+- [x] 5.4 `<DataTable density={density}>` 6 欄：時間 / Kind / Symbol / Decision id / 狀態（`<StatusBadge>`） / 摘要（payload 取 1–2 關鍵欄位）；`expandedRowRender` 同 PaperOrdersPage
+- [x] 5.5 分頁列右側顯示 `共 {Intl.NumberFormat('zh-TW').format(total)} 列`
+- [x] 5.6 「匯出本頁 N 列 JSONL」：items 逐筆 `JSON.stringify` 用 `\n` 接 → blob 下載
+- [x] 5.7 三態：與 PaperOrdersPage 相同
+- [x] 5.8 從 `stubs.tsx` 移除 `AuditPage` export；router import 切換
+- [x] 5.9 新檔 `audit-page.test.tsx`：4 個三態 + 1 個 filter→fetch query 對齊 test（含 decision_id）+ 1 個 density toggle test（共 6 test）
+- [x] 5.10 `pnpm tsc --noEmit && pnpm test` 全綠
+- [x] 5.11 commit 5：`feat(web-admin): AuditPage real implementation + tests`
 
 ## 6. 收尾
 
