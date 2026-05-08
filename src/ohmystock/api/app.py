@@ -33,6 +33,7 @@ from ohmystock.api.routes._envelope import to_error
 from ohmystock.api.routes.confirm_gate import router as confirm_gate_router
 from ohmystock.api.routes.exit_engine import router as exit_engine_router
 from ohmystock.api.routes.journal import router as journal_router
+from ohmystock.api.routes.market import router as market_router
 from ohmystock.api.routes.positions import router as positions_router
 from ohmystock.api.routes.screener import router as screener_router
 from ohmystock.api.routes.stats import router as stats_router
@@ -117,6 +118,7 @@ def create_app() -> FastAPI:
     app.include_router(confirm_gate_router)
     app.include_router(exit_engine_router)
     app.include_router(journal_router)
+    app.include_router(market_router)
     app.include_router(positions_router)
     app.include_router(stats_router)
 

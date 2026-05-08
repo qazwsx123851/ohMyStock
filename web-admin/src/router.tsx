@@ -6,9 +6,10 @@ import { PaperPositionsPage } from '@/pages/PaperPositionsPage'
 import { PaperOrdersPage } from '@/pages/PaperOrdersPage'
 import { PaperOverviewPage } from '@/pages/PaperOverviewPage'
 import { AuditPage } from '@/pages/AuditPage'
+import { MarketPage } from '@/pages/MarketPage'
+import { MarketSymbolPage } from '@/pages/MarketSymbolPage'
 import {
   ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage, BacktestPage, BacktestJobPage,
-  MarketPage, MarketSymbolPage,
   SkillsPage, SkillDetailPage, MemoryPage, SessionsPage, SettingsPage,
 } from '@/pages/stubs'
 

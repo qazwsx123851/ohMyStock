@@ -67,6 +67,93 @@ export type LiveEvent = {
   payload?: Record<string, unknown> & { symbol?: string; price?: number }
 }
 
+// ---------------------------------------------------------------------------
+// Market endpoint types — mirror admin-market-symbol-endpoint spec
+// (openspec/changes/web-admin-market-pages/specs/admin-market-symbol-endpoint/spec.md)
+// ---------------------------------------------------------------------------
+
+export type MarketBar = {
+  date: string
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
+export type Quote = {
+  price: number
+  change: number | null
+  change_pct: number | null
+  volume: number
+  asof: string
+}
+
+export type RsRating = {
+  value: number
+  asof: string
+}
+
+export type SepaInfo = {
+  stage: number
+  since: string | null
+}
+
+export type InstitutionalRow = {
+  date: string
+  foreign: number
+  trust: number
+  dealer: number
+  total: number
+}
+
+export type RecentPattern = {
+  ts: string
+  pattern: string
+  score: number
+  outcome: string
+}
+
+export type MarketSymbolDetail = {
+  symbol: string
+  quote: Quote
+  bars_daily: MarketBar[]
+  rs: RsRating | null
+  sepa: SepaInfo | null
+  institutional: InstitutionalRow[]
+  recent_patterns: RecentPattern[]
+}
+
+// ---------------------------------------------------------------------------
+// Screener types — mirror screener.run server-action endpoint
+// ---------------------------------------------------------------------------
+
+export type ScreenerHit = {
+  symbol: string
+  name?: string
+  price?: number
+  change_pct?: number | null
+  pattern?: string
+  score?: number
+  [k: string]: unknown
+}
+
+export type ScreenerInput = {
+  universe: string
+  custom_symbols?: string[] | null
+  filters?: Array<Record<string, unknown>> | null
+  asof_date?: string | null
+}
+
+export type ScreenerRun = {
+  run_id?: string
+  asof_date_used?: string
+  candidates?: ScreenerHit[]
+  hits?: ScreenerHit[]
+  elapsed_ms?: number
+  [k: string]: unknown
+}
+
 export type Envelope<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } }
@@ -193,6 +280,28 @@ export function openSSE(path: string, handlers: SseHandlers): SseHandle {
       try { ctrl.abort() } catch { /* ignore */ }
     },
   }
+}
+
+// ---------------------------------------------------------------------------
+// Market + screener wrappers
+// ---------------------------------------------------------------------------
+
+export function getMarketSymbol(
+  symbol: string,
+  options?: { days?: number },
+): Promise<MarketSymbolDetail> {
+  const path =
+    options?.days != null
+      ? `/api/admin/market/symbols/${encodeURIComponent(symbol)}?days=${options.days}`
+      : `/api/admin/market/symbols/${encodeURIComponent(symbol)}`
+  return apiFetch<MarketSymbolDetail>(path)
+}
+
+export function runScreener(input: ScreenerInput): Promise<ScreenerRun> {
+  return apiFetch<ScreenerRun>('/api/admin/screener/run', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
 }
 
 function parseAndDispatch(raw: string, onEvent: (e: LiveEvent) => void): void {
