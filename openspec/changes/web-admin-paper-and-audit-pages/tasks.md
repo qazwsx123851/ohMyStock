@@ -29,18 +29,18 @@
 
 ## 4. `/paper/orders` 實作
 
-- [ ] 4.1 新檔 `web-admin/src/pages/PaperOrdersPage.tsx`：用 `useSearchParams` 讀 / 寫 filter（kind multi、symbol、date_from、date_to、page）；queryKey 含 search params 序列化
-- [ ] 4.2 Filter bar：依 `JOURNAL_KIND_ENTRY_LIKE` 渲染 4 個原生 `<input type="checkbox">`、symbol `<input>`、`<input type="date">` x2、「套用」/「清空」/「匯出本頁 N 列 CSV」按鈕
-- [ ] 4.3 Pending state（local React state）追使用者改動；按「套用」才寫回 URL；「清空」reset 至 default 並清 URL
-- [ ] 4.4 useQuery 對 `/api/admin/journal/rows?...` 拉資料；`limit=50`、`offset=(page-1)*50`；`keepPreviousData: true`；`refetchInterval: 60_000`
-- [ ] 4.5 `<DataTable>` 7 欄：時間 / Kind / Symbol / 方向 / Qty / Price / 狀態（`<StatusBadge>`）；`onRowClick` + `expandedRowRender` 顯示 row 完整 raw payload (JSON pretty `<pre>`)
-- [ ] 4.6 方向欄套色（`payload.side` 'long' → up + ArrowUp，'short' → down + ArrowDown）
-- [ ] 4.7 「匯出本頁 N 列 CSV」：當前 items → CSV blob → `URL.createObjectURL` 下載；header 行為 7 欄欄名
-- [ ] 4.8 三態：loading Skeleton 表格、empty「此 filter 無紀錄」+「清空 filter」、error retry
-- [ ] 4.9 從 `stubs.tsx` 移除 `PaperOrdersPage` export；router import 切換
-- [ ] 4.10 新檔 `paper-orders-page.test.tsx`：4 個三態 test + 1 filter→fetch query 對齊 test
-- [ ] 4.11 `pnpm tsc --noEmit && pnpm test` 全綠
-- [ ] 4.12 commit 4：`feat(web-admin): PaperOrdersPage real implementation + tests`
+- [x] 4.1 新檔 `web-admin/src/pages/PaperOrdersPage.tsx`：用 `useSearchParams` 讀 / 寫 filter（kind multi、symbol、date_from、date_to、page）；queryKey 含 search params 序列化
+- [x] 4.2 Filter bar：依 `JOURNAL_KIND_ENTRY_LIKE` 渲染 4 個原生 `<input type="checkbox">`、symbol `<input>`、`<input type="date">` x2、「套用」/「清空」/「匯出本頁 N 列 CSV」按鈕
+- [x] 4.3 Pending state（local React state）追使用者改動；按「套用」才寫回 URL；「清空」reset 至 default 並清 URL
+- [x] 4.4 useQuery 對 `/api/admin/journal/rows?...` 拉資料；`limit=50`、`offset=(page-1)*50`；`keepPreviousData: true`；`refetchInterval: 60_000`
+- [x] 4.5 `<DataTable>` 7 欄：時間 / Kind / Symbol / 方向 / Qty / Price / 狀態（`<StatusBadge>`）；`onRowClick` + `expandedRowRender` 顯示 row 完整 raw payload (JSON pretty `<pre>`)
+- [x] 4.6 方向欄套色（`payload.side` 'long' → up + ArrowUp，'short' → down + ArrowDown）
+- [x] 4.7 「匯出本頁 N 列 CSV」：當前 items → CSV blob → `URL.createObjectURL` 下載；header 行為 7 欄欄名
+- [x] 4.8 三態：loading Skeleton 表格、empty「此 filter 無紀錄」+「清空 filter」、error retry
+- [x] 4.9 從 `stubs.tsx` 移除 `PaperOrdersPage` export；router import 切換
+- [x] 4.10 新檔 `paper-orders-page.test.tsx`：4 個三態 test + 1 filter→fetch query 對齊 test
+- [x] 4.11 `pnpm tsc --noEmit && pnpm test` 全綠
+- [x] 4.12 commit 4：`feat(web-admin): PaperOrdersPage real implementation + tests`
 
 ## 5. `/audit` 實作
 

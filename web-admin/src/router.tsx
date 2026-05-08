@@ -3,9 +3,10 @@ import { Layout } from '@/components/layout'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { PaperPositionsPage } from '@/pages/PaperPositionsPage'
+import { PaperOrdersPage } from '@/pages/PaperOrdersPage'
 import {
   ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage, BacktestPage, BacktestJobPage,
-  PaperPage, PaperOrdersPage, MarketPage, MarketSymbolPage,
+  PaperPage, MarketPage, MarketSymbolPage,
   SkillsPage, SkillDetailPage, MemoryPage, SessionsPage, SettingsPage, AuditPage,
 } from '@/pages/stubs'
 
