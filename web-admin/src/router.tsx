@@ -2,9 +2,10 @@ import { createBrowserRouter } from 'react-router'
 import { Layout } from '@/components/layout'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
+import { PaperPositionsPage } from '@/pages/PaperPositionsPage'
 import {
   ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage, BacktestPage, BacktestJobPage,
-  PaperPage, PaperOrdersPage, PaperPositionsPage, MarketPage, MarketSymbolPage,
+  PaperPage, PaperOrdersPage, MarketPage, MarketSymbolPage,
   SkillsPage, SkillDetailPage, MemoryPage, SessionsPage, SettingsPage, AuditPage,
 } from '@/pages/stubs'
 

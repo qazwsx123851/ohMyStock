@@ -17,15 +17,15 @@
 
 ## 3. `/paper/positions` 實作
 
-- [ ] 3.1 新檔 `web-admin/src/pages/PaperPositionsPage.tsx`：useQuery 拉 `/api/admin/positions/open`，`refetchInterval: 30_000`
-- [ ] 3.2 用 `<DataTable>` 列 10 欄（依 `docs/web-admin-page-designs.md` §9 順序）；P&L / P&L% 欄使用 `directionOf(value)` + `--up`/`--down` token + Lucide ArrowUp/ArrowDown；方向欄同樣處理
-- [ ] 3.3 selectedRowId state；點 row → 切換；下方 render `<Card>` detail panel（`entry_at` / `entry_reason` / 停損距離 / T1 距離 / `time_stop_date`）；若 selectedRowId 為 null 則不渲染 panel
-- [ ] 3.4 三態：loading 顯 5 列 Skeleton + panel Skeleton；empty 顯「目前無開倉」+ Lucide `ListOrdered`；error 顯 `--destructive` 區塊 + retry
-- [ ] 3.5 從 `web-admin/src/pages/stubs.tsx` 移除 `PaperPositionsPage` 的 export
-- [ ] 3.6 在 `web-admin/src/router.tsx` 將 `/paper/positions` 的 import 由 `./pages/stubs` 改為 `./pages/PaperPositionsPage`
-- [ ] 3.7 新檔 `web-admin/src/pages/__tests__/paper-positions-page.test.tsx`：mock `apiFetch`；4 個 test 涵蓋 loading / resolved（含紅漲綠跌雙重編碼 assert）/ empty / error
-- [ ] 3.8 `pnpm tsc --noEmit && pnpm test` 全綠
-- [ ] 3.9 commit 3：`feat(web-admin): PaperPositionsPage real implementation + tests`
+- [x] 3.1 新檔 `web-admin/src/pages/PaperPositionsPage.tsx`：useQuery 拉 `/api/admin/positions/open`，`refetchInterval: 30_000`
+- [x] 3.2 用 `<DataTable>` 列 10 欄（依 `docs/web-admin-page-designs.md` §9 順序）；P&L / P&L% 欄使用 `directionOf(value)` + `--up`/`--down` token + Lucide ArrowUp/ArrowDown；方向欄同樣處理
+- [x] 3.3 selectedRowId state；點 row → 切換；下方 render `<Card>` detail panel（`entry_at` / `entry_reason` / 停損距離 / T1 距離 / `time_stop_date`）；若 selectedRowId 為 null 則不渲染 panel
+- [x] 3.4 三態：loading 顯 5 列 Skeleton + panel Skeleton；empty 顯「目前無開倉」+ Lucide `ListOrdered`；error 顯 `--destructive` 區塊 + retry
+- [x] 3.5 從 `web-admin/src/pages/stubs.tsx` 移除 `PaperPositionsPage` 的 export
+- [x] 3.6 在 `web-admin/src/router.tsx` 將 `/paper/positions` 的 import 由 `./pages/stubs` 改為 `./pages/PaperPositionsPage`
+- [x] 3.7 新檔 `web-admin/src/pages/__tests__/paper-positions-page.test.tsx`：mock `apiFetch`；4 個 test 涵蓋 loading / resolved（含紅漲綠跌雙重編碼 assert）/ empty / error
+- [x] 3.8 `pnpm tsc --noEmit && pnpm test` 全綠
+- [x] 3.9 commit 3：`feat(web-admin): PaperPositionsPage real implementation + tests`
 
 ## 4. `/paper/orders` 實作
 

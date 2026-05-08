@@ -11,7 +11,6 @@ export const BacktestPage       = make('回測入口',     '策略表單 + 歷�
 export const BacktestJobPage    = make('回測結果',     '資金曲線 / 回撤 / 交易明細 / 診斷')
 export const PaperPage          = make('模擬交易',     '下單、部位、委託、權益')
 export const PaperOrdersPage    = make('委託歷史',     '所有 paper 委託與成交')
-export const PaperPositionsPage = make('持倉明細',     'Open positions、停損 / T1、未實現 PnL')
 export const MarketPage         = make('市場掃描',     '即時行情、籌碼、強弱排行')
 export const MarketSymbolPage   = make('個股頁',       'K 線 + 三大法人 + 融資融券 + 籌碼分點')
 export const SkillsPage         = make('Skills 瀏覽', '已註冊 skill 清單與啟停')
