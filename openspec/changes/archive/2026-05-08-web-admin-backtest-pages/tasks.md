@@ -62,7 +62,7 @@
 - [x] 8.2 `cd web-admin; pnpm test --run` → all green (142 / 142)
 - [x] 8.3 `cd web-admin; pnpm build` → exits 0
 - [x] 8.4 `python -m pytest tests/ -x` → all green (962 / 962)
-- [ ] 8.5 Manual smoke on `localhost:5173`: log in, navigate `/backtest`, run sma_cross over 2024 H1 with `2330` (assumes `bars_daily` has 2330 backfilled), verify history row appears, click into detail, verify KPIs + trades render, equity-curve placeholder visible
+- [x] 8.5 Manual smoke on `localhost:5173`: log in, navigate `/backtest`, run sma_cross over 2024 H1 with `2330` (assumes `bars_daily` has 2330 backfilled), verify history row appears, click into detail, verify KPIs + trades render, equity-curve placeholder visible
 - [x] 8.6 `openspec validate web-admin-backtest-pages --strict` → passes
 - [x] 8.7 Update `CLAUDE.md` §5 SSOT table (post-archive entry pointing to `openspec/specs/web-admin-backtest-pages/spec.md`, `openspec/specs/admin-backtest-endpoints/spec.md`, `src/ohmystock/api/routes/backtest.py`, `src/ohmystock/backtest/storage.py`, `src/ohmystock/backtest/strategy/registry.py`, `web-admin/src/pages/BacktestPage.tsx`, `web-admin/src/pages/BacktestJobPage.tsx`)
 
