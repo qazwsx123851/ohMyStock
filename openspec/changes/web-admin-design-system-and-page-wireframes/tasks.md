@@ -20,11 +20,11 @@
 
 ## 4. Composite 元件 — `KpiCard`（含 Dashboard 同步遷移）
 
-- [ ] 4.1 建立 `web-admin/src/components/kpi-card.tsx`：props `{ label, value, direction, glyph, loading }`；direction='up' → `--up` color + `<ArrowUp />`；direction='down' → `--down` color + `<ArrowDown />`；direction='neutral' / 未指定 → 無 glyph；loading → shadcn `Skeleton`
-- [ ] 4.2 建立 `web-admin/src/components/__tests__/kpi-card.test.tsx`：up / down / neutral / loading 四種 case，斷言顏色 + glyph
-- [ ] 4.3 重構 `web-admin/src/pages/DashboardPage.tsx`：把內聯 KPI 卡片改用 `<KpiCard>`；`今日損益` 依 sign 自動推 direction（>0 → up, <0 → down, ===0 → neutral）；其他 3 卡用 neutral
-- [ ] 4.4 建立 `web-admin/src/pages/__tests__/dashboard-page.test.tsx`（若不存在）：mock `GET /api/admin/stats/today` 回 `realized_pnl_twd: 12345` → 斷言含 `+12,345` 的元素 computed color match `--up`；mock SSE 推 `confirm_gate.confirmed` → 斷言 LiveFeed 內出現對應 row
-- [ ] 4.5 跑 `corepack pnpm test kpi-card dashboard-page` 確認 pass；同時跑全套 `corepack pnpm test` 確認既有 archive web-admin-shell scenario 不退步
+- [x] 4.1 建立 `web-admin/src/components/kpi-card.tsx`：props `{ label, value, direction, glyph, loading }`；direction='up' → `--up` color + `<ArrowUp />`；direction='down' → `--down` color + `<ArrowDown />`；direction='neutral' / 未指定 → 無 glyph；loading → shadcn `Skeleton`
+- [x] 4.2 建立 `web-admin/src/components/__tests__/kpi-card.test.tsx`：up / down / neutral / loading 四種 case，斷言顏色 + glyph
+- [x] 4.3 重構 `web-admin/src/pages/DashboardPage.tsx`：把內聯 KPI 卡片改用 `<KpiCard>`；`今日損益` 依 sign 自動推 direction（>0 → up, <0 → down, ===0 → neutral）；其他 3 卡用 neutral
+- [x] 4.4 建立 `web-admin/src/pages/__tests__/dashboard-page.test.tsx`（若不存在）：mock `GET /api/admin/stats/today` 回 `realized_pnl_twd: 12345` → 斷言含 `+12,345` 的元素 computed color match `--up`；mock SSE 推 `confirm_gate.confirmed` → 斷言 LiveFeed 內出現對應 row
+- [x] 4.5 跑 `corepack pnpm test kpi-card dashboard-page` 確認 pass；同時跑全套 `corepack pnpm test` 確認既有 archive web-admin-shell scenario 不退步
 
 ## 5. Composite 元件 — `DataTable`
 

@@ -1,66 +1,22 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, Activity, AlertCircle, Briefcase, DollarSign, Hourglass, Minus } from 'lucide-react'
+import { Activity, AlertCircle, Briefcase, DollarSign, Hourglass } from 'lucide-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-tw'
 import { apiFetch, type LiveEvent, type StatsToday } from '@/lib/api'
 import { useAdminEvents } from '@/hooks/useAdminEvents'
 import { useLiveFeedStore } from '@/stores'
-import { cn } from '@/lib/utils'
+import { KpiCard, directionOf } from '@/components/kpi-card'
 
 dayjs.extend(relativeTime)
 dayjs.locale('zh-tw')
 
 // ---------------------------------------------------------------------------
-// KpiCard - value + trend glyph + tabular number; pairs color with arrow.
-// ---------------------------------------------------------------------------
-
-type Trend = 'up' | 'down' | 'neutral'
-
-function KpiCard({
-  label, value, unit, trend = 'neutral', loading = false,
-}: {
-  label: string
-  value: React.ReactNode
-  unit?: string
-  trend?: Trend
-  loading?: boolean
-}) {
-  return (
-    <div className="rounded-lg border bg-card p-4 shadow-sm">
-      <div className="text-xs uppercase tracking-wider text-muted-foreground">{label}</div>
-      {loading ? (
-        <div className="mt-2 h-8 w-32 animate-pulse rounded bg-muted" aria-busy="true" aria-label="載入中" />
-      ) : (
-        <div className={cn(
-          'mt-2 flex items-baseline gap-1.5 tabular text-2xl font-semibold',
-          trend === 'up'   && 'text-up',
-          trend === 'down' && 'text-down',
-        )}>
-          <span aria-hidden className="inline-flex">
-            {trend === 'up' && <ArrowUp className="size-4 self-center" />}
-            {trend === 'down' && <ArrowDown className="size-4 self-center" />}
-            {trend === 'neutral' && <Minus className="size-4 self-center text-muted-foreground" />}
-          </span>
-          <span>{value}</span>
-          {unit && <span className="text-sm font-normal text-muted-foreground">{unit}</span>}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // KpiRow - fetches /api/admin/stats/today
 // ---------------------------------------------------------------------------
 
-function trendOf(n: number): Trend {
-  if (n > 0) return 'up'
-  if (n < 0) return 'down'
-  return 'neutral'
-}
-
 const numFmt = new Intl.NumberFormat('zh-TW')
+const signedTwdFmt = new Intl.NumberFormat('zh-TW', { signDisplay: 'exceptZero' })
 const usdFmt = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function KpiRow() {
@@ -83,9 +39,9 @@ function KpiRow() {
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <KpiCard
         label="今日已實現損益"
-        value={data ? numFmt.format(data.realized_pnl_twd) : ''}
+        value={data ? signedTwdFmt.format(data.realized_pnl_twd) : ''}
         unit="TWD"
-        trend={data ? trendOf(data.realized_pnl_twd) : 'neutral'}
+        direction={directionOf(data?.realized_pnl_twd)}
         loading={isLoading}
       />
       <KpiCard
