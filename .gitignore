@@ -45,6 +45,9 @@ downloads/
 eggs/
 lib/
 lib64/
+# negate: web-admin React source `lib/` is real source, not a Python build dir
+!web-admin/src/lib/
+!web-admin/src/lib/**
 parts/
 sdist/
 var/
