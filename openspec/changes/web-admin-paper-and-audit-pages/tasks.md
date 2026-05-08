@@ -58,11 +58,11 @@
 
 ## 6. 收尾
 
-- [ ] 6.1 全集 `pnpm tsc --noEmit && pnpm test && pnpm build` 全綠
+- [x] 6.1 全集 `pnpm tsc --noEmit && pnpm test && pnpm build` 全綠
 - [ ] 6.2 啟動 `pnpm dev` 並在瀏覽器手動驗證三頁：
    - `/paper/positions`：empty / 有資料兩態
    - `/paper/orders`：filter 改 → 套用 → URL 變 → 結果變；CSV 下載
    - `/audit`：density toggle 切換生效；JSONL 下載
-- [ ] 6.3 `openspec validate --change web-admin-paper-and-audit-pages --strict` 通過
+- [x] 6.3 `openspec validate --change web-admin-paper-and-audit-pages --strict` 通過（CLI 旗標：`openspec validate web-admin-paper-and-audit-pages --type change --strict`）
 - [ ] 6.4 commit 6（archive）：執行 `/opsx:archive web-admin-paper-and-audit-pages` 由該 skill 處理 archive + delta sync + commit
 - [ ] 6.5 `git push origin main`
