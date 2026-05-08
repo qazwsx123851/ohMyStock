@@ -69,6 +69,6 @@
 
 ## 9. Commit + push
 
-- [ ] 9.1 `git add` 三 source 檔（`PaperOverviewPage.tsx`、`router.tsx`、`stubs.tsx`）+ 1 test 檔 + 4 openspec 檔（proposal / design / specs / tasks）
-- [ ] 9.2 commit message: `feat(web-admin): PaperOverviewPage real implementation + tests`，body 列關鍵 wired endpoints + 5 SSE event_types
-- [ ] 9.3 `git push origin main`（per user memory：solo dev 直接 push，不開 PR）
+- [x] 9.1 `git add` 三 source 檔（`PaperOverviewPage.tsx`、`router.tsx`、`stubs.tsx`）+ 1 test 檔 + 5 openspec 檔（`.openspec.yaml` / proposal / design / specs / tasks）
+- [x] 9.2 commit `bde6ee4` — `feat(web-admin): PaperOverviewPage real implementation + tests`，body 列 7 個 wired endpoints + 5 SSE event_types + reject body amendment
+- [x] 9.3 `git push origin main` 完成（`2e584f5..bde6ee4  main -> main`）
