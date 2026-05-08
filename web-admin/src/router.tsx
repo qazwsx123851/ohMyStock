@@ -8,8 +8,10 @@ import { PaperOverviewPage } from '@/pages/PaperOverviewPage'
 import { AuditPage } from '@/pages/AuditPage'
 import { MarketPage } from '@/pages/MarketPage'
 import { MarketSymbolPage } from '@/pages/MarketSymbolPage'
+import { BacktestPage } from '@/pages/BacktestPage'
+import { BacktestJobPage } from '@/pages/BacktestJobPage'
 import {
-  ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage, BacktestPage, BacktestJobPage,
+  ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage,
   SkillsPage, SkillDetailPage, MemoryPage, SessionsPage, SettingsPage,
 } from '@/pages/stubs'
 

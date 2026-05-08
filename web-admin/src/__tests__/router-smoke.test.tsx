@@ -5,6 +5,8 @@ import { RouterProvider, createMemoryRouter } from 'react-router'
 import * as stubs from '@/pages/stubs'
 import { MarketPage } from '@/pages/MarketPage'
 import { MarketSymbolPage } from '@/pages/MarketSymbolPage'
+import { BacktestPage } from '@/pages/BacktestPage'
+import { BacktestJobPage } from '@/pages/BacktestJobPage'
 import { useAuthStore } from '@/stores'
 
 vi.mock('@/hooks/useAdminEvents', () => ({ useAdminEvents: () => {} }))
@@ -46,6 +48,39 @@ beforeEach(() => {
           },
         })
       }
+      if (url.includes('/api/admin/backtest/strategies')) {
+        return jsonResponse({
+          ok: true,
+          data: { strategies: [{ name: 'sma_cross', description: 'SMA' }] },
+        })
+      }
+      if (url.includes('/api/admin/backtest/jobs/')) {
+        return jsonResponse({
+          ok: true,
+          data: {
+            id: 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
+            strategy: 'sma_cross',
+            period_from: '2024-01-01',
+            period_to: '2024-12-31',
+            custom_symbols: ['2330'],
+            initial_capital: 1_000_000,
+            status: 'completed',
+            elapsed_ms: 200,
+            created_at: '2026-05-08T10:00:00+08:00',
+            metrics: null,
+            equity_curve: [],
+            drawdown: [],
+            trades: [],
+            error: null,
+          },
+        })
+      }
+      if (url.includes('/api/admin/backtest/jobs')) {
+        return jsonResponse({
+          ok: true,
+          data: { items: [], count: 0 },
+        })
+      }
       return jsonResponse(
         { ok: false, error: { code: 'unhandled', message: url } },
         404,
@@ -65,9 +100,11 @@ function makeQc() {
 }
 
 describe('Router smoke: /market and /market/:symbol render real pages', () => {
-  it('stubs.tsx no longer exports MarketPage / MarketSymbolPage', () => {
+  it('stubs.tsx no longer exports MarketPage / MarketSymbolPage / BacktestPage / BacktestJobPage', () => {
     expect(Object.keys(stubs)).not.toContain('MarketPage')
     expect(Object.keys(stubs)).not.toContain('MarketSymbolPage')
+    expect(Object.keys(stubs)).not.toContain('BacktestPage')
+    expect(Object.keys(stubs)).not.toContain('BacktestJobPage')
   })
 
   it('/market renders MarketPage (filter form, not <ComingSoon>)', async () => {
@@ -99,6 +136,38 @@ describe('Router smoke: /market and /market/:symbol render real pages', () => {
       </QueryClientProvider>,
     )
     await screen.findByText(/1,025/)
+    expect(screen.queryByText('建置中')).toBeNull()
+  })
+
+  it('/backtest renders BacktestPage (filter form, not <ComingSoon>)', async () => {
+    const router = createMemoryRouter(
+      [{ path: '/backtest', element: <BacktestPage /> }],
+      { initialEntries: ['/backtest'] },
+    )
+    render(
+      <QueryClientProvider client={makeQc()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    )
+    await waitFor(() => {
+      expect(
+        screen.getByRole('form', { name: /backtest filter form/i }),
+      ).toBeInTheDocument()
+    })
+    expect(screen.queryByText('建置中')).toBeNull()
+  })
+
+  it('/backtest/<id> renders BacktestJobPage (header, not <ComingSoon>)', async () => {
+    const router = createMemoryRouter(
+      [{ path: '/backtest/:jobId', element: <BacktestJobPage /> }],
+      { initialEntries: ['/backtest/a1b2c3d4e5f60718293a4b5c6d7e8f90'] },
+    )
+    render(
+      <QueryClientProvider client={makeQc()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    )
+    await screen.findByText(/sma_cross/)
     expect(screen.queryByText('建置中')).toBeNull()
   })
 })

@@ -7,7 +7,14 @@ import {
   vi,
   type Mock,
 } from 'vitest'
-import { getMarketSymbol, runScreener } from '@/lib/api'
+import {
+  getBacktestJob,
+  getMarketSymbol,
+  listBacktestJobs,
+  listStrategies,
+  runBacktest,
+  runScreener,
+} from '@/lib/api'
 import { useAuthStore } from '@/stores'
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -125,5 +132,106 @@ describe('runScreener', () => {
     expect(init?.method).toBe('POST')
     expect(typeof init?.body).toBe('string')
     expect(JSON.parse(String(init?.body))).toEqual(input)
+  })
+})
+
+describe('runBacktest', () => {
+  it('POSTs JSON body to /api/admin/backtest/run', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: true,
+        data: { job_id: 'abc', status: 'completed', elapsed_ms: 100 },
+      }),
+    )
+    const input = {
+      strategy: 'sma_cross',
+      symbols: ['2330'],
+      period_from: '2024-01-01',
+      period_to: '2024-12-31',
+    }
+    await runBacktest(input)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [first, init] = fetchMock.mock.calls[0] as [
+      RequestInfo,
+      RequestInit | undefined,
+    ]
+    const url = typeof first === 'string' ? first : (first as Request).url
+    expect(url).toContain('/api/admin/backtest/run')
+    expect(init?.method).toBe('POST')
+    const decoded = JSON.parse(String(init?.body))
+    expect(decoded).toMatchObject({
+      strategy: 'sma_cross',
+      symbols: ['2330'],
+      period_from: '2024-01-01',
+      period_to: '2024-12-31',
+    })
+  })
+})
+
+describe('listBacktestJobs', () => {
+  it('appends ?limit=50 when limit is provided', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ ok: true, data: { items: [], count: 0 } }),
+    )
+    await listBacktestJobs(50)
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toContain('/api/admin/backtest/jobs')
+    expect(url).toContain('limit=50')
+  })
+
+  it('omits the limit query string when no argument is passed', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ ok: true, data: { items: [], count: 0 } }),
+    )
+    await listBacktestJobs()
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toContain('/api/admin/backtest/jobs')
+    expect(url).not.toContain('limit=')
+  })
+})
+
+describe('getBacktestJob', () => {
+  it('hits /api/admin/backtest/jobs/{jobId}', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: true,
+        data: {
+          id: 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
+          strategy: 'sma_cross',
+          period_from: '2024-01-01',
+          period_to: '2024-12-31',
+          custom_symbols: ['2330'],
+          initial_capital: 1000000,
+          status: 'completed',
+          elapsed_ms: 200,
+          created_at: '2026-05-08T10:00:00+08:00',
+          metrics: null,
+          equity_curve: [],
+          drawdown: [],
+          trades: [],
+          error: null,
+        },
+      }),
+    )
+    await getBacktestJob('a1b2c3d4e5f60718293a4b5c6d7e8f90')
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toContain(
+      '/api/admin/backtest/jobs/a1b2c3d4e5f60718293a4b5c6d7e8f90',
+    )
+  })
+})
+
+describe('listStrategies', () => {
+  it('hits /api/admin/backtest/strategies', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: true,
+        data: { strategies: [{ name: 'sma_cross', description: 'SMA' }] },
+      }),
+    )
+    await listStrategies()
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toContain('/api/admin/backtest/strategies')
   })
 })

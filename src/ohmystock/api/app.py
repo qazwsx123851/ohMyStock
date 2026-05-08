@@ -29,7 +29,9 @@ from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from ohmystock.api.auth import AuthError, _validate_admin_token, require_admin
+from ohmystock.api.db import get_connection
 from ohmystock.api.routes._envelope import to_error
+from ohmystock.api.routes.backtest import router as backtest_router
 from ohmystock.api.routes.confirm_gate import router as confirm_gate_router
 from ohmystock.api.routes.exit_engine import router as exit_engine_router
 from ohmystock.api.routes.journal import router as journal_router
@@ -37,6 +39,7 @@ from ohmystock.api.routes.market import router as market_router
 from ohmystock.api.routes.positions import router as positions_router
 from ohmystock.api.routes.screener import router as screener_router
 from ohmystock.api.routes.stats import router as stats_router
+from ohmystock.backtest import storage as backtest_storage
 from ohmystock.config import Settings
 from ohmystock.data.disposition import fetch_disposition_set
 from ohmystock.eventbus import AdminEventSerializer, bus
@@ -56,6 +59,15 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     set_universe_closes_loader(
         build_universe_closes_loader(disposition_fetcher=fetch_disposition_set)
     )
+
+    # Bootstrap backtest_jobs schema once at startup so the first request
+    # against a fresh DB succeeds without relying on per-handler init calls.
+    init_conn = get_connection()
+    try:
+        backtest_storage.init_schema(init_conn)
+    finally:
+        init_conn.close()
+
     try:
         yield
     finally:
@@ -121,5 +133,6 @@ def create_app() -> FastAPI:
     app.include_router(market_router)
     app.include_router(positions_router)
     app.include_router(stats_router)
+    app.include_router(backtest_router)
 
     return app

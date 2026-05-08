@@ -154,6 +154,99 @@ export type ScreenerRun = {
   [k: string]: unknown
 }
 
+// ---------------------------------------------------------------------------
+// Backtest endpoint types — mirror admin-backtest-endpoints spec
+// (openspec/changes/web-admin-backtest-pages/specs/admin-backtest-endpoints/spec.md)
+// ---------------------------------------------------------------------------
+
+export type BacktestStrategy = {
+  name: string
+  description: string
+}
+
+export type BacktestRunInput = {
+  strategy: string
+  symbols: string[]
+  period_from: string
+  period_to: string
+  initial_capital?: number
+  fee_discount?: number
+  slippage_bps?: number
+  day_trade?: boolean
+}
+
+export type BacktestRunResponse = {
+  job_id: string
+  status: 'completed' | 'failed'
+  elapsed_ms: number
+}
+
+export type BacktestJobSummary = {
+  id: string
+  strategy: string
+  period_from: string
+  period_to: string
+  status: 'completed' | 'failed'
+  elapsed_ms: number
+  created_at: string
+  annual_return_pct: number | null
+  sharpe: number | null
+  max_drawdown_pct: number | null
+  win_rate_pct: number | null
+}
+
+export type BacktestEquityPoint = {
+  date: string
+  equity: number
+}
+
+export type BacktestDrawdownPoint = {
+  date: string
+  dd: number
+}
+
+export type BacktestTrade = {
+  entry_date: string
+  exit_date: string
+  symbol: string
+  side: string
+  qty: number
+  entry_price: number
+  exit_price: number
+  pnl_twd: number
+  hold_days: number
+  pattern?: string | null
+}
+
+export type BacktestJobMetrics = {
+  annual_return_pct: number | null
+  sharpe: number | null
+  max_drawdown_pct: number | null
+  win_rate_pct: number | null
+  total_return_pct?: number | null
+  sortino?: number | null
+  profit_factor?: number | null
+  expectancy?: number | null
+  total_trades?: number | null
+}
+
+export type BacktestJobDetail = {
+  id: string
+  strategy: string
+  period_from: string
+  period_to: string
+  custom_symbols: string[]
+  initial_capital: number
+  status: 'completed' | 'failed'
+  elapsed_ms: number
+  created_at: string
+  metrics: BacktestJobMetrics | null
+  equity_curve: BacktestEquityPoint[]
+  drawdown: BacktestDrawdownPoint[]
+  trades: BacktestTrade[]
+  error: { code: string; message: string } | null
+}
+
 export type Envelope<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } }
@@ -302,6 +395,41 @@ export function runScreener(input: ScreenerInput): Promise<ScreenerRun> {
     method: 'POST',
     body: JSON.stringify(input),
   })
+}
+
+// ---------------------------------------------------------------------------
+// Backtest wrappers
+// ---------------------------------------------------------------------------
+
+export function listStrategies(): Promise<{ strategies: BacktestStrategy[] }> {
+  return apiFetch<{ strategies: BacktestStrategy[] }>(
+    '/api/admin/backtest/strategies',
+  )
+}
+
+export function runBacktest(
+  input: BacktestRunInput,
+): Promise<BacktestRunResponse> {
+  return apiFetch<BacktestRunResponse>('/api/admin/backtest/run', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export function listBacktestJobs(
+  limit?: number,
+): Promise<{ items: BacktestJobSummary[]; count: number }> {
+  const path =
+    limit != null
+      ? `/api/admin/backtest/jobs?limit=${encodeURIComponent(String(limit))}`
+      : '/api/admin/backtest/jobs'
+  return apiFetch<{ items: BacktestJobSummary[]; count: number }>(path)
+}
+
+export function getBacktestJob(jobId: string): Promise<BacktestJobDetail> {
+  return apiFetch<BacktestJobDetail>(
+    `/api/admin/backtest/jobs/${encodeURIComponent(jobId)}`,
+  )
 }
 
 function parseAndDispatch(raw: string, onEvent: (e: LiveEvent) => void): void {
