@@ -75,6 +75,10 @@
   --destructive-foreground: #fef2f2;
   --warning: #d97706;             /* amber-600  Risk-Off / breaker */
   --warning-foreground: #fffbeb;
+
+  /* DataTable / list density (light + dark share the same values) */
+  --density-row-h: 36px;
+  --density-row-h-compact: 28px;
 }
 
 .dark {

@@ -8,15 +8,15 @@
 
 ## 2. shadcn primitive 元件落地（5 個最小集合）
 
-- [ ] 2.1 從 shadcn/ui 官方 GitHub 複製 `button.tsx` 到 `web-admin/src/components/ui/button.tsx`，檔頂 JSDoc 註明 source URL + commit hash；改 className helper 為 `cn`（from `@/lib/utils`）
-- [ ] 2.2 重複 2.1 流程，落地 `card.tsx`、`skeleton.tsx`、`table.tsx`、`badge.tsx`（共 4 檔）
-- [ ] 2.3 跑 `corepack pnpm typecheck` 確認 5 個 primitive 全部編譯過；跑 `corepack pnpm build` 確認 production bundle 能成功產生
+- [x] 2.1 從 shadcn/ui 官方 GitHub 複製 `button.tsx` 到 `web-admin/src/components/ui/button.tsx`，檔頂 JSDoc 註明 source URL + commit hash；改 className helper 為 `cn`（from `@/lib/utils`）
+- [x] 2.2 重複 2.1 流程，落地 `card.tsx`、`skeleton.tsx`、`table.tsx`、`badge.tsx`（共 4 檔）
+- [x] 2.3 跑 `corepack pnpm typecheck` 確認 5 個 primitive 全部編譯過；跑 `corepack pnpm build` 確認 production bundle 能成功產生
 
 ## 3. Composite 元件 — `StatusBadge`（最簡 → 最先做）
 
-- [ ] 3.1 建立 `web-admin/src/components/status-badge.tsx`：`status: 7 種` → 對應 Lucide icon（Clock / Check / X / CheckCircle / Hourglass / Ban / AlertCircle）+ shadcn `Badge` variant；errored 用 `--destructive` token
-- [ ] 3.2 建立 `web-admin/src/components/__tests__/status-badge.test.tsx`：渲染 7 種狀態、檢查每個都有 SVG icon、檢查 errored 對應 `--destructive` token
-- [ ] 3.3 跑 `corepack pnpm test status-badge` 確認 pass
+- [x] 3.1 建立 `web-admin/src/components/status-badge.tsx`：`status: 7 種` → 對應 Lucide icon（Clock / Check / X / CheckCircle / Hourglass / Ban / AlertCircle）+ shadcn `Badge` variant；errored 用 `--destructive` token
+- [x] 3.2 建立 `web-admin/src/components/__tests__/status-badge.test.tsx`：渲染 7 種狀態、檢查每個都有 SVG icon、檢查 errored 對應 `--destructive` token
+- [x] 3.3 跑 `corepack pnpm test status-badge` 確認 pass
 
 ## 4. Composite 元件 — `KpiCard`（含 Dashboard 同步遷移）
 
@@ -38,7 +38,7 @@
 
 ## 6. Density token + index.css
 
-- [ ] 6.1 在 `web-admin/src/index.css` `:root` 區塊新增：`--density-row-h: 36px;` 和 `--density-row-h-compact: 28px;`（光明 + 暗模式都需要，但值相同 → 只在 `:root` 加一次）
+- [x] 6.1 在 `web-admin/src/index.css` `:root` 區塊新增：`--density-row-h: 36px;` 和 `--density-row-h-compact: 28px;`（光明 + 暗模式都需要，但值相同 → 只在 `:root` 加一次）
 
 ## 7. SSOT / 文件 / README 同步
 
