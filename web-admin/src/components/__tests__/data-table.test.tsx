@@ -144,4 +144,47 @@ describe('DataTable', () => {
     expect(screen.queryByRole('button', { name: /上一頁/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /下一頁/ })).toBeNull()
   })
+
+  it('onRowClick fires with the clicked row when expandedRowRender is also provided', () => {
+    const onRowClick = vi.fn()
+    const { container } = render(
+      <DataTable
+        rows={ROWS}
+        columns={COLS}
+        onRowClick={onRowClick}
+        expandedRowRender={(r) => <div data-testid="exp">{r.name}</div>}
+      />,
+    )
+    const dataRows = container.querySelectorAll('tbody tr')
+    fireEvent.click(dataRows[1])
+    expect(onRowClick).toHaveBeenCalledTimes(1)
+    expect(onRowClick).toHaveBeenCalledWith(ROWS[1])
+  })
+
+  it('expandedRowRender renders a colspan-full row directly below the clicked row', () => {
+    const onRowClick = vi.fn()
+    const { container } = render(
+      <DataTable
+        rows={ROWS}
+        columns={COLS}
+        onRowClick={onRowClick}
+        expandedRowRender={(r) => <div data-testid="exp">id={r.id}</div>}
+      />,
+    )
+    expect(container.querySelector('[data-testid="exp"]')).toBeNull()
+
+    const dataRows = container.querySelectorAll('tbody tr')
+    fireEvent.click(dataRows[0])
+
+    const exp = container.querySelector('[data-testid="exp"]')
+    expect(exp).not.toBeNull()
+    expect(exp!.textContent).toBe('id=1')
+
+    const expTd = exp!.closest('td') as HTMLTableCellElement
+    expect(expTd).not.toBeNull()
+    expect(expTd.colSpan).toBe(COLS.length)
+
+    fireEvent.click(dataRows[0])
+    expect(container.querySelector('[data-testid="exp"]')).toBeNull()
+  })
 })

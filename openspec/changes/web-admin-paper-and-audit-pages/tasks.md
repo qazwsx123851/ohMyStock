@@ -9,11 +9,11 @@
 
 ## 2. DataTable 擴充：opt-in expandedRow / onRowClick
 
-- [ ] 2.1 在 `web-admin/src/components/data-table.tsx` props 介面新增 `onRowClick?: (row: T) => void` 與 `expandedRowRender?: (row: T, isExpanded: boolean) => ReactNode | null`
-- [ ] 2.2 內部新增 `expandedRowId` state（`Set<string | number>` 或單一 id）；只有當 `expandedRowRender` 與 `onRowClick` 同時提供時才啟用 toggle 行為
-- [ ] 2.3 點擊 row → 呼叫 `onRowClick(row)` + toggle expanded id；展開時下方多一列 `<tr><td colSpan={cols.length}>{expandedRowRender(row, true)}</td></tr>`
-- [ ] 2.4 既有 `data-table.test.tsx` 不修改即通過；新增 2 個 test：`onRowClick fires with row` 與 `expandedRowRender renders below clicked row`
-- [ ] 2.5 commit 2：`feat(web-admin): DataTable opt-in expandedRowRender / onRowClick`
+- [x] 2.1 在 `web-admin/src/components/data-table.tsx` props 介面新增 `onRowClick?: (row: T) => void` 與 `expandedRowRender?: (row: T, isExpanded: boolean) => ReactNode | null`
+- [x] 2.2 內部新增 `expandedRowId` state（`Set<string | number>` 或單一 id）；只有當 `expandedRowRender` 與 `onRowClick` 同時提供時才啟用 toggle 行為
+- [x] 2.3 點擊 row → 呼叫 `onRowClick(row)` + toggle expanded id；展開時下方多一列 `<tr><td colSpan={cols.length}>{expandedRowRender(row, true)}</td></tr>`
+- [x] 2.4 既有 `data-table.test.tsx` 不修改即通過；新增 2 個 test：`onRowClick fires with row` 與 `expandedRowRender renders below clicked row`
+- [x] 2.5 commit 2：`feat(web-admin): DataTable opt-in expandedRowRender / onRowClick`
 
 ## 3. `/paper/positions` 實作
 

@@ -54,6 +54,13 @@ export interface DataTableProps<T> {
   skeletonRows?: number
   /** Stable React key per row; defaults to index. */
   rowKey?: (row: T, index: number) => React.Key
+  /**
+   * Optional inline expansion row. When BOTH `onRowClick` and
+   * `expandedRowRender` are provided, clicking a row toggles a colspan-full
+   * `<tr>` immediately below it whose content is `expandedRowRender(row, true)`.
+   * If only one of the props is provided, the table behaves as before.
+   */
+  expandedRowRender?: (row: T, isExpanded: boolean) => React.ReactNode | null
 }
 
 const ALIGN_CLASS: Record<Align, string> = {
@@ -78,11 +85,15 @@ export function DataTable<T>({
   className,
   skeletonRows = 3,
   rowKey,
+  expandedRowRender,
 }: DataTableProps<T>) {
   const [sort, setSort] = React.useState<{ id: string; dir: SortDir }>({
     id: '',
     dir: null,
   })
+  const expansionEnabled =
+    typeof expandedRowRender === 'function' && typeof onRowClick === 'function'
+  const [expandedKey, setExpandedKey] = React.useState<React.Key | null>(null)
 
   const rowMinH =
     density === 'compact'
@@ -103,10 +114,14 @@ export function DataTable<T>({
   }
 
   const handleRowKeyDown =
-    (row: T) => (e: React.KeyboardEvent<HTMLTableRowElement>) => {
+    (row: T, key: React.Key) =>
+    (e: React.KeyboardEvent<HTMLTableRowElement>) => {
       if (e.key === 'Enter' && onRowClick) {
         e.preventDefault()
         onRowClick(row)
+        if (expansionEnabled) {
+          setExpandedKey((prev) => (prev === key ? null : key))
+        }
       }
     }
 
@@ -211,28 +226,50 @@ export function DataTable<T>({
                   ))}
                 </TableRow>
               ))
-            : rows.map((row, i) => (
-                <TableRow
-                  key={rowKey ? rowKey(row, i) : i}
-                  tabIndex={onRowClick ? 0 : undefined}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  onKeyDown={onRowClick ? handleRowKeyDown(row) : undefined}
-                  style={rowStyle}
-                  className={cn(
-                    onRowClick &&
-                      'cursor-pointer focus-visible:bg-muted/60 focus-visible:outline-none',
-                  )}
-                >
-                  {columns.map((col) => (
-                    <TableCell
-                      key={col.id}
-                      className={ALIGN_CLASS[col.align ?? 'left']}
-                    >
-                      {col.accessor(row)}
+            : rows.flatMap((row, i) => {
+                const key = rowKey ? rowKey(row, i) : i
+                const isExpanded = expansionEnabled && expandedKey === key
+                const handleClick = onRowClick
+                  ? () => {
+                      onRowClick(row)
+                      if (expansionEnabled) {
+                        setExpandedKey((prev) => (prev === key ? null : key))
+                      }
+                    }
+                  : undefined
+                const tr = (
+                  <TableRow
+                    key={key}
+                    tabIndex={onRowClick ? 0 : undefined}
+                    onClick={handleClick}
+                    onKeyDown={onRowClick ? handleRowKeyDown(row, key) : undefined}
+                    style={rowStyle}
+                    aria-expanded={expansionEnabled ? isExpanded : undefined}
+                    className={cn(
+                      onRowClick &&
+                        'cursor-pointer focus-visible:bg-muted/60 focus-visible:outline-none',
+                    )}
+                  >
+                    {columns.map((col) => (
+                      <TableCell
+                        key={col.id}
+                        className={ALIGN_CLASS[col.align ?? 'left']}
+                      >
+                        {col.accessor(row)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                )
+                if (!isExpanded) return [tr]
+                return [
+                  tr,
+                  <TableRow key={`${String(key)}-exp`} aria-hidden={false}>
+                    <TableCell colSpan={columns.length} className="bg-muted/30">
+                      {expandedRowRender!(row, true)}
                     </TableCell>
-                  ))}
-                </TableRow>
-              ))}
+                  </TableRow>,
+                ]
+              })}
         </TableBody>
       </Table>
       {showPager && (
