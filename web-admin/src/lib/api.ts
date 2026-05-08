@@ -247,6 +247,43 @@ export type BacktestJobDetail = {
   error: { code: string; message: string } | null
 }
 
+// ---------------------------------------------------------------------------
+// Settings endpoint types — mirror admin-settings-endpoint spec
+// (openspec/changes/web-admin-settings-page/specs/admin-settings-endpoint/spec.md)
+// ---------------------------------------------------------------------------
+
+export type SettingsApiKeys = {
+  anthropic: boolean
+  finmind: boolean
+  shioaji: boolean
+}
+
+export type SettingsTheme = {
+  mode: 'system'
+}
+
+export type SettingsSafety = {
+  auto_execute: boolean
+  broker: 'mock' | 'shioaji-sim' | 'shioaji-live'
+}
+
+export type SettingsBreakers = {
+  min_confidence: number
+  daily_limit: number
+  max_notional_pct: number
+  max_sizing_deviation: number
+  loss_lockout_hours: number
+  loss_pct_threshold: number
+  account_equity_twd: number
+}
+
+export type SettingsPayload = {
+  api_keys: SettingsApiKeys
+  theme: SettingsTheme
+  safety: SettingsSafety
+  breakers: SettingsBreakers
+}
+
 export type Envelope<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } }
@@ -430,6 +467,14 @@ export function getBacktestJob(jobId: string): Promise<BacktestJobDetail> {
   return apiFetch<BacktestJobDetail>(
     `/api/admin/backtest/jobs/${encodeURIComponent(jobId)}`,
   )
+}
+
+// ---------------------------------------------------------------------------
+// Settings wrapper
+// ---------------------------------------------------------------------------
+
+export function getSettings(): Promise<SettingsPayload> {
+  return apiFetch<SettingsPayload>('/api/admin/settings')
 }
 
 function parseAndDispatch(raw: string, onEvent: (e: LiveEvent) => void): void {

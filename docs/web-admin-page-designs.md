@@ -1019,71 +1019,78 @@ Sidebar 依 4 群組顯示：**工作流**（Dashboard / 對話 / Swarm / 回測
 ## 16. `/settings` — 設定
 
 **用途：** API keys（Anthropic / FinMind / Shioaji）、主題、Safety toggle (`OHMYSTOCK_AUTO_EXECUTE`)、breaker thresholds。
-**後端狀態：** ❌（future GET / PUT `/api/admin/settings`）
+**後端狀態：** ✅（read-only v0；`GET /api/admin/settings`）；PUT 為意圖性 deferred — `OHMYSTOCK_AUTO_EXECUTE` 等安全旗標僅可由 `.env` + restart 改動（`docs/safety-and-simulation.md` §2.9 防禦縱深）。
 
-**ASCII wireframe**
+**ASCII wireframe (read-only v0)**
 ```
 +--------------------------------------------------------------+
-|  分區：API keys / 主題 / Safety / Breakers                     |
+|  設定（只讀檢視。變更請編輯 .env 並重啟服務。）                |
 +--------------------------------------------------------------+
 |  ┌─ API keys ──────────────────────────────────────────────┐  |
-|  │ Anthropic     [●●●●●●● sk-ant-...xyz]  [更新]            │  |
-|  │ FinMind       [●●●●●●● 已設定]         [更新]            │  |
-|  │ Shioaji 帳號  [●●●●●●●]                [更新]            │  |
+|  │ Anthropic                              [已設定]         │  |
+|  │ FinMind                                [未設定]         │  |
+|  │ Shioaji                                [已設定]         │  |
+|  │   編輯 .env 並重啟以變更                                  │  |
 |  └─────────────────────────────────────────────────────────┘  |
 |                                                               |
 |  ┌─ 主題 ──────────────────────────────────────────────────┐  |
-|  │ 模式: [ 跟隨系統 ▼ ]   ( 此版本未提供主題切換 UI )       │  |
+|  │ 模式: [ 跟隨系統 ▼ ] (disabled)                          │  |
+|  │   此版本未提供主題切換 UI                                 │  |
 |  └─────────────────────────────────────────────────────────┘  |
 |                                                               |
-|  ┌─ Safety ────────────────────────────────────────────────┐  |
-|  │ ⚠ OHMYSTOCK_AUTO_EXECUTE                                │  |
-|  │   當前: ☐ 關（人工 confirm gate）                       │  |
-|  │   開啟後 LLM 可繞過 confirm 自動下單，受 5 條 breaker 制約 │  |
-|  │   [我已了解風險，啟用]                                  │  |
+|  ┌─ Safety  (border-warning + AlertTriangle) ──────────────┐  |
+|  │ ⚠  Safety                                                │  |
+|  │   AUTO_EXECUTE 關閉（人工 Confirm Gate）                  │  |
+|  │   Broker：shioaji-sim                                    │  |
+|  │   編輯 .env 並重啟以變更                                  │  |
 |  └─────────────────────────────────────────────────────────┘  |
 |                                                               |
 |  ┌─ Breakers ─────────────────────────────────────────────┐   |
-|  │ 信心下限     [ 0.70 ]    單日上限   [ 5  ] 筆           │   |
-|  │ 配額         [ 25  ] %   偏離上限   [ 30 ] %           │   |
-|  │                                              [儲存]    │   |
+|  │ 信心下限   [ 0.70 ]    (disabled)                        │  |
+|  │ 單日上限   [ 5    ] 筆 (disabled)                        │  |
+|  │ 配額       [ 25   ] %  (disabled)                        │  |
+|  │ 偏離上限   [ 30   ] %  (disabled)                        │  |
+|  │ 鎖定小時   [ 24   ] h  (disabled)                        │  |
+|  │ 鎖定觸發   [ -5   ] %  (disabled)                        │  |
+|  │ 帳戶權益   [1,000,000] TWD (disabled)                    │  |
+|  │   編輯 .env 並重啟以變更                                  │  |
 |  └─────────────────────────────────────────────────────────┘  |
 +--------------------------------------------------------------+
 ```
+
+`auto_execute=true` 時：Safety Card 改套 `border-destructive` + `AlertCircle`，文案改為 "⚠ AUTO_EXECUTE 已啟用"。
 
 **Layout slots**
 | Slot | 內容 | shadcn primitive | 紅漲綠跌套用？ |
 |---|---|---|---|
-| 分區 nav | 4 anchor link 在頁頂（不切頁，scroll 到對應段） | `Button` (ghost) | 否 |
-| API keys 區 | 3 列：name / masked input / 更新按鈕 | `Input type=password` / `Button` | 否 |
-| 主題區 | 1 個 select（本 change 不暴露切換 UI；佔位） | `Select` | 否 |
-| Safety 區 | 警告 banner + 啟用按鈕 | `Card` (warning) / `Button` | 是（warning / destructive） |
-| Breakers 區 | 4 個 number input + 儲存 | `Input type=number` / `Button` | 否 |
+| Header | 頁標題 + "只讀檢視" 提示 | 純文字 | 否 |
+| API keys 區 | 3 列：name / Badge（已設定/未設定）；無 mask dot，無 raw value | `Card` / `Badge` | 否 |
+| 主題區 | 1 個 disabled select（佔位） | `Card` / `Select` (disabled) | 否 |
+| Safety 區 | warning/destructive Card + Lucide icon + AUTO_EXECUTE 文案 + broker | `Card` (`border-warning` 或 `border-destructive`) / Lucide `AlertTriangle` 或 `AlertCircle` | 是（warning / destructive 雙重編碼） |
+| Breakers 區 | 7 個 disabled `<input>`（`type="text" inputMode="numeric"`，因為 `type="number"` 會剔除千分位逗號） | `Card` / `Input` (disabled) | 否 |
 
 **資料來源**
-- (future) `GET /api/admin/settings` / `PUT /api/admin/settings`
-- 訂閱 SSE event_type：不訂閱
+- `GET /api/admin/settings`（Bearer auth, `{ok,data,error}` envelope, 4 sections — `api_keys` / `theme` / `safety` / `breakers`）
+- 訂閱 SSE event_type：不訂閱（`Settings` 對 process 生命週期內 immutable）
 
-**互動**
-- 「更新」開 dialog：輸入新 key → 驗證（呼叫對應 health check）→ 儲存
-- Safety「啟用」按鈕 → confirm dialog 二次確認，文案警告「啟用後 LLM 可繞過 confirm 自動下單」
-- Breakers 改值 →「儲存」按鈕由 muted 變 primary
-- Cmd/Ctrl+S → 全頁儲存所有 dirty 區（per-section save 也接受）
+**互動（read-only v0）**
+- 全頁 disabled。沒有「儲存」「啟用」「我已了解風險」「更新」按鈕。
+- 唯一可點：載入失敗時的「重試」按鈕。
+- 鍵盤 Tab 順序：API keys → 主題 → Safety → Breakers（spec `web-admin-settings-page` 強制）。
 
 **State 行為**
-- `loading`：每區獨立 Skeleton。
-- `empty`：不適用（settings 必有值，未設定的顯示「未設定」placeholder）。
-- `error`：每區獨立 retry；驗證失敗紅 banner inline。
+- `loading`：4 個 Card 各帶 Skeleton。
+- `empty`：不適用（每欄一律有值，secret 以布林呈現、未設定顯示「未設定」Badge）。
+- `error`：頁頂單一 destructive Card + retry 按鈕。
 - `live-update`：不適用。
 
 **紅漲綠跌套用範例**
-- Safety 區整體 `Card` 邊框用 `--warning` (`border-warning`) + `<AlertTriangle className="text-warning"/>`。啟用後該 banner 改 `--destructive` + `<AlertCircle/>`，文案「⚠ AUTO_EXECUTE 已啟用」。
-- 「我已了解風險，啟用」按鈕用 `--destructive` variant + `<AlertTriangle/>`（強烈警示，避免誤點）。
+- `auto_execute=false`：Safety Card `border-warning` + `<AlertTriangle className="text-warning"/>` + 「AUTO_EXECUTE 關閉（人工 Confirm Gate）」。
+- `auto_execute=true`：Safety Card `border-destructive` + `<AlertCircle className="text-destructive"/>` + 「⚠ AUTO_EXECUTE 已啟用」。色彩永遠搭配 icon — 不依賴顏色為唯一訊號（§0.3 強制）。
 
 **鍵盤可達性**
-- Tab：分區 nav 4 個 → API keys row 1..3 → 主題 → Safety → Breakers 各 input → 儲存
-- Cmd/Ctrl+S → 全頁儲存
-- confirm dialog Esc → 取消啟用
+- Tab：API keys 區（3 列 Badge，非互動，跳過）→ 主題（disabled select）→ Safety Card → Breakers Card 內 7 個 disabled input → 「重試」（僅錯誤狀態時存在）
+- 沒有寫入路徑就沒有 confirm dialog；Esc 不需處理。
 
 ---
 

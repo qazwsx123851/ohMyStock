@@ -10,9 +10,10 @@ import { MarketPage } from '@/pages/MarketPage'
 import { MarketSymbolPage } from '@/pages/MarketSymbolPage'
 import { BacktestPage } from '@/pages/BacktestPage'
 import { BacktestJobPage } from '@/pages/BacktestJobPage'
+import { SettingsPage } from '@/pages/SettingsPage'
 import {
   ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage,
-  SkillsPage, SkillDetailPage, MemoryPage, SessionsPage, SettingsPage,
+  SkillsPage, SkillDetailPage, MemoryPage, SessionsPage,
 } from '@/pages/stubs'
 
 export const router = createBrowserRouter([

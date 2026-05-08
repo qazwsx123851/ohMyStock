@@ -8,8 +8,10 @@ import {
   type Mock,
 } from 'vitest'
 import {
+  ApiError,
   getBacktestJob,
   getMarketSymbol,
+  getSettings,
   listBacktestJobs,
   listStrategies,
   runBacktest,
@@ -233,5 +235,67 @@ describe('listStrategies', () => {
     await listStrategies()
     const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
     expect(url).toContain('/api/admin/backtest/strategies')
+  })
+})
+
+describe('getSettings', () => {
+  const HAPPY_PAYLOAD = {
+    api_keys: { anthropic: true, finmind: false, shioaji: true },
+    theme: { mode: 'system' as const },
+    safety: { auto_execute: false, broker: 'shioaji-sim' as const },
+    breakers: {
+      min_confidence: 0.7,
+      daily_limit: 5,
+      max_notional_pct: 0.25,
+      max_sizing_deviation: 0.3,
+      loss_lockout_hours: 24,
+      loss_pct_threshold: -0.05,
+      account_equity_twd: 1_000_000,
+    },
+  }
+
+  it('hits /api/admin/settings and resolves to data (not the envelope)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ ok: true, data: HAPPY_PAYLOAD }),
+    )
+    const result = await getSettings()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toContain('/api/admin/settings')
+    expect(result).toEqual(HAPPY_PAYLOAD)
+    expect(result.api_keys.anthropic).toBe(true)
+  })
+
+  it('rejects with ApiError when envelope.ok is false, propagating error.code', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: false,
+        error: { code: 'internal_error', message: 'boom' },
+      }),
+    )
+    await expect(getSettings()).rejects.toBeInstanceOf(ApiError)
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: false,
+        error: { code: 'internal_error', message: 'boom' },
+      }),
+    )
+    try {
+      await getSettings()
+    } catch (e) {
+      expect((e as ApiError).code).toBe('internal_error')
+    }
+  })
+
+  it('triggers logout on 401', async () => {
+    useAuthStore.getState().setToken('test-token-aaaaaaaaaaaaaaaaaaaaaaaa')
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { ok: false, error: { code: 'auth_invalid', message: 'no' } },
+        401,
+      ),
+    )
+    await expect(getSettings()).rejects.toBeInstanceOf(ApiError)
+    expect(useAuthStore.getState().token).toBeNull()
   })
 })

@@ -7,6 +7,7 @@ import { MarketPage } from '@/pages/MarketPage'
 import { MarketSymbolPage } from '@/pages/MarketSymbolPage'
 import { BacktestPage } from '@/pages/BacktestPage'
 import { BacktestJobPage } from '@/pages/BacktestJobPage'
+import { SettingsPage } from '@/pages/SettingsPage'
 import { useAuthStore } from '@/stores'
 
 vi.mock('@/hooks/useAdminEvents', () => ({ useAdminEvents: () => {} }))
@@ -100,11 +101,12 @@ function makeQc() {
 }
 
 describe('Router smoke: /market and /market/:symbol render real pages', () => {
-  it('stubs.tsx no longer exports MarketPage / MarketSymbolPage / BacktestPage / BacktestJobPage', () => {
+  it('stubs.tsx no longer exports MarketPage / MarketSymbolPage / BacktestPage / BacktestJobPage / SettingsPage', () => {
     expect(Object.keys(stubs)).not.toContain('MarketPage')
     expect(Object.keys(stubs)).not.toContain('MarketSymbolPage')
     expect(Object.keys(stubs)).not.toContain('BacktestPage')
     expect(Object.keys(stubs)).not.toContain('BacktestJobPage')
+    expect(Object.keys(stubs)).not.toContain('SettingsPage')
   })
 
   it('/market renders MarketPage (filter form, not <ComingSoon>)', async () => {
@@ -168,6 +170,40 @@ describe('Router smoke: /market and /market/:symbol render real pages', () => {
       </QueryClientProvider>,
     )
     await screen.findByText(/sma_cross/)
+    expect(screen.queryByText('建置中')).toBeNull()
+  })
+
+  it('/settings renders SettingsPage (4 cards, not <ComingSoon>)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (async () =>
+        jsonResponse({
+          ok: true,
+          data: {
+            api_keys: { anthropic: false, finmind: false, shioaji: false },
+            theme: { mode: 'system' },
+            safety: { auto_execute: false, broker: 'shioaji-sim' },
+            breakers: {
+              min_confidence: 0.7,
+              daily_limit: 5,
+              max_notional_pct: 0.25,
+              max_sizing_deviation: 0.3,
+              loss_lockout_hours: 24,
+              loss_pct_threshold: -0.05,
+              account_equity_twd: 1_000_000,
+            },
+          },
+        })) as never,
+    )
+    const router = createMemoryRouter(
+      [{ path: '/settings', element: <SettingsPage /> }],
+      { initialEntries: ['/settings'] },
+    )
+    render(
+      <QueryClientProvider client={makeQc()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    )
+    await screen.findByText('API keys')
     expect(screen.queryByText('建置中')).toBeNull()
   })
 })
