@@ -284,6 +284,37 @@ export type SettingsPayload = {
   breakers: SettingsBreakers
 }
 
+// ---------------------------------------------------------------------------
+// Skills endpoint types — mirror admin-skills-endpoints spec
+// (openspec/changes/web-admin-skills-pages/specs/admin-skills-endpoints/spec.md)
+// ---------------------------------------------------------------------------
+
+export type SkillCategory =
+  | 'data'
+  | 'indicator'
+  | 'signal'
+  | 'decider'
+  | 'gate'
+  | 'tool'
+  | 'report'
+
+export type Skill = {
+  name: string
+  description: string
+  category: SkillCategory
+  body_preview: string
+  body_truncated: boolean
+  cited_specs: string[]
+}
+
+export type SkillDetail = {
+  name: string
+  description: string
+  category: SkillCategory
+  body: string
+  cited_specs: string[]
+}
+
 export type Envelope<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } }
@@ -475,6 +506,20 @@ export function getBacktestJob(jobId: string): Promise<BacktestJobDetail> {
 
 export function getSettings(): Promise<SettingsPayload> {
   return apiFetch<SettingsPayload>('/api/admin/settings')
+}
+
+// ---------------------------------------------------------------------------
+// Skills wrappers
+// ---------------------------------------------------------------------------
+
+export function listSkills(): Promise<{ items: Skill[] }> {
+  return apiFetch<{ items: Skill[] }>('/api/admin/skills')
+}
+
+export function getSkill(name: string): Promise<SkillDetail> {
+  return apiFetch<SkillDetail>(
+    `/api/admin/skills/${encodeURIComponent(name)}`,
+  )
 }
 
 function parseAndDispatch(raw: string, onEvent: (e: LiveEvent) => void): void {

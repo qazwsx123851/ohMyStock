@@ -788,7 +788,11 @@ Sidebar 依 4 群組顯示：**工作流**（Dashboard / 對話 / Swarm / 回測
 ## 12. `/skills` — Skills 列表
 
 **用途：** ~30 個 Claude Agent SDK skill（YAML frontmatter + Markdown body）的列表 + 啟用 toggle + 最後執行時間。
-**後端狀態：** ❌（future GET `/api/admin/skills`、PATCH `/api/admin/skills/:name`）
+**後端狀態：** ✅ v0（GET `/api/admin/skills`，list-only）。PATCH `/api/admin/skills/:name` 仍 deferred。
+
+**v0 範圍（已 ship — `web-admin-skills-pages` change，2026-05-09）**
+- 實際 ship：filter bar（搜尋 input + 類別 select，client-side 即時過濾、無 debounce）、responsive grid（1/2/3/4 col）、卡片顯示 name（font-mono）+ description（line-clamp-2）+ `<CategoryBadge>`（neutral `secondary` Badge + Lucide icon 配對，**不**用紅漲綠跌）。卡片 click + Enter / Space 導向 `/skills/<name>`。
+- 仍為 stub：「☑ 啟用」toggle、「最後跑: 5m ago」時間、「編輯 →」按鈕。本 v0 是 **read-only**：沒有 `enabled` 欄位、沒有執行 log，所以 toggle 與時間在後端落地前不會出現於 UI。
 
 **ASCII wireframe**
 ```
@@ -842,7 +846,12 @@ Sidebar 依 4 群組顯示：**工作流**（Dashboard / 對話 / Swarm / 回測
 ## 13. `/skills/:name` — Skill 編輯器
 
 **用途：** 編輯單一 skill 的 YAML frontmatter + Markdown body；存檔。
-**後端狀態：** ❌（future GET `/api/admin/skills/:name`、PUT `/api/admin/skills/:name`）
+**後端狀態：** ✅ v0（GET `/api/admin/skills/:name`，read-only）。PUT 仍 deferred。
+
+**v0 範圍（已 ship — `web-admin-skills-pages` change，2026-05-09）**
+- 實際 ship：header（back-link `← Skills` + name as `<h1>` font-mono + `<CategoryBadge>` + 一行 description）、cited-specs row（每個 spec 名以 `<code>` chip 呈現；空陣列顯示「（無 cited_specs）」fallback）、Body Card（`<pre className="whitespace-pre-wrap font-mono text-sm">` 含 char count，**沒有** markdown parser／syntax highlighter）。`max-h-[70vh] overflow-auto` 防止超長 body 把頁面拉到天荒地老。
+- 404 surfaces 為「找不到 skill: `<name>`」empty-state + 「返回 Skills」按鈕；500 surfaces 為 destructive Card + AlertCircle + 重試 button（與 §共用 patterns 一致）。
+- 仍為 stub：「預覽」/「儲存」按鈕、YAML / Markdown 編輯 textarea、dirty state、Cmd/Ctrl+S hotkey、離頁 confirm dialog。本 v0 是 **read-only**：沒有寫回 disk 的後端 API，所以編輯器在 PUT endpoint 落地前不會出現於 UI。
 
 **ASCII wireframe**
 ```

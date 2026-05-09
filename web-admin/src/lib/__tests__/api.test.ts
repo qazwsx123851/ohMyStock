@@ -12,10 +12,14 @@ import {
   getBacktestJob,
   getMarketSymbol,
   getSettings,
+  getSkill,
   listBacktestJobs,
+  listSkills,
   listStrategies,
   runBacktest,
   runScreener,
+  type Skill,
+  type SkillDetail,
 } from '@/lib/api'
 import { useAuthStore } from '@/stores'
 
@@ -297,5 +301,83 @@ describe('getSettings', () => {
     )
     await expect(getSettings()).rejects.toBeInstanceOf(ApiError)
     expect(useAuthStore.getState().token).toBeNull()
+  })
+})
+
+describe('listSkills', () => {
+  it('hits /api/admin/skills and unwraps items', async () => {
+    const items: Skill[] = [
+      {
+        name: 'alpha',
+        description: 'alpha desc',
+        category: 'data',
+        body_preview: '# Body',
+        body_truncated: false,
+        cited_specs: ['spec-one'],
+      },
+    ]
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ ok: true, data: { items } }),
+    )
+
+    const result = await listSkills()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toBe('/api/admin/skills')
+    expect(result.items).toEqual(items)
+  })
+})
+
+describe('getSkill', () => {
+  it('hits /api/admin/skills/{name} and returns SkillDetail', async () => {
+    const detail: SkillDetail = {
+      name: 'market-data',
+      description: 'fetch bars',
+      category: 'data',
+      body: '# full body',
+      cited_specs: ['market-data-cache'],
+    }
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true, data: detail }))
+
+    const result = await getSkill('market-data')
+
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toBe('/api/admin/skills/market-data')
+    expect(result).toEqual(detail)
+  })
+
+  it('encodes the path component (space → %20)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: true,
+        data: {
+          name: 'foo bar',
+          description: '',
+          category: 'data',
+          body: '',
+          cited_specs: [],
+        },
+      }),
+    )
+
+    await getSkill('foo bar')
+
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toBe('/api/admin/skills/foo%20bar')
+  })
+
+  it('throws ApiError with code "not_found" on 404 envelope', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { ok: false, error: { code: 'not_found', message: 'skill not found: x' } },
+        404,
+      ),
+    )
+
+    await expect(getSkill('x')).rejects.toMatchObject({
+      code: 'not_found',
+      httpStatus: 404,
+    })
   })
 })
