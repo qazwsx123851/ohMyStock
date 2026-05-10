@@ -14,6 +14,8 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { SkillsPage } from '@/pages/SkillsPage'
 import { SkillDetailPage } from '@/pages/SkillDetailPage'
 import { MemoryPage } from '@/pages/MemoryPage'
+import { ProposalsPage } from '@/pages/ProposalsPage'
+import { ProposalDetailPage } from '@/pages/ProposalDetailPage'
 import {
   ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage,
   SessionsPage,
@@ -40,6 +42,8 @@ export const router = createBrowserRouter([
       { path: 'skills',               element: <SkillsPage /> },
       { path: 'skills/:name',         element: <SkillDetailPage /> },
       { path: 'memory',               element: <MemoryPage /> },
+      { path: 'proposals',            element: <ProposalsPage /> },
+      { path: 'proposals/:slug',      element: <ProposalDetailPage /> },
       { path: 'sessions',             element: <SessionsPage /> },
       { path: 'settings',             element: <SettingsPage /> },
       { path: 'audit',                element: <AuditPage /> },

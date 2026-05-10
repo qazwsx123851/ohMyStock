@@ -341,6 +341,88 @@ export type MemoryRowsResponse = {
   has_more: boolean
 }
 
+// ---------------------------------------------------------------------------
+// Proposal endpoint types — mirror admin-proposals-endpoints spec
+// (openspec/changes/admin-proposals-endpoints-and-pages/specs/admin-proposals-endpoints/spec.md)
+// ---------------------------------------------------------------------------
+
+export type ProposalStatus =
+  | 'pending'
+  | 'validating'
+  | 'approved'
+  | 'merged'
+  | 'rejected'
+
+export type ProposalPriority = 'high' | 'medium' | 'low'
+
+export type Proposal = {
+  slug: string
+  proposal_id: string
+  status: ProposalStatus
+  topic: string
+  target_section: string
+  created_by: string
+  created_at: string
+  review_id: string | null
+  priority: ProposalPriority
+}
+
+export type ProposalChangelogEntry =
+  | {
+      kind: 'transition'
+      timestamp: string
+      from_status: ProposalStatus
+      to_status: ProposalStatus
+      actor: string
+      reason: string | null
+    }
+  | { kind: 'created'; timestamp: string; actor: string }
+  | { kind: 'raw'; text: string }
+
+export type ProposalDetail = Proposal & {
+  body: {
+    description: string
+    motivation: string
+    diff_draft: string
+    expected_impact: string
+    risk_assessment: string
+    validation_plan: string
+    expected_improvement: string
+  }
+  changelog: ProposalChangelogEntry[]
+  extra_frontmatter: Partial<
+    Record<
+      | 'validation_report_path'
+      | 'merged_to_version'
+      | 'merged_at'
+      | 'rejected_reason',
+      string
+    >
+  >
+}
+
+export type ProposalsListResponse = {
+  items: Proposal[]
+  total: number
+  limit: number
+  offset: number
+  has_more: boolean
+}
+
+export type ProposalTransitionBody = {
+  new_status: ProposalStatus
+  actor: string
+  reason?: string
+  validation_report_path?: string
+  merged_to_version?: string
+}
+
+export type ProposalTransitionResult = {
+  slug: string
+  new_status: ProposalStatus
+  new_path: string
+}
+
 export type Envelope<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } }
@@ -581,6 +663,41 @@ export function searchMemory(
     (params.limit !== undefined ? `&limit=${encodeURIComponent(String(params.limit))}` : '') +
     (params.offset !== undefined ? `&offset=${encodeURIComponent(String(params.offset))}` : '')
   return apiFetch<MemoryRowsResponse>(`/api/admin/memory/search${qs}`)
+}
+
+// ---------------------------------------------------------------------------
+// Proposal wrappers
+// ---------------------------------------------------------------------------
+
+export function listProposals(
+  params: { status?: ProposalStatus; limit?: number; offset?: number } = {},
+): Promise<ProposalsListResponse> {
+  const qs = buildQueryString({
+    status: params.status,
+    limit: params.limit,
+    offset: params.offset,
+  })
+  return apiFetch<ProposalsListResponse>(`/api/admin/proposals${qs}`)
+}
+
+export function getProposal(slug: string): Promise<ProposalDetail> {
+  return apiFetch<ProposalDetail>(
+    `/api/admin/proposals/${encodeURIComponent(slug)}`,
+  )
+}
+
+export function transitionProposal(
+  slug: string,
+  body: ProposalTransitionBody,
+): Promise<ProposalTransitionResult> {
+  return apiFetch<ProposalTransitionResult>(
+    `/api/admin/proposals/${encodeURIComponent(slug)}/transition`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
 }
 
 function parseAndDispatch(raw: string, onEvent: (e: LiveEvent) => void): void {

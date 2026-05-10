@@ -7,6 +7,7 @@ downstream code is responsible for asserting required values before use.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Literal
 
 from pydantic import field_validator, model_validator
@@ -34,6 +35,11 @@ class Settings(BaseSettings):
     ohmystock_llm_degrade: str | None = None
     ohmystock_db_path: str = "~/.ohmystock/journal.db"
     ohmystock_log_level: str = "INFO"
+
+    # Proposals filesystem root — read by ohmystock.api.routes.proposals via the
+    # _PROPOSALS_ROOT_FACTORY indirection so test scopes can override per-request.
+    # Default is CWD-relative ("proposals/"), matching docs/README.md §7.
+    proposals_dir: Path = Path("proposals")
 
     # web-admin Bearer auth — see openspec/specs/web-admin-bearer-auth/spec.md
     # (after archive). Default None lets Settings() construct without env;

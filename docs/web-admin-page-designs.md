@@ -979,6 +979,40 @@ Sidebar 依 4 群組顯示：**工作流**（Dashboard / 對話 / Swarm / 回測
 
 ---
 
+## 14.5 `/proposals` — 提案清單
+
+**用途：** 列出所有 strategy-change 提案（跨 4 個 sub-location）並按狀態過濾。
+**後端狀態：** ✅ read + transition v0（`GET /api/admin/proposals`，spec: `openspec/specs/admin-proposals-endpoints/spec.md`，shipped 2026-05-10）
+
+> **v0 範圍（read + transition，無 SSE / 無 body preview）：**
+> - 頂部 6-tab segmented control（`全部 / pending / validating / approved / merged / rejected`）；切 tab 由 `?status=` URL search param 持久化，react-query keyed cache 支援回切免重撈。
+> - 5-col `<DataTable>`：時間（mono ISO）/ 狀態（`Badge variant="secondary"`）/ 主題 / target_section（`text-muted-foreground` truncate）/ 優先級（`Badge variant="outline"`）。
+> - row click（或 Tab + Enter）= 導向 `/proposals/<slug>`。
+> - **無**：SSE live-update、body preview 欄、bulk-transition、新增 button、編輯 popover。proposals 由 Phase 5 復盤 `proposer` 節點寫入；本頁僅讀。
+> - 不套漲跌色（提案與市場價格無語意關係）；錯誤狀態用 destructive `Card` + `AlertCircle` + 「重試」（仍滿足「color-is-never-the-only-signal」鐵律）。
+> - 載入：8 列 Skeleton row；空集合：「尚無提案」（registry 空）/「目前 X 沒有提案」+「回到全部」 button（filter 過後）；error：destructive Card + 重試。
+
+**Deferred：** WFA validation engine、auto-run scheduling、git/PR 自動化、cheatsheet diff 套用、EventBus `proposal_transitioned` event、markdown body 預覽、bulk transition、`reverted_at` rollback。
+
+---
+
+## 14.6 `/proposals/:slug` — 提案詳情 + 狀態轉移
+
+**用途：** 完整呈現一份提案的 frontmatter / 7 段 body / changelog；以 status-aware action row 觸發 5 條合法狀態轉移。
+**後端狀態：** ✅ v0（`GET /api/admin/proposals/{slug}` + `POST /api/admin/proposals/{slug}/transition`，spec: `openspec/specs/admin-proposals-endpoints/spec.md`，shipped 2026-05-10）
+
+> **v0 範圍（read-only `<pre>` body，status-aware action row，no editor / no Save / no Markdown parser）：**
+> - Header：back-link「← Proposals」+ `<h1>{topic}</h1>` + status `Badge variant="secondary"` + priority `Badge variant="outline"` + meta line（`{created_by} · {created_at}`）+「Target section: {target_section}」。
+> - 可選 Extra metadata `Card`（`extra_frontmatter` 為空時整張卡省略）：呈現 `validation_report_path` / `merged_to_version` / `merged_at` / `rejected_reason` 任一存在的鍵值對。
+> - 7 個 body section `Card`，每個 Card 開頭顯示 `## N. <title>` 標題行，內容為 `<pre className="whitespace-pre-wrap font-mono text-sm">`（**無** markdown parser，與 `/skills/:name` 一致）。
+> - 「變更紀錄」`Card` 為 `<ul>`：`kind=transition` → `<ts> — <from_status> → <to_status> by <actor>` + 可選 italic reason；`kind=created` → `<ts> — created by <actor>`；`kind=raw` → `<pre>` 整行原文。
+> - **Action row**（status-aware）：`pending` → `[Mark Validating]`（觸發 `<ValidatingConfirmDialog>`，actor 單一輸入）；`validating` → `[Approve…]` `[Reject…]`；`approved` → `[Mark Merged…]` `[Reject…]`；`merged` / `rejected` → 灰色「終局狀態」label，無 button。所有「…」button 觸發 `<TransitionDialog>` 收 actor + target-conditional 必填欄位。
+> - `<TransitionDialog>` submit 成功 → 寫 `localStorage['ohmystock.admin.actor']` → 關閉 dialog → invalidate `['proposal', slug]` query 重新載入。失敗 → inline `<p className="text-sm text-destructive">{code}: {message}</p>`，dialog 不關，submit 重新可用。
+> - 錯誤分流：404 `not_found` → 「找不到提案」empty state + 返回 button；422 `malformed_proposal` → destructive Card + back-link，**無** retry（重試也救不了壞檔）；其他 → destructive Card + AlertCircle + 「重試」。
+> - **無**：YAML editor、body Textarea、Save button、dirty state、autosave、`<form>` for body、Markdown 渲染、git commit、PR 自動化（皆 deferred）。
+
+---
+
 ## 15. `/sessions` — 對話歷史搜尋
 
 **用途：** Claude Code session transcripts FTS5 搜尋（時間範圍 + 關鍵字）。

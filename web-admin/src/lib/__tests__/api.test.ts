@@ -11,16 +11,21 @@ import {
   ApiError,
   getBacktestJob,
   getMarketSymbol,
+  getProposal,
   getSettings,
   getSkill,
   listBacktestJobs,
   listMemory,
+  listProposals,
   listSkills,
   listStrategies,
   runBacktest,
   runScreener,
   searchMemory,
+  transitionProposal,
   type MemoryRowsResponse,
+  type Proposal,
+  type ProposalDetail,
   type Skill,
   type SkillDetail,
 } from '@/lib/api'
@@ -492,5 +497,166 @@ describe('searchMemory', () => {
       code: 'invalid_query',
       httpStatus: 400,
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Proposal wrappers
+// ---------------------------------------------------------------------------
+
+describe('listProposals', () => {
+  it('hits /api/admin/proposals without query string when no params', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: true,
+        data: { items: [], total: 0, limit: 50, offset: 0, has_more: false },
+      }),
+    )
+    await listProposals()
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toBe('/api/admin/proposals')
+  })
+
+  it('composes status / limit / offset query params', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: true,
+        data: { items: [], total: 0, limit: 25, offset: 50, has_more: false },
+      }),
+    )
+    await listProposals({ status: 'approved', limit: 25, offset: 50 })
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toContain('/api/admin/proposals')
+    expect(url).toContain('status=approved')
+    expect(url).toContain('limit=25')
+    expect(url).toContain('offset=50')
+  })
+
+  it('unwraps envelope to items array', async () => {
+    const items: Proposal[] = [
+      {
+        slug: '2026-04-30-x',
+        proposal_id: '2026-04-30-x',
+        status: 'pending',
+        topic: 'x',
+        target_section: 'cheatsheet §1',
+        created_by: 'mark',
+        created_at: '2026-04-30T10:00:00+08:00',
+        review_id: null,
+        priority: 'medium',
+      },
+    ]
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: true,
+        data: { items, total: 1, limit: 50, offset: 0, has_more: false },
+      }),
+    )
+    const result = await listProposals()
+    expect(result.items).toEqual(items)
+    expect(result.total).toBe(1)
+  })
+})
+
+describe('getProposal', () => {
+  it('encodes slug into the URL path', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: true,
+        data: {
+          slug: '2026-04-30-x y',
+          proposal_id: '2026-04-30-x y',
+          status: 'pending',
+          topic: 'x y',
+          target_section: '',
+          created_by: 'mark',
+          created_at: '2026-04-30T10:00:00+08:00',
+          review_id: null,
+          priority: 'low',
+          body: {
+            description: '',
+            motivation: '',
+            diff_draft: '',
+            expected_impact: '',
+            risk_assessment: '',
+            validation_plan: '',
+            expected_improvement: '',
+          },
+          changelog: [],
+          extra_frontmatter: {},
+        } satisfies ProposalDetail,
+      }),
+    )
+    await getProposal('2026-04-30-x y')
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toBe('/api/admin/proposals/2026-04-30-x%20y')
+  })
+
+  it('rejects with ApiError on 404 not_found', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { ok: false, error: { code: 'not_found', message: 'gone' } },
+        404,
+      ),
+    )
+    await expect(getProposal('missing')).rejects.toMatchObject({
+      code: 'not_found',
+      httpStatus: 404,
+    })
+  })
+})
+
+describe('transitionProposal', () => {
+  it('POSTs JSON body to /api/admin/proposals/{slug}/transition', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: true,
+        data: {
+          slug: '2026-04-30-x',
+          new_status: 'validating',
+          new_path: '2026-04-30-x.md',
+        },
+      }),
+    )
+    await transitionProposal('2026-04-30-x', {
+      new_status: 'validating',
+      actor: 'mark',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [first, init] = fetchMock.mock.calls[0] as [
+      RequestInfo,
+      RequestInit | undefined,
+    ]
+    const url = typeof first === 'string' ? first : (first as Request).url
+    expect(url).toBe('/api/admin/proposals/2026-04-30-x/transition')
+    expect(init?.method).toBe('POST')
+    const headers = init?.headers as Record<string, string>
+    expect(headers['Content-Type']).toBe('application/json')
+    expect(JSON.parse(String(init?.body))).toEqual({
+      new_status: 'validating',
+      actor: 'mark',
+    })
+  })
+
+  it('propagates 409 illegal_transition as ApiError', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          ok: false,
+          error: {
+            code: 'illegal_transition',
+            message: 'pending -> approved',
+          },
+        },
+        409,
+      ),
+    )
+    await expect(
+      transitionProposal('2026-04-30-x', {
+        new_status: 'approved',
+        actor: 'mark',
+        validation_report_path: 'x.json',
+      }),
+    ).rejects.toMatchObject({ code: 'illegal_transition', httpStatus: 409 })
   })
 })

@@ -38,6 +38,7 @@ from ohmystock.api.routes.journal import router as journal_router
 from ohmystock.api.routes.market import router as market_router
 from ohmystock.api.routes.memory import router as memory_router
 from ohmystock.api.routes.positions import router as positions_router
+from ohmystock.api.routes.proposals import router as proposals_router
 from ohmystock.api.routes.screener import router as screener_router
 from ohmystock.api.routes.settings import router as settings_router
 from ohmystock.api.routes.skills import router as skills_router
@@ -147,5 +148,6 @@ def create_app() -> FastAPI:
     app.include_router(backtest_router)
     app.include_router(settings_router)
     app.include_router(skills_router)
+    app.include_router(proposals_router)
 
     return app
