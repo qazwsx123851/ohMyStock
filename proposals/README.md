@@ -41,6 +41,22 @@ proposal 建立(status=pending)
 
 > ⚠️ **安全約束**:`merge` 動作必須由 `/api/proposals/{id}/merge` 端點注入 `confirm_token`(來自人工 ConfirmDialog)。LLM 直接呼叫 `proposal_tool.merge_proposal` 會被拒絕。
 
+### 2.1 v0 狀態轉換層 — 已完成 / 仍 deferred
+
+`proposal-state-machine` change（archive 後 spec：`openspec/specs/proposal-state-machine/spec.md`）落地的範圍：
+
+| 元件 | 狀態 |
+|---|---|
+| `transition_proposal()` Python API（5 條合法 edge、原子寫、自動搬檔、frontmatter 變更紀錄追加）| ✅ 完成（`src/ohmystock/proposal/state.py`）|
+| WFA / Robust / 黃金樣本 驗證引擎 | ⏳ deferred |
+| `/api/proposals/{id}/validate`、`/merge`、`/reject` endpoint | ⏳ deferred |
+| web-admin `/proposals` 頁面 | ⏳ deferred |
+| git commit / PR 自動化、cheatsheet diff 套用、版本 bump | ⏳ deferred |
+| `scripts/update_proposal_stats.py`（README §10 表）| ⏳ deferred |
+| 回滾流程（`reverted_at` / `reverted_reason`）| ⏳ deferred |
+
+意思是：**狀態機本身可用**（人工或下一輪復盤節點可呼叫 `transition_proposal` 推進狀態 + 搬檔），但驅動它的「自動驗證閘」與「合併流程」仍是手動操作，需後續 change 補齊。
+
 ---
 
 ## 3. 檔案命名規則
