@@ -30,12 +30,6 @@ def backtest() -> None:
     raise typer.Exit(1)
 
 
-@app.command(help="跑 Phase 5 月度復盤五節點 swarm（後續 change 實作）")
-def review() -> None:
-    typer.echo("not implemented")
-    raise typer.Exit(1)
-
-
 @app.command(help="生成策略改動提案，走 WFA 樣本外驗證（後續 change 實作）")
 def propose() -> None:
     typer.echo("not implemented")
@@ -182,6 +176,19 @@ app.command(
         "decision_status to closed for triggered positions."
     ),
 )(evaluate_exits)
+
+
+from ohmystock.cli._review import review_cmd  # noqa: E402
+
+app.command(
+    "review",
+    help=(
+        "Phase 5 post-trade review — sequential 5-node pipeline "
+        "(data_loader → attributor → aggregator → critic → proposer). "
+        "Writes reviews/<period>/ + proposals/<id>.md per spec. "
+        "Use --dry-run to estimate token cost."
+    ),
+)(review_cmd)
 
 
 def main() -> None:

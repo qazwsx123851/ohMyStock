@@ -17,8 +17,9 @@ from ohmystock.config import Settings
 
 runner = CliRunner()
 
-STUB_SUBCOMMANDS = ["run", "backtest", "review", "propose", "screen"]
-ALL_SUBCOMMANDS = [*STUB_SUBCOMMANDS, "api", "smoke-test", "score"]
+STUB_SUBCOMMANDS = ["run", "backtest", "propose", "screen"]
+# `review` graduated from stub to real impl in phase5-review-mvp.
+ALL_SUBCOMMANDS = [*STUB_SUBCOMMANDS, "review", "api", "smoke-test", "score"]
 
 
 def test_root_help_lists_all_subcommands() -> None:

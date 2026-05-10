@@ -143,6 +143,7 @@ v2 流程是「自動掃描 → 自動評分 → 人工 Phase 3 進場 → 出�
 | **資料備份** | 🟡 待設計 | `~/.ohmystock/` 整個目錄定期備份到外接 SSD？ |
 | **防線 9 red-team 演練** | 🔵 切 live 前 1 個月 | 5 個 manual test case 注入假決策驗證熔斷觸發；不需 framework；thread C item 2 |
 | **Phase 2B 65 分閾值校準** | 🟡 v1 上線前 | v3 改了權重（技 35 + 籌 45 + 產 10 + 情緒 10），需重跑 5 年 WFA 比 55/60/65/70/75 不同閾值；確認 65 仍最優或更新 cheatsheet §6；thread C item 3 |
+| **Phase 5 README 對齊** | 🟡 後續 change 補 | `phase5-review-mvp` archive 後僅實作五節點 + writer 的 v0 路徑；`reviews/README.md` §5/§10、`proposals/README.md` §6/§7/§9/§10、`docs/post-trade-review-rubric.md` §7/§8 描述的「驗證閘 / 狀態機 / merge / 跨月趨勢 / `_golden/` 集」皆 deferred 到後續 `phase5-validation-gate` / `proposal-state-machine` / `proposal-merge-flow` / `phase5-scheduler` / `phase5-prompt-evolution` change，不需立刻改 README 文字 |
 
 ---
 
