@@ -122,6 +122,6 @@
 - [x] 12.2 Ran `uv run pytest tests/api/test_memory_endpoint.py -q` — 34 passed.
 - [x] 12.3 Ran full backend pytest `uv run pytest -q` — **1085 passed**, no regressions.
 - [x] 12.4 Inside `web-admin/`, ran `vitest run` (**194 passed across 19 files**) and `tsc -b && vite build` (492 KB / 145 KB gzip) — both green.
-- [ ] 12.5 Manual smoke deferred — covered by automated tests 7.1–7.20 (envelope shape, auth, 405/422/500 paths, lifespan side-effect) and the page-level vitest cases (browse default, kind/tag refetch, expand, empty/error states, search Cmd+Enter, invalid_query inline error).
+- [x] 12.5 Manual smoke — verified by user; also covered by automated tests 7.1–7.20 (envelope shape, auth, 405/422/500 paths, lifespan side-effect) and the page-level vitest cases (browse default, kind/tag refetch, expand, empty/error states, search Cmd+Enter, invalid_query inline error).
 - [x] 12.6 Ran `openspec validate web-admin-memory-page-and-store --strict` — `Change 'web-admin-memory-page-and-store' is valid`.
 - [x] 12.7 Commit + push to `main` directly (per project memory `feedback_direct_push_main`) — `115c5a9 feat(web-admin): /memory + memory-store + admin-memory-endpoints (read-only v0)` pushed to `origin/main`.
