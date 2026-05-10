@@ -36,6 +36,7 @@ from ohmystock.api.routes.confirm_gate import router as confirm_gate_router
 from ohmystock.api.routes.exit_engine import router as exit_engine_router
 from ohmystock.api.routes.journal import router as journal_router
 from ohmystock.api.routes.market import router as market_router
+from ohmystock.api.routes.memory import router as memory_router
 from ohmystock.api.routes.positions import router as positions_router
 from ohmystock.api.routes.screener import router as screener_router
 from ohmystock.api.routes.settings import router as settings_router
@@ -45,6 +46,7 @@ from ohmystock.backtest import storage as backtest_storage
 from ohmystock.config import Settings
 from ohmystock.data.disposition import fetch_disposition_set
 from ohmystock.eventbus import AdminEventSerializer, bus
+from ohmystock.memory import init_schema as memory_init_schema
 from ohmystock.sepa.rs import reset_providers, set_universe_closes_loader
 from ohmystock.sepa.rs_loader import build_universe_closes_loader
 
@@ -55,18 +57,24 @@ _KEEPALIVE_TIMEOUT_SECONDS = 15.0
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Wire the rs-percentile universe-closes loader for the app's lifetime.
 
+    Also bootstraps the ``backtest_jobs`` schema and the ``memory_rows`` +
+    FTS5 schema once at startup so the first request against a fresh DB
+    succeeds without relying on per-handler init calls. Both
+    ``init_schema`` calls are idempotent.
+
     Spec: openspec/changes/rs-percentile-finmind-wiring/specs/rs-percentile/spec.md
     ("Production universe-closes loader …")
+          openspec/changes/web-admin-memory-page-and-store/specs/admin-memory-endpoints/spec.md
+    ("Requirement: ``init_schema`` wired from app lifespan")
     """
     set_universe_closes_loader(
         build_universe_closes_loader(disposition_fetcher=fetch_disposition_set)
     )
 
-    # Bootstrap backtest_jobs schema once at startup so the first request
-    # against a fresh DB succeeds without relying on per-handler init calls.
     init_conn = get_connection()
     try:
         backtest_storage.init_schema(init_conn)
+        memory_init_schema(init_conn)
     finally:
         init_conn.close()
 
@@ -133,6 +141,7 @@ def create_app() -> FastAPI:
     app.include_router(exit_engine_router)
     app.include_router(journal_router)
     app.include_router(market_router)
+    app.include_router(memory_router)
     app.include_router(positions_router)
     app.include_router(stats_router)
     app.include_router(backtest_router)

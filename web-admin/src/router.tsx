@@ -13,9 +13,10 @@ import { BacktestJobPage } from '@/pages/BacktestJobPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { SkillsPage } from '@/pages/SkillsPage'
 import { SkillDetailPage } from '@/pages/SkillDetailPage'
+import { MemoryPage } from '@/pages/MemoryPage'
 import {
   ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage,
-  MemoryPage, SessionsPage,
+  SessionsPage,
 } from '@/pages/stubs'
 
 export const router = createBrowserRouter([

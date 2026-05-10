@@ -914,7 +914,17 @@ Sidebar 依 4 群組顯示：**工作流**（Dashboard / 對話 / Swarm / 回測
 ## 14. `/memory` — 長期記憶
 
 **用途：** Memory entries CRUD + FTS5 search。
-**後端狀態：** ❌（future GET / POST / DELETE `/api/admin/memory`）
+**後端狀態：** ✅ read-only v0（GET `/api/admin/memory/rows` + GET `/api/admin/memory/search`，spec: `openspec/specs/{memory-store,admin-memory-endpoints,web-admin-memory-page}/spec.md`，shipped 2026-05-09）
+
+> **v0 範圍（read-only）：** 本頁 v0 為 read-only，下面 wireframe 中的「+ 新增」/「⋮ 編輯 / 刪除」/「Cmd+N」/ inline 新增 row / 刪除 confirm dialog **皆為後續 change 的目標，未實作**。同樣 deferred 的還有 tag autocomplete、date-range filter、semantic search。
+>
+> v0 實際 render：
+> - 頂部 segmented control 切換「瀏覽」/「搜尋」兩個 view（取代 wireframe 上方那一條 filter bar）。
+> - 「瀏覽」view = kind `<Select>`（5 個 option：全部 / 筆記 / 經驗 / 提案 / 復盤）+ 1-tag chip-input + 5-col `<DataTable>`（時間 / kind / tags / 內容預覽 / 來源）+ DataTable 內建分頁。
+> - 「搜尋」view = single `<Input>`（FTS5 表達式，例 `VCP AND breakout`）+ 「搜尋」 button；按 Enter / Cmd+Enter / Ctrl+Enter 送出；空 input 不發 request、改顯示「請輸入查詢關鍵字」。
+> - row click（或 keyboard Enter / Space）= inline expand 顯示完整 `content`（`<pre>` block，max-h 70vh，含字元數）；切 tab 收合展開。
+> - 載入：6 列 Skeleton；空集合：「尚無 memory；待 Phase 5 復盤 / proposal 任務寫入」 / 「無符合條件的 memory」+ 清除 filter / 「找不到符合『q』的 memory」三種；error：destructive Card + AlertCircle + 重試；FTS5 syntax error → inline「查詢語法錯誤」。
+> - **無**新增 / 編輯 / 刪除 button、無 Textarea、無 Save/Cmd+S、無 dirty state、無 ⋮ popover。寫入路徑要等 Phase 5 復盤 / proposal job change 把 memory writer 接上才會出現。
 
 **ASCII wireframe**
 ```

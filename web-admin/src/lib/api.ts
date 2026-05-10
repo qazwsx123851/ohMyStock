@@ -315,6 +315,32 @@ export type SkillDetail = {
   cited_specs: string[]
 }
 
+// ---------------------------------------------------------------------------
+// Memory endpoint types — mirror admin-memory-endpoints spec
+// (openspec/changes/web-admin-memory-page-and-store/specs/admin-memory-endpoints/spec.md)
+// ---------------------------------------------------------------------------
+
+export type MemoryKind = 'note' | 'lesson' | 'proposal' | 'review_summary'
+
+export type MemoryRow = {
+  id: number
+  kind: MemoryKind
+  content: string
+  content_preview: string
+  content_truncated: boolean
+  tags: string[]
+  source: string | null
+  created_at: string
+}
+
+export type MemoryRowsResponse = {
+  items: MemoryRow[]
+  total: number
+  limit: number
+  offset: number
+  has_more: boolean
+}
+
 export type Envelope<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } }
@@ -520,6 +546,41 @@ export function getSkill(name: string): Promise<SkillDetail> {
   return apiFetch<SkillDetail>(
     `/api/admin/skills/${encodeURIComponent(name)}`,
   )
+}
+
+// ---------------------------------------------------------------------------
+// Memory wrappers
+// ---------------------------------------------------------------------------
+
+function buildQueryString(params: Record<string, string | number | undefined | null>): string {
+  const parts: string[] = []
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null) continue
+    if (typeof value === 'string' && value.length === 0) continue
+    parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+  }
+  return parts.length === 0 ? '' : `?${parts.join('&')}`
+}
+
+export function listMemory(
+  params: { kind?: MemoryKind; tag?: string; limit?: number; offset?: number } = {},
+): Promise<MemoryRowsResponse> {
+  const qs = buildQueryString({
+    kind: params.kind,
+    tag: params.tag,
+    limit: params.limit,
+    offset: params.offset,
+  })
+  return apiFetch<MemoryRowsResponse>(`/api/admin/memory/rows${qs}`)
+}
+
+export function searchMemory(
+  params: { q: string; limit?: number; offset?: number },
+): Promise<MemoryRowsResponse> {
+  const qs = `?q=${encodeURIComponent(params.q)}` +
+    (params.limit !== undefined ? `&limit=${encodeURIComponent(String(params.limit))}` : '') +
+    (params.offset !== undefined ? `&offset=${encodeURIComponent(String(params.offset))}` : '')
+  return apiFetch<MemoryRowsResponse>(`/api/admin/memory/search${qs}`)
 }
 
 function parseAndDispatch(raw: string, onEvent: (e: LiveEvent) => void): void {

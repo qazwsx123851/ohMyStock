@@ -14,10 +14,13 @@ import {
   getSettings,
   getSkill,
   listBacktestJobs,
+  listMemory,
   listSkills,
   listStrategies,
   runBacktest,
   runScreener,
+  searchMemory,
+  type MemoryRowsResponse,
   type Skill,
   type SkillDetail,
 } from '@/lib/api'
@@ -378,6 +381,116 @@ describe('getSkill', () => {
     await expect(getSkill('x')).rejects.toMatchObject({
       code: 'not_found',
       httpStatus: 404,
+    })
+  })
+})
+
+const EMPTY_MEMORY: MemoryRowsResponse = {
+  items: [],
+  total: 0,
+  limit: 50,
+  offset: 0,
+  has_more: false,
+}
+
+describe('listMemory', () => {
+  it('hits /api/admin/memory/rows with no query string when params are empty', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true, data: EMPTY_MEMORY }))
+
+    await listMemory({})
+
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toBe('/api/admin/memory/rows')
+  })
+
+  it('builds URL with kind, tag, limit, offset all set', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true, data: EMPTY_MEMORY }))
+
+    await listMemory({ kind: 'lesson', tag: 'vcp', limit: 20, offset: 40 })
+
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toContain('/api/admin/memory/rows?')
+    expect(url).toContain('kind=lesson')
+    expect(url).toContain('tag=vcp')
+    expect(url).toContain('limit=20')
+    expect(url).toContain('offset=40')
+  })
+
+  it('omits empty-string tag from the query string', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true, data: EMPTY_MEMORY }))
+
+    await listMemory({ kind: 'note', tag: '' })
+
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).not.toContain('tag=')
+    expect(url).toContain('kind=note')
+  })
+
+  it('returns the unwrapped MemoryRowsResponse', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true, data: EMPTY_MEMORY }))
+
+    const result = await listMemory({})
+    expect(result).toEqual(EMPTY_MEMORY)
+  })
+
+  it('throws ApiError on 400 invalid_input envelope', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { ok: false, error: { code: 'invalid_input', message: 'kind invalid' } },
+        400,
+      ),
+    )
+
+    await expect(listMemory({ kind: 'note' })).rejects.toBeInstanceOf(ApiError)
+  })
+})
+
+describe('searchMemory', () => {
+  it('encodes q correctly (CJK + spaces)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true, data: EMPTY_MEMORY }))
+
+    await searchMemory({ q: 'foo bar 中文' })
+
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toBe('/api/admin/memory/search?q=foo%20bar%20%E4%B8%AD%E6%96%87')
+  })
+
+  it('always passes q through even when empty (server rejects)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { ok: false, error: { code: 'invalid_input', message: 'empty q' } },
+        400,
+      ),
+    )
+
+    // The wrapper must not throw client-side — the server returns 400 and
+    // react-query's error path picks it up.
+    await expect(searchMemory({ q: '' })).rejects.toBeInstanceOf(ApiError)
+
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toBe('/api/admin/memory/search?q=')
+  })
+
+  it('appends limit and offset when provided', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true, data: EMPTY_MEMORY }))
+
+    await searchMemory({ q: 'breakout', limit: 30, offset: 60 })
+
+    const url = urlOf(fetchMock.mock.calls[0] as Parameters<typeof fetch>)
+    expect(url).toBe('/api/admin/memory/search?q=breakout&limit=30&offset=60')
+  })
+
+  it('throws ApiError with code "invalid_query" on FTS5 syntax error', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { ok: false, error: { code: 'invalid_query', message: 'FTS5 query syntax error' } },
+        400,
+      ),
+    )
+
+    await expect(searchMemory({ q: 'foo OR' })).rejects.toMatchObject({
+      code: 'invalid_query',
+      httpStatus: 400,
     })
   })
 })
