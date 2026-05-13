@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router'
 import {
   LayoutDashboard, MessagesSquare, Network, FlaskConical, ReceiptText, ListOrdered,
   Briefcase, LineChart, BookOpen, History, Settings, ShieldCheck, Sparkles,
+  ClipboardList, GitPullRequest,
   PanelLeftClose, PanelLeftOpen, LogOut,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -40,6 +41,13 @@ const NAV: NavGroup[] = [
     ],
   },
   {
+    name: '復盤',
+    items: [
+      { to: '/reviews',   label: 'Reviews',   icon: ClipboardList },
+      { to: '/proposals', label: 'Proposals', icon: GitPullRequest },
+    ],
+  },
+  {
     name: '系統',
     items: [
       { to: '/settings', label: '設定', icon: Settings },
@@ -60,6 +68,8 @@ const TITLE_BY_PATH: Record<string, string> = {
   '/skills':          'Skills',
   '/memory':          '長期記憶',
   '/sessions':        '對話歷史',
+  '/reviews':         'Reviews',
+  '/proposals':       'Proposals',
   '/settings':        '設定',
   '/audit':           '稽核日誌',
 }
@@ -71,6 +81,8 @@ function pageTitle(pathname: string): string {
   if (pathname.startsWith('/backtest/')) return '回測結果'
   if (pathname.startsWith('/market/'))   return '個股頁'
   if (pathname.startsWith('/skills/'))   return 'Skill 詳情'
+  if (pathname.startsWith('/reviews/'))  return 'Review 詳情'
+  if (pathname.startsWith('/proposals/')) return 'Proposal 詳情'
   return 'ohMyStock'
 }
 

@@ -423,6 +423,72 @@ export type ProposalTransitionResult = {
   new_path: string
 }
 
+// ---------------------------------------------------------------------------
+// Review endpoint types — mirror admin-reviews-endpoints spec
+// (openspec/changes/admin-reviews-endpoints-and-pages/specs/admin-reviews-endpoints/spec.md)
+// ---------------------------------------------------------------------------
+
+export type ReviewKind = 'monthly' | 'quarterly' | 'forced' | 'manual'
+
+export type ReviewSummary = {
+  review_id: string
+  kind: ReviewKind
+  period: { from: string; to: string }
+  trade_count: number
+  win_rate: number
+  pf: number
+  proposals_created: number
+  completed_at: string
+}
+
+export type ReviewFileStatus = {
+  exists: boolean
+  path: string | null
+}
+
+export type ReviewFiles = {
+  data_json: ReviewFileStatus
+  attribution_json: ReviewFileStatus
+  metrics_json: ReviewFileStatus
+  critique_md: ReviewFileStatus
+  report_md: ReviewFileStatus
+  proposals_created_md: ReviewFileStatus
+}
+
+export type ReviewMetricsOverall = {
+  win_rate: number
+  profit_factor: number
+  expectancy_pct: number
+  max_drawdown_pct: number
+  max_consecutive_loss: number
+  avg_hold_days: number
+}
+
+export type ReviewProposalCreatedRow = {
+  slug: string
+  status: string
+  priority: string
+  target: string
+}
+
+export type ReviewDetail = {
+  review_id: string
+  partial: boolean
+  summary: ReviewSummary | null
+  files: ReviewFiles
+  report: string | null
+  metrics_overall: ReviewMetricsOverall | null
+  proposals_created: ReviewProposalCreatedRow[]
+}
+
+export type ReviewsListResponse = {
+  items: ReviewSummary[]
+  total: number
+  limit: number
+  offset: number
+  has_more: boolean
+}
+
 export type Envelope<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } }
@@ -697,6 +763,27 @@ export function transitionProposal(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     },
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Review wrappers
+// ---------------------------------------------------------------------------
+
+export function listReviews(
+  params: { kind?: ReviewKind; limit?: number; offset?: number } = {},
+): Promise<ReviewsListResponse> {
+  const qs = buildQueryString({
+    kind: params.kind,
+    limit: params.limit,
+    offset: params.offset,
+  })
+  return apiFetch<ReviewsListResponse>(`/api/admin/reviews${qs}`)
+}
+
+export function getReview(reviewId: string): Promise<ReviewDetail> {
+  return apiFetch<ReviewDetail>(
+    `/api/admin/reviews/${encodeURIComponent(reviewId)}`,
   )
 }
 

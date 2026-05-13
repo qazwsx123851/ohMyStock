@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # Default is CWD-relative ("proposals/"), matching docs/README.md §7.
     proposals_dir: Path = Path("proposals")
 
+    # Reviews filesystem root — read by ohmystock.api.routes.reviews via the
+    # _REVIEWS_ROOT_FACTORY indirection so test scopes can override per-request.
+    # Default mirrors proposals_dir; reviews/README.md §3 documents the on-disk
+    # layout (reviews/<review_id>/ + _index.json).
+    reviews_dir: Path = Path("reviews")
+
     # web-admin Bearer auth — see openspec/specs/web-admin-bearer-auth/spec.md
     # (after archive). Default None lets Settings() construct without env;
     # ohmystock.api.auth._validate_admin_token() enforces presence + length

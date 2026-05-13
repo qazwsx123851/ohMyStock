@@ -16,6 +16,8 @@ import { SkillDetailPage } from '@/pages/SkillDetailPage'
 import { MemoryPage } from '@/pages/MemoryPage'
 import { ProposalsPage } from '@/pages/ProposalsPage'
 import { ProposalDetailPage } from '@/pages/ProposalDetailPage'
+import { ReviewsPage } from '@/pages/ReviewsPage'
+import { ReviewDetailPage } from '@/pages/ReviewDetailPage'
 import {
   ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage,
   SessionsPage,
@@ -42,6 +44,8 @@ export const router = createBrowserRouter([
       { path: 'skills',               element: <SkillsPage /> },
       { path: 'skills/:name',         element: <SkillDetailPage /> },
       { path: 'memory',               element: <MemoryPage /> },
+      { path: 'reviews',              element: <ReviewsPage /> },
+      { path: 'reviews/:reviewId',    element: <ReviewDetailPage /> },
       { path: 'proposals',            element: <ProposalsPage /> },
       { path: 'proposals/:slug',      element: <ProposalDetailPage /> },
       { path: 'sessions',             element: <SessionsPage /> },
