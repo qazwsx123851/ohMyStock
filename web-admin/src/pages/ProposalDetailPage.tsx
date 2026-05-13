@@ -18,6 +18,7 @@ import { AlertCircle, ArrowLeft, FileX } from 'lucide-react'
 import {
   ApiError,
   getProposal,
+  listStrategies,
   type ProposalChangelogEntry,
   type ProposalDetail,
 } from '@/lib/api'
@@ -29,6 +30,7 @@ import {
   TransitionDialog,
   ValidatingConfirmDialog,
 } from '@/components/transition-dialog'
+import { ValidationDialog } from '@/components/validation-dialog'
 
 const BODY_SECTIONS: {
   key: keyof ProposalDetail['body']
@@ -240,6 +242,15 @@ function ActionRow({
   status: ProposalDetail['status']
 }) {
   const [active, setActive] = React.useState<ActiveDialogKind>('none')
+  const [validationOpen, setValidationOpen] = React.useState(false)
+
+  const strategiesQuery = useQuery({
+    queryKey: ['strategies'],
+    queryFn: listStrategies,
+    retry: false,
+    // Strategies only matter when the [Run Validation…] button can fire.
+    enabled: status === 'validating',
+  })
 
   if (status === 'merged' || status === 'rejected') {
     return (
@@ -264,6 +275,20 @@ function ActionRow({
         )}
         {status === 'validating' && (
           <>
+            <Button
+              variant="default"
+              onClick={() => setValidationOpen(true)}
+              disabled={strategiesQuery.isLoading || strategiesQuery.isError}
+              title={
+                strategiesQuery.isLoading
+                  ? '載入策略中…'
+                  : strategiesQuery.isError
+                    ? '策略清單載入失敗'
+                    : undefined
+              }
+            >
+              Run Validation…
+            </Button>
             <Button onClick={() => setActive('approved')}>Approve…</Button>
             <Button variant="outline" onClick={() => setActive('rejected')}>
               Reject…
@@ -293,6 +318,12 @@ function ActionRow({
           onOpenChange={(o) => setActive(o ? transitionTarget : 'none')}
         />
       )}
+      <ValidationDialog
+        slug={slug}
+        strategies={strategiesQuery.data?.strategies ?? []}
+        open={validationOpen}
+        onOpenChange={setValidationOpen}
+      />
     </>
   )
 }

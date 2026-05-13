@@ -424,6 +424,32 @@ export type ProposalTransitionResult = {
 }
 
 // ---------------------------------------------------------------------------
+// Proposal validate endpoint types — mirror admin-proposal-validate-action spec
+// (openspec/changes/admin-proposal-validate-action/specs/admin-proposals-endpoints/spec.md)
+// ---------------------------------------------------------------------------
+
+export type ValidateRequest = {
+  strategy: string
+  period: { from: string; to: string }
+  param_overrides: string[]
+  universe: string[]
+  wfa_windows: number
+  in_sample_ratio: number
+  initial_capital: number | null
+  dry_run: boolean
+}
+
+export type ValidateResponse = {
+  verdict: 'pass' | 'fail'
+  slug: string
+  new_status: 'approved' | 'rejected' | 'validating'
+  new_path: string | null
+  report_path: string | null
+  deltas: { sharpe: number; max_drawdown: number; win_rate: number }
+  failures: string[]
+}
+
+// ---------------------------------------------------------------------------
 // Review endpoint types — mirror admin-reviews-endpoints spec
 // (openspec/changes/admin-reviews-endpoints-and-pages/specs/admin-reviews-endpoints/spec.md)
 // ---------------------------------------------------------------------------
@@ -758,6 +784,20 @@ export function transitionProposal(
 ): Promise<ProposalTransitionResult> {
   return apiFetch<ProposalTransitionResult>(
     `/api/admin/proposals/${encodeURIComponent(slug)}/transition`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+}
+
+export function validateProposal(
+  slug: string,
+  body: ValidateRequest,
+): Promise<ValidateResponse> {
+  return apiFetch<ValidateResponse>(
+    `/api/admin/proposals/${encodeURIComponent(slug)}/validate`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

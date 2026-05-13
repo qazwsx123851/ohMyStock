@@ -27,6 +27,7 @@ Spec: openspec/changes/admin-proposals-endpoints-and-pages/specs/admin-proposals
 
 from __future__ import annotations
 
+import ast
 import logging
 import os
 import re
@@ -35,21 +36,29 @@ from typing import Any, Callable, Literal
 
 from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ohmystock.api.auth import require_admin
+from ohmystock.api.db import get_connection
 from ohmystock.api.routes._envelope import (
     map_exception_to_envelope,
     to_error,
     to_success,
 )
 from ohmystock.config import Settings
+from ohmystock.data.cache import select_bars
+from ohmystock.data.sources.base import BarRow
 from ohmystock.proposal import (
     ProposalParseError,
     ProposalStateError,
     ProposalStatus,
     parse_proposal,
     transition_proposal,
+)
+from ohmystock.validation import (
+    ValidationReport,
+    WfaValidationError,
+    run_validation,
 )
 
 
@@ -67,6 +76,16 @@ logger = logging.getLogger(__name__)
 # Production reads ``Settings().proposals_dir`` per request so .env reloads
 # (or test scopes) take effect without restarting the app.
 _PROPOSALS_ROOT_FACTORY: Callable[[], Path] = lambda: Settings().proposals_dir
+
+
+# Test override seam for the validate endpoint's market data loader.
+# Default builds the loader from ``get_connection() + select_bars`` so
+# tests can ``monkeypatch.setattr(routes.proposals,
+# "_MARKET_DATA_LOADER_FACTORY", lambda: synthetic_loader)`` and avoid
+# touching the SQLite cache. Mirrors ``cli._validate_proposal``'s factory.
+_MARKET_DATA_LOADER_FACTORY: Callable[
+    [], Callable[[str, str, str], list[BarRow]]
+] = lambda: (lambda sym, s, e: select_bars(get_connection(), sym, s, e))
 
 
 _INVALID_NAME_TOKENS: tuple[str, ...] = ("/", "\\", "..", os.sep)
@@ -333,6 +352,104 @@ class TransitionRequest(BaseModel):
     merged_to_version: str | None = None
 
 
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+class PeriodModel(BaseModel):
+    """``{from, to}`` ISO-date window, with ``from <= to`` enforced."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    from_: str = Field(alias="from")
+    to: str
+
+    @field_validator("from_", "to")
+    @classmethod
+    def _iso_date(cls, value: str) -> str:
+        if not _ISO_DATE_RE.match(value):
+            raise ValueError(f"must match YYYY-MM-DD, got {value!r}")
+        return value
+
+    @model_validator(mode="after")
+    def _check_order(self) -> "PeriodModel":
+        if self.from_ > self.to:
+            raise ValueError(
+                f"period.from must be <= period.to ({self.from_} > {self.to})"
+            )
+        return self
+
+
+class ValidateRequest(BaseModel):
+    """JSON body for ``POST /api/admin/proposals/{slug}/validate``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    strategy: str
+    period: PeriodModel
+    param_overrides: list[str]
+    universe: list[str] = Field(..., min_length=1)
+    wfa_windows: int = Field(default=5, ge=2)
+    in_sample_ratio: float = Field(default=0.7, gt=0.0, lt=1.0)
+    initial_capital: int | None = None
+    dry_run: bool = False
+
+
+def _parse_param_pairs(pairs: list[str]) -> dict[str, Any]:
+    """Parse ``["key=value", ...]`` into a dict via ``ast.literal_eval`` on values.
+
+    Mirrors ``cli._validate_proposal._parse_param_pairs`` exactly. Not imported
+    from the CLI module because that would couple two unrelated layers.
+    """
+    out: dict[str, Any] = {}
+    for raw in pairs:
+        if not raw:
+            continue
+        key, sep, value = raw.partition("=")
+        if sep != "=" or not key.strip():
+            raise ValueError(f"unparseable_param: {raw!r} (need key=value)")
+        key_stripped = key.strip()
+        value_stripped = value.strip()
+        try:
+            out[key_stripped] = ast.literal_eval(value_stripped)
+        except (ValueError, SyntaxError) as exc:
+            raise ValueError(
+                f"unparseable_param: {key_stripped}={value_stripped} ({exc})"
+            ) from exc
+    return out
+
+
+def _post_run_state_paths(
+    report: ValidationReport,
+    slug: str,
+    root: Path,
+    dry_run: bool,
+) -> tuple[str | None, str | None]:
+    """Compute ``(new_path, report_path)`` forward-slash strings post-run.
+
+    Dry-run → ``(None, None)``. Otherwise, infer the new markdown location
+    from ``report.verdict`` (pass → ``PENDING_REVIEW/`` / fail → ``rejected/``)
+    plus the co-located ``<slug>.validation.json``. Each path is converted to
+    a forward-slash POSIX string relative to ``root``; if ``relative_to``
+    fails (path outside root), fall back to ``str(...)`` + a warning so the
+    endpoint never 500s on a defensive edge.
+    """
+    if dry_run:
+        return None, None
+
+    sink_name = "PENDING_REVIEW" if report.verdict == "pass" else "rejected"
+    new_path = root / sink_name / f"{slug}.md"
+    report_path = root / sink_name / f"{slug}.validation.json"
+
+    def _rel(p: Path) -> str:
+        try:
+            return p.relative_to(root).as_posix()
+        except ValueError:
+            logger.warning("post-run path outside proposals root: %s", p)
+            return str(p)
+
+    return _rel(new_path), _rel(report_path)
+
+
 # Router ----------------------------------------------------------------------
 
 
@@ -409,6 +526,20 @@ def reject_get_on_transition(slug: str) -> JSONResponse:
     Without this handler the catch-all detail route (``{slug:path}``) would
     swallow the request and reject it as ``invalid_input`` (slug contains
     ``/``). The spec requires a clean 405 instead.
+    """
+    return JSONResponse(
+        status_code=405,
+        content={"detail": "Method Not Allowed"},
+        headers={"Allow": "POST"},
+    )
+
+
+@router.get("/api/admin/proposals/{slug:path}/validate")
+def reject_get_on_validate(slug: str) -> JSONResponse:
+    """Return 405 explicitly for GET on the validate path.
+
+    Same rationale as ``reject_get_on_transition``: the catch-all detail
+    route would otherwise swallow the slug.
     """
     return JSONResponse(
         status_code=405,
@@ -542,5 +673,100 @@ def transition_proposal_endpoint(
             ),
         )
     except Exception as exc:  # noqa: BLE001
+        http_status, envelope = map_exception_to_envelope(exc)
+        return JSONResponse(status_code=http_status, content=envelope)
+
+
+# Registered AFTER ``transition`` so the catch-all ``{slug:path}`` detail
+# route never swallows ``<slug>/validate`` requests.
+@router.post("/api/admin/proposals/{slug:path}/validate")
+def validate_proposal_endpoint(
+    slug: str, body: ValidateRequest = Body(...)
+) -> JSONResponse:
+    if not _is_safe_slug(slug):
+        return JSONResponse(
+            status_code=400,
+            content=to_error("invalid_input", "invalid proposal slug"),
+        )
+
+    try:
+        root = _PROPOSALS_ROOT_FACTORY()
+        path = _resolve_slug_to_path(root, slug)
+        if path is None:
+            return JSONResponse(
+                status_code=404,
+                content=to_error("not_found", f"proposal not found: {slug}"),
+            )
+
+        try:
+            param_overrides_dict = _parse_param_pairs(body.param_overrides)
+        except ValueError as exc:
+            return JSONResponse(
+                status_code=400,
+                content=to_error("invalid_input", str(exc)),
+            )
+
+        initial_capital = (
+            body.initial_capital
+            if body.initial_capital is not None
+            else Settings().starting_equity_twd
+        )
+
+        market_data_loader = _MARKET_DATA_LOADER_FACTORY()
+
+        try:
+            report = run_validation(
+                path,
+                strategy_name=body.strategy,
+                period={"from": body.period.from_, "to": body.period.to},
+                param_overrides=param_overrides_dict,
+                universe=body.universe,
+                wfa_windows=body.wfa_windows,
+                in_sample_ratio=body.in_sample_ratio,
+                initial_capital=initial_capital,
+                market_data_loader=market_data_loader,
+                dry_run=body.dry_run,
+            )
+        except WfaValidationError as exc:
+            msg = str(exc)
+            if msg.startswith("status_not_validating"):
+                return JSONResponse(
+                    status_code=409,
+                    content=to_error("illegal_transition", msg),
+                )
+            return JSONResponse(
+                status_code=422,
+                content=to_error("wfa_validation_failed", msg),
+            )
+        except ProposalStateError as state_exc:
+            http_status, envelope = _map_state_error(state_exc)
+            return JSONResponse(status_code=http_status, content=envelope)
+
+        new_path_str, report_path_str = _post_run_state_paths(
+            report, slug, root, body.dry_run
+        )
+
+        if body.dry_run:
+            new_status: Literal["approved", "rejected", "validating"] = "validating"
+        elif report.verdict == "pass":
+            new_status = "approved"
+        else:
+            new_status = "rejected"
+
+        return JSONResponse(
+            status_code=200,
+            content=to_success(
+                {
+                    "verdict": report.verdict,
+                    "slug": slug,
+                    "new_status": new_status,
+                    "new_path": new_path_str,
+                    "report_path": report_path_str,
+                    "deltas": report.deltas,
+                    "failures": list(report.failures),
+                }
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001 — generic mapper redacts message
         http_status, envelope = map_exception_to_envelope(exc)
         return JSONResponse(status_code=http_status, content=envelope)
