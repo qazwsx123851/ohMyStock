@@ -191,5 +191,19 @@ app.command(
 )(review_cmd)
 
 
+from ohmystock.cli._validate_proposal import validate_proposal  # noqa: E402
+
+app.command(
+    "validate-proposal",
+    help=(
+        "WFA validation gate (Phase 5 §16.3) — runs walk-forward analysis on "
+        "a `validating` proposal's baseline vs candidate strategy, writes "
+        "<slug>.validation.json, then transitions the proposal to approved "
+        "(pass) or rejected (fail). Use --dry-run to compute verdict without "
+        "writing the report or moving state."
+    ),
+)(validate_proposal)
+
+
 def main() -> None:
     app()
