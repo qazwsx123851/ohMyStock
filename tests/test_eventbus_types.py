@@ -5,7 +5,7 @@ from __future__ import annotations
 from ohmystock.eventbus.types import Agent, EventType
 
 
-def test_event_type_has_all_16_canonical_strings() -> None:
+def test_event_type_has_all_21_canonical_strings() -> None:
     expected = {
         "screener_started",
         "screener_completed",
@@ -23,8 +23,19 @@ def test_event_type_has_all_16_canonical_strings() -> None:
         "wfa_passed",
         "wfa_failed",
         "risk_off_triggered",
+        "swarm_run_started",
+        "swarm_run_completed",
+        "swarm_run_failed",
+        "swarm_node_started",
+        "swarm_node_completed",
     }
     assert {m.value for m in EventType} == expected
+
+
+def test_swarm_event_type_member_equals_string_literal() -> None:
+    e = EventType.SWARM_RUN_STARTED
+    assert e == "swarm_run_started"
+    assert isinstance(e, str)
 
 
 def test_agent_has_all_9_canonical_strings() -> None:

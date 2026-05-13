@@ -18,8 +18,10 @@ import { ProposalsPage } from '@/pages/ProposalsPage'
 import { ProposalDetailPage } from '@/pages/ProposalDetailPage'
 import { ReviewsPage } from '@/pages/ReviewsPage'
 import { ReviewDetailPage } from '@/pages/ReviewDetailPage'
+import { SwarmPage } from '@/pages/SwarmPage'
+import { SwarmRunPage } from '@/pages/SwarmRunPage'
 import {
-  ChatPage, ChatSessionPage, SwarmPage, SwarmRunPage,
+  ChatPage, ChatSessionPage,
   SessionsPage,
 } from '@/pages/stubs'
 

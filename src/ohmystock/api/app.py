@@ -44,6 +44,7 @@ from ohmystock.api.routes.screener import router as screener_router
 from ohmystock.api.routes.settings import router as settings_router
 from ohmystock.api.routes.skills import router as skills_router
 from ohmystock.api.routes.stats import router as stats_router
+from ohmystock.api.routes.swarm import router as swarm_router
 from ohmystock.backtest import storage as backtest_storage
 from ohmystock.config import Settings
 from ohmystock.data.disposition import fetch_disposition_set
@@ -51,6 +52,7 @@ from ohmystock.eventbus import AdminEventSerializer, bus
 from ohmystock.memory import init_schema as memory_init_schema
 from ohmystock.sepa.rs import reset_providers, set_universe_closes_loader
 from ohmystock.sepa.rs_loader import build_universe_closes_loader
+from ohmystock.swarm_runs import storage as swarm_runs_storage
 
 _KEEPALIVE_TIMEOUT_SECONDS = 15.0
 
@@ -76,6 +78,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_conn = get_connection()
     try:
         backtest_storage.init_schema(init_conn)
+        swarm_runs_storage.init_schema(init_conn)
         memory_init_schema(init_conn)
     finally:
         init_conn.close()
@@ -151,5 +154,6 @@ def create_app() -> FastAPI:
     app.include_router(skills_router)
     app.include_router(proposals_router)
     app.include_router(reviews_router)
+    app.include_router(swarm_router)
 
     return app

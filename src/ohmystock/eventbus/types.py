@@ -32,6 +32,11 @@ class EventType(StrEnum):
     WFA_PASSED = "wfa_passed"
     WFA_FAILED = "wfa_failed"
     RISK_OFF_TRIGGERED = "risk_off_triggered"
+    SWARM_RUN_STARTED = "swarm_run_started"
+    SWARM_RUN_COMPLETED = "swarm_run_completed"
+    SWARM_RUN_FAILED = "swarm_run_failed"
+    SWARM_NODE_STARTED = "swarm_node_started"
+    SWARM_NODE_COMPLETED = "swarm_node_completed"
 
 
 class Agent(StrEnum):

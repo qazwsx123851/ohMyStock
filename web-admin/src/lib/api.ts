@@ -827,6 +827,63 @@ export function getReview(reviewId: string): Promise<ReviewDetail> {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Swarm runs — admin-swarm-endpoints-and-pages
+// ---------------------------------------------------------------------------
+
+export type SwarmPreset = {
+  name: string
+  title: string
+  description: string
+  nodes: string[]
+  params_schema: Record<string, unknown>
+}
+
+export type SwarmRunRequest = {
+  preset: string
+  params: Record<string, unknown>
+}
+
+export type SwarmRunSummary = {
+  id: string
+  preset: string
+  status: 'completed' | 'failed'
+  elapsed_ms: number
+  created_at: string
+}
+
+export type SwarmRunRow = SwarmRunSummary & {
+  params: Record<string, unknown>
+  result: Record<string, unknown>
+}
+
+export function listSwarmPresets(): Promise<{ items: SwarmPreset[] }> {
+  return apiFetch<{ items: SwarmPreset[] }>('/api/admin/swarm/presets')
+}
+
+export function runSwarm(body: SwarmRunRequest): Promise<SwarmRunRow> {
+  return apiFetch<SwarmRunRow>('/api/admin/swarm/runs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export function listSwarmRuns(
+  limit?: number,
+): Promise<{ items: SwarmRunSummary[]; limit: number }> {
+  const qs = limit !== undefined ? `?limit=${limit}` : ''
+  return apiFetch<{ items: SwarmRunSummary[]; limit: number }>(
+    `/api/admin/swarm/runs${qs}`,
+  )
+}
+
+export function getSwarmRun(id: string): Promise<SwarmRunRow> {
+  return apiFetch<SwarmRunRow>(
+    `/api/admin/swarm/runs/${encodeURIComponent(id)}`,
+  )
+}
+
 function parseAndDispatch(raw: string, onEvent: (e: LiveEvent) => void): void {
   const lines = raw.split('\n')
   const dataLines: string[] = []
