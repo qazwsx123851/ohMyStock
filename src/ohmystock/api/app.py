@@ -20,12 +20,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sqlite3
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager
 from importlib.metadata import version as _pkg_version
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
 from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
 from ohmystock.api.auth import AuthError, _validate_admin_token, require_admin
@@ -40,6 +43,11 @@ from ohmystock.api.routes.market import router as market_router
 from ohmystock.api.routes.memory import router as memory_router
 from ohmystock.api.routes.positions import router as positions_router
 from ohmystock.api.routes.proposals import router as proposals_router
+from ohmystock.api.routes.public_events import (
+    clear_mask_table,
+    router as public_events_router,
+    set_mask_table,
+)
 from ohmystock.api.routes.reviews import router as reviews_router
 from ohmystock.api.routes.screener import router as screener_router
 from ohmystock.api.routes.settings import router as settings_router
@@ -49,7 +57,7 @@ from ohmystock.api.routes.swarm import router as swarm_router
 from ohmystock.backtest import storage as backtest_storage
 from ohmystock.config import Settings
 from ohmystock.data.disposition import fetch_disposition_set
-from ohmystock.eventbus import AdminEventSerializer, bus
+from ohmystock.eventbus import AdminEventSerializer, SymbolMaskTable, bus
 from ohmystock.chat import init_schema as chat_init_schema
 from ohmystock.memory import init_schema as memory_init_schema
 from ohmystock.sepa.rs import reset_providers, set_universe_closes_loader
@@ -57,6 +65,50 @@ from ohmystock.sepa.rs_loader import build_universe_closes_loader
 from ohmystock.swarm_runs import storage as swarm_runs_storage
 
 _KEEPALIVE_TIMEOUT_SECONDS = 15.0
+
+_PUBLIC_PATH_PREFIX = "/api/public/"
+_PUBLIC_ALLOWED_ORIGINS = frozenset({
+    "http://localhost:5173",
+    "http://localhost:5174",
+})
+
+
+class _PublicCORSMiddleware(BaseHTTPMiddleware):
+    """Path-scoped CORS for ``/api/public/*`` only.
+
+    FastAPI's built-in ``CORSMiddleware`` is global; admin routes must stay
+    closed to web-public dev origins so a token leak in browser dev-tools
+    cannot also be exploited via a CORS-bypass. This middleware only sets
+    ``Access-Control-Allow-Origin`` when the request path starts with
+    ``/api/public/`` and the ``Origin`` is on the allowlist.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        super().__init__(app)
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        origin = request.headers.get("origin", "")
+        is_public = path.startswith(_PUBLIC_PATH_PREFIX)
+        origin_allowed = is_public and origin in _PUBLIC_ALLOWED_ORIGINS
+
+        if request.method == "OPTIONS" and is_public:
+            headers = {
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": (
+                    "Accept, Cache-Control, Last-Event-ID, Content-Type"
+                ),
+                "Access-Control-Max-Age": "600",
+            }
+            if origin_allowed:
+                headers["Access-Control-Allow-Origin"] = origin
+            return JSONResponse({}, status_code=204, headers=headers)
+
+        response = await call_next(request)
+        if origin_allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+        return response
 
 
 @asynccontextmanager
@@ -83,13 +135,33 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         swarm_runs_storage.init_schema(init_conn)
         chat_init_schema(init_conn)
         memory_init_schema(init_conn)
+        industry_lookup = _load_industry_lookup(init_conn)
     finally:
         init_conn.close()
+
+    set_mask_table(SymbolMaskTable(industry_lookup))
 
     try:
         yield
     finally:
+        clear_mask_table()
         reset_providers()
+
+
+def _load_industry_lookup(conn: "sqlite3.Connection") -> dict[str, str]:
+    """Best-effort SELECT of distinct (symbol, industry) pairs from
+    ``universe_daily``. Returns ``{}`` on any failure (missing table, fresh
+    DB, etc.); the SymbolMaskTable will then fall through to ``"其他"`` for
+    every symbol — acceptable v0 behaviour.
+    """
+    try:
+        rows = conn.execute(
+            "SELECT DISTINCT symbol, industry FROM universe_daily "
+            "WHERE industry IS NOT NULL AND industry != ''"
+        ).fetchall()
+    except sqlite3.OperationalError:
+        return {}
+    return {symbol: industry for symbol, industry in rows}
 
 
 async def _admin_event_stream() -> AsyncGenerator[ServerSentEvent | dict[str, str], None]:
@@ -125,6 +197,8 @@ def create_app() -> FastAPI:
         lifespan=_lifespan,
     )
 
+    app.add_middleware(_PublicCORSMiddleware)
+
     # Map AuthError raised by `require_admin` into the unified envelope.
     # `Depends` runs before route handlers, so the inline try/except inside
     # individual handlers cannot catch it — we need an app-level handler.
@@ -159,5 +233,6 @@ def create_app() -> FastAPI:
     app.include_router(reviews_router)
     app.include_router(swarm_router)
     app.include_router(chat_router)
+    app.include_router(public_events_router)
 
     return app

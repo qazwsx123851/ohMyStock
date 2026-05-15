@@ -1,0 +1,33 @@
+@import 'tailwindcss';
+
+/* ohMyStock — web-public minimal token set.
+ *
+ * Deliberately tiny: only what DisclaimerBanner + MaskedEventsFeed need.
+ * No 紅漲綠跌 semantics here — this app never renders P&L or price arrows
+ * because such fields never cross the mask boundary.
+ */
+
+@theme inline {
+  --font-sans: 'Inter', 'Noto Sans TC', system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #18181b;
+  --muted-foreground: #71717a;
+  --warning: #d97706;
+  --warning-foreground: #fffbeb;
+}
+
+html, body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
