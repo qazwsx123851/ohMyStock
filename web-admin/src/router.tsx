@@ -20,10 +20,9 @@ import { ReviewsPage } from '@/pages/ReviewsPage'
 import { ReviewDetailPage } from '@/pages/ReviewDetailPage'
 import { SwarmPage } from '@/pages/SwarmPage'
 import { SwarmRunPage } from '@/pages/SwarmRunPage'
-import {
-  ChatPage, ChatSessionPage,
-  SessionsPage,
-} from '@/pages/stubs'
+import { ChatSessionsPage } from '@/pages/ChatSessionsPage'
+import { ChatSessionPage } from '@/pages/ChatSessionPage'
+import { SessionsPage } from '@/pages/SessionsPage'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -32,7 +31,7 @@ export const router = createBrowserRouter([
     element: <Layout />,
     children: [
       { index: true,                  element: <DashboardPage /> },
-      { path: 'chat',                 element: <ChatPage /> },
+      { path: 'chat',                 element: <ChatSessionsPage /> },
       { path: 'chat/:sessionId',      element: <ChatSessionPage /> },
       { path: 'swarm',                element: <SwarmPage /> },
       { path: 'swarm/:preset/:runId', element: <SwarmRunPage /> },

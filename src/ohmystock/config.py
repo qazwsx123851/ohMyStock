@@ -79,6 +79,17 @@ class Settings(BaseSettings):
         "shioaji-sim"
     )
 
+    # Chat (admin-chat-sessions-endpoints-and-pages) — default models used by
+    # the ChatAgent runtime and the title autogen. Fail-safe defaults so
+    # Settings() constructs without env; the field validator rejects
+    # whitespace-only values so an empty env override surfaces loudly rather
+    # than silently disabling chat. Field names carry the OHMYSTOCK_ prefix
+    # to match the env-name convention used by every other ohmystock_*
+    # setting; the GET /api/admin/settings response surfaces them under
+    # the shorter ``chat.model_default`` / ``chat.title_model`` keys.
+    ohmystock_chat_model_default: str = "claude-sonnet-4-6"
+    ohmystock_chat_title_model: str = "claude-haiku-4-5-20251001"
+
     # Auto-execute Phase 3.5 — see openspec/specs/auto-execute/spec.md
     # (after archive). All defaults match cheatsheet §6.7 and safety §2.9.
     ohmystock_auto_execute: bool = False
@@ -89,6 +100,17 @@ class Settings(BaseSettings):
     ohmystock_auto_execute_loss_lockout_hours: int = 24
     ohmystock_auto_execute_loss_pct_threshold: float = -0.05
     ohmystock_auto_execute_account_equity_twd: int = 1_000_000
+
+    @field_validator(
+        "ohmystock_chat_model_default", "ohmystock_chat_title_model"
+    )
+    @classmethod
+    def _must_not_be_blank(cls, value: str, info) -> str:  # noqa: ANN001
+        if not value or not value.strip():
+            raise ValueError(
+                f"{info.field_name} must be a non-empty string"
+            )
+        return value
 
     @field_validator(
         "ohmystock_confirm_timeout_minutes",

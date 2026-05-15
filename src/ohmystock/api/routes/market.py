@@ -346,6 +346,43 @@ def _fetch_recent_patterns(
     return out
 
 
+def aggregate_symbol(
+    conn: sqlite3.Connection,
+    symbol: str,
+    days: int = _DEFAULT_DAYS,
+    *,
+    today: date | None = None,
+) -> MarketSymbolData | None:
+    """Compose the full ``MarketSymbolData`` aggregate for one symbol.
+
+    Returns ``None`` if no ``bars_daily`` rows exist (the route maps that
+    to 404 ``market_symbol_not_found``; other callers — e.g. the chat
+    tool wrapper — translate it to their own ``not_found`` shape).
+
+    ``days`` is validated against ``_validate_days`` so invalid values
+    surface as :class:`_InvalidDaysError` before any DB I/O.
+    """
+
+    days_v = _validate_days(int(days))
+    today_v = today if today is not None else datetime.now(_TPE).date()
+    bars = _fetch_bars(conn, symbol, days_v, today_v)
+    if not bars:
+        return None
+
+    last_close = float(bars[-1]["c"])
+    return MarketSymbolData(
+        symbol=symbol,
+        quote=_build_quote(bars),
+        bars_daily=_build_market_bars(bars),
+        rs=_fetch_rs(conn, symbol),
+        sepa=_classify_sepa(bars),
+        institutional=_fetch_institutional(conn, symbol, today_v),
+        recent_patterns=_fetch_recent_patterns(
+            conn, symbol, today_v, last_close
+        ),
+    )
+
+
 @router.get("/api/admin/market/symbols/{symbol}")
 def get_market_symbol(
     symbol: str,
@@ -354,16 +391,14 @@ def get_market_symbol(
 ) -> JSONResponse:
     try:
         try:
-            days_v = _validate_days(int(days))
+            data = aggregate_symbol(conn, symbol, days)
         except _InvalidDaysError as exc:
             return JSONResponse(
                 status_code=400,
                 content=to_error("invalid_days", str(exc)),
             )
 
-        today = datetime.now(_TPE).date()
-        bars = _fetch_bars(conn, symbol, days_v, today)
-        if not bars:
+        if data is None:
             return JSONResponse(
                 status_code=404,
                 content=to_error(
@@ -371,26 +406,6 @@ def get_market_symbol(
                     f"no bars_daily rows for symbol {symbol!r}",
                 ),
             )
-
-        quote = _build_quote(bars)
-        market_bars = _build_market_bars(bars)
-        rs = _fetch_rs(conn, symbol)
-        sepa = _classify_sepa(bars)
-        institutional = _fetch_institutional(conn, symbol, today)
-        last_close = float(bars[-1]["c"])
-        recent_patterns = _fetch_recent_patterns(
-            conn, symbol, today, last_close
-        )
-
-        data = MarketSymbolData(
-            symbol=symbol,
-            quote=quote,
-            bars_daily=market_bars,
-            rs=rs,
-            sepa=sepa,
-            institutional=institutional,
-            recent_patterns=recent_patterns,
-        )
     except Exception as exc:  # noqa: BLE001
         status, body = map_exception_to_envelope(exc)
         return JSONResponse(status_code=status, content=body)

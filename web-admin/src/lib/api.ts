@@ -884,6 +884,114 @@ export function getSwarmRun(id: string): Promise<SwarmRunRow> {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Chat — admin-chat-sessions-endpoints-and-pages
+// ---------------------------------------------------------------------------
+
+export type ChatSessionStatus = 'active' | 'deleted'
+
+export type ChatSessionSummary = {
+  id: string
+  title: string
+  model: string
+  status: ChatSessionStatus
+  created_at: string
+  updated_at: string
+  message_count: number
+}
+
+export type ChatMessageRole = 'user' | 'assistant' | 'tool_result'
+
+export type ChatMessage = {
+  id: string
+  session_id: string
+  role: ChatMessageRole
+  content: string
+  tool_calls_json: string | null
+  tool_result_for: string | null
+  llm_cost_id: string | null
+  created_at: string
+}
+
+export type ChatSessionDetail = {
+  session: ChatSessionSummary
+  messages: ChatMessage[]
+}
+
+export type ChatSessionCreateRequest = {
+  title?: string
+  model?: string
+}
+
+export type ChatSnippetHit = {
+  message_id: string
+  snippet: string
+  created_at: string
+}
+
+export type ChatSearchGroup = {
+  session_id: string
+  session_title: string
+  session_status: ChatSessionStatus
+  hits: ChatSnippetHit[]
+}
+
+export type ChatSearchResult = {
+  groups: ChatSearchGroup[]
+  total_hits: number
+}
+
+export function listChatSessions(opts?: {
+  limit?: number
+  offset?: number
+}): Promise<PaginatedRows<ChatSessionSummary>> {
+  const params = new URLSearchParams()
+  if (opts?.limit !== undefined) params.set('limit', String(opts.limit))
+  if (opts?.offset !== undefined) params.set('offset', String(opts.offset))
+  const qs = params.toString()
+  return apiFetch<PaginatedRows<ChatSessionSummary>>(
+    `/api/admin/chat/sessions${qs ? `?${qs}` : ''}`,
+  )
+}
+
+export function createChatSession(
+  body: ChatSessionCreateRequest = {},
+): Promise<ChatSessionSummary> {
+  return apiFetch<ChatSessionSummary>('/api/admin/chat/sessions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
+export function getChatSession(id: string): Promise<ChatSessionDetail> {
+  return apiFetch<ChatSessionDetail>(
+    `/api/admin/chat/sessions/${encodeURIComponent(id)}`,
+  )
+}
+
+export function deleteChatSession(id: string): Promise<{ deleted: boolean }> {
+  return apiFetch<{ deleted: boolean }>(
+    `/api/admin/chat/sessions/${encodeURIComponent(id)}`,
+    { method: 'DELETE' },
+  )
+}
+
+export function searchChat(opts: {
+  q: string
+  dateFrom?: string
+  dateTo?: string
+  limit?: number
+}): Promise<ChatSearchResult> {
+  const params = new URLSearchParams({ q: opts.q })
+  if (opts.dateFrom) params.set('date_from', opts.dateFrom)
+  if (opts.dateTo) params.set('date_to', opts.dateTo)
+  if (opts.limit !== undefined) params.set('limit', String(opts.limit))
+  return apiFetch<ChatSearchResult>(
+    `/api/admin/chat/search?${params.toString()}`,
+  )
+}
+
 function parseAndDispatch(raw: string, onEvent: (e: LiveEvent) => void): void {
   const lines = raw.split('\n')
   const dataLines: string[] = []

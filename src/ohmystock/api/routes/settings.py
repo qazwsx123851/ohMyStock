@@ -80,6 +80,10 @@ def _redact(settings: Settings) -> dict[str, Any]:
             "loss_pct_threshold": settings.ohmystock_auto_execute_loss_pct_threshold,
             "account_equity_twd": settings.ohmystock_auto_execute_account_equity_twd,
         },
+        "chat": {
+            "model_default": settings.ohmystock_chat_model_default,
+            "title_model": settings.ohmystock_chat_title_model,
+        },
     }
 
 

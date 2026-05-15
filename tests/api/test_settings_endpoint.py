@@ -107,7 +107,13 @@ async def test_default_settings_all_four_sections(
     body = r.json()
     assert body["ok"] is True
     data = body["data"]
-    assert set(data.keys()) == {"api_keys", "theme", "safety", "breakers"}
+    assert set(data.keys()) == {
+        "api_keys",
+        "theme",
+        "safety",
+        "breakers",
+        "chat",
+    }
     assert data["api_keys"] == {
         "anthropic": False,
         "finmind": False,
@@ -116,6 +122,10 @@ async def test_default_settings_all_four_sections(
     assert data["theme"] == {"mode": "system"}
     assert data["safety"]["auto_execute"] is False
     assert data["safety"]["broker"] == "shioaji-sim"
+    assert data["chat"] == {
+        "model_default": "claude-sonnet-4-6",
+        "title_model": "claude-haiku-4-5-20251001",
+    }
 
 
 async def test_response_does_not_leak_raw_settings_field_names(

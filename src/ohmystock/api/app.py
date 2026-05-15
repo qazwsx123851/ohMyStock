@@ -32,6 +32,7 @@ from ohmystock.api.auth import AuthError, _validate_admin_token, require_admin
 from ohmystock.api.db import get_connection
 from ohmystock.api.routes._envelope import to_error
 from ohmystock.api.routes.backtest import router as backtest_router
+from ohmystock.api.routes.chat import router as chat_router
 from ohmystock.api.routes.confirm_gate import router as confirm_gate_router
 from ohmystock.api.routes.exit_engine import router as exit_engine_router
 from ohmystock.api.routes.journal import router as journal_router
@@ -49,6 +50,7 @@ from ohmystock.backtest import storage as backtest_storage
 from ohmystock.config import Settings
 from ohmystock.data.disposition import fetch_disposition_set
 from ohmystock.eventbus import AdminEventSerializer, bus
+from ohmystock.chat import init_schema as chat_init_schema
 from ohmystock.memory import init_schema as memory_init_schema
 from ohmystock.sepa.rs import reset_providers, set_universe_closes_loader
 from ohmystock.sepa.rs_loader import build_universe_closes_loader
@@ -79,6 +81,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         backtest_storage.init_schema(init_conn)
         swarm_runs_storage.init_schema(init_conn)
+        chat_init_schema(init_conn)
         memory_init_schema(init_conn)
     finally:
         init_conn.close()
@@ -155,5 +158,6 @@ def create_app() -> FastAPI:
     app.include_router(proposals_router)
     app.include_router(reviews_router)
     app.include_router(swarm_router)
+    app.include_router(chat_router)
 
     return app
