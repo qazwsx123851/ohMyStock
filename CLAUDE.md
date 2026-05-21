@@ -12,10 +12,10 @@
 - **使用者**：單一用戶本機 localhost（admin）+ 公網匿名訪客（masked feed）
 - **市場**：台灣證交所（TWSE）/ 櫃買中心（OTC）
 - **執行範圍**：Paper Trading（永豐 Shioaji 模擬倉，**第一階段不接實單**）
-- **目前狀態**（2026-05-18）：Phase 4 / 5 mid-implementation
+- **目前狀態**（2026-05-21）：Phase 4 / 5 mid-implementation
   - Phase 0 – 3.5 已完成（scaffold、回測、訊號、Decider、Confirm Gate、Auto-execute 9 條防線）
   - Phase 4 web-admin 全 23 頁實作完成（無 stub）
-  - Phase 4.5 web-public shell + masked SSE 已完成；Canvas 2D 像素辦公室 deferred
+  - Phase 4.5 web-public shell + masked SSE + Canvas 2D Gen 2 像素辦公室 MVP 已完成；生產部署 deferred
   - Phase 5 review pipeline + proposal writer + state machine + WFA validator + admin proposals/reviews endpoints 已完成；reviews UI 與月度自動觸發 deferred
 - **目標**：~20 週至 MVP（v3，含 LLM 復盤閉環），2026-09-15 完成
 
@@ -145,6 +145,7 @@ LLM 自動下單熔斷（confidence 0.7 / 單日 5 筆 / 25% 配額 / 30% 偏離
 | Admin swarm endpoints + pages + EventType 16→21 | `archive/2026-05-13-admin-swarm-endpoints-and-pages` + `src/ohmystock/swarm_runs/` + `web-admin/src/pages/Swarm*.tsx` |
 | Admin chat sessions endpoints + pages（single-agent chat runtime） | `archive/2026-05-15-admin-chat-sessions-endpoints-and-pages` + `src/ohmystock/chat/` + `web-admin/src/pages/ChatSession*.tsx` |
 | Public SSE channel + masked serializer + web-public shell | `archive/2026-05-15-web-public-shell-and-mask` + `src/ohmystock/eventbus/{mask_table,serializers}.py` + `src/ohmystock/api/routes/public_events.py` + `web-public/` |
+| web-public Pixel 辦公室 MVP（Canvas 2D Gen 2 風格 / 13 character / SSE → action / palette compliance / mask defense） | `archive/2026-05-21-web-public-pixel-office-mvp` + `web-public/src/{canvas,components,hooks,lib,locales,pages,stores,styles,types}/` + `openspec/specs/web-public-pixel-office/spec.md` |
 
 ---
 
@@ -216,15 +217,15 @@ LLM 自動下單熔斷（confidence 0.7 / 單日 5 筆 / 25% 配額 / 30% 偏離
 | 3 | LLM Decider + Confirm Gate + Trade Journal v3 | 2026-07-07 | ✅ |
 | 3.5 | `OHMYSTOCK_AUTO_EXECUTE` 雙模式 + 9 條安全防線 | 2026-07-28 | ✅ |
 | 4 | web-admin（23 頁）+ Bearer auth | 2026-08-11 | ✅ |
-| 4.5 | web-public pixel + Mask serializer + E2E 滲透測試 | 2026-08-25 | 🟡（shell + mask ✅、pixel 辦公室 + 生產部署 ⏳） |
+| 4.5 | web-public pixel + Mask serializer + E2E 滲透測試 | 2026-08-25 | 🟡（shell + mask ✅、pixel 辦公室 ✅、生產部署 ⏳） |
 | 5 | LLM 復盤五節點 swarm + 提案 → WFA → 合併閉環 | 2026-09-15 | 🟡（pipeline / proposals / WFA / validate / admin endpoints ✅、月度自動觸發 + reviews UI 強化 ⏳） |
 
 ### 進度評估
-進度顯著超前原時程（今天 2026-05-18，原 Phase 4 預計 2026-08-11 完成）。剩餘未 ship 子項：
-- `web-public-pixel-office-mvp`（Canvas 2D + 9 角色 sprite + 動畫狀態機）
+進度顯著超前原時程（今天 2026-05-21，原 Phase 4 預計 2026-08-11 完成）。剩餘未 ship 子項：
 - 月度復盤自動觸發（cron / scheduler）
+- reviews UI 強化（DAG 視覺化 / proposer diff preview）
 - EventBus 剩 7 個 unwired emitter（屬於各自 producing capability）
-- 生產部署（Cloudflare Tunnel / Vercel / 收窄 CORS / rate limit）
+- 生產部署（Cloudflare Tunnel for admin / Vercel for web-public / 收窄 CORS / rate limit）
 
 ---
 
