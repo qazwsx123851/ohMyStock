@@ -1,0 +1,47 @@
+{
+  "disclaimer": {
+    "text": "本網站為 AI 系統運作展示，非投資建議。所有股票代號（STK-A、STK-B 等）為虛構代換，不對應任何真實標的。過往任何績效數字皆不代表未來表現。"
+  },
+  "idle": {
+    "overlay": "目前 idle，等待開盤 09:00"
+  },
+  "about": {
+    "title": "關於 ohMyStock",
+    "intro": "ohMyStock 是一個台股 AI 交易代理人實驗作品 — 從選股、進場、出場到復盤改進，全流程由 LLM 自主完成。",
+    "demo_note": "這個公開頁面是後台 LLM agents 工作流程的即時擬人化展示。所有股票代號皆已替換為虛構符號（STK-A、STK-B 等），所有價格 / 持倉 / P&L 欄位已從 SSE 串流中移除。",
+    "not_advice": "本網站不構成任何形式的投資建議。任何依本網站資訊所做的決策，後果由您自負。",
+    "links": "原始碼：",
+    "repo_label": "GitHub"
+  },
+  "agent_sheet": {
+    "title": "Agent 資訊",
+    "state": "目前狀態",
+    "recent": "最近事件",
+    "total_today": "今日事件總數",
+    "no_events": "尚無事件",
+    "close": "關閉"
+  },
+  "timeline": {
+    "title": "Activity Timeline",
+    "expand": "展開",
+    "collapse": "收起",
+    "empty": "尚無事件 — 等待 SSE 推送"
+  },
+  "regions": {
+    "lobby": "行情大廳",
+    "analysis": "K 線分析室",
+    "decision": "決策桌",
+    "library": "圖書館",
+    "lab": "實驗室",
+    "meeting": "會議室"
+  },
+  "footer": {
+    "demo": "ohMyStock — 開源教育性 demo，非投資建議。",
+    "about": "關於"
+  },
+  "language": {
+    "label": "語言",
+    "en": "English",
+    "zh_TW": "繁體中文"
+  }
+}

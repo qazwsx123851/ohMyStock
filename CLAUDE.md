@@ -1,6 +1,6 @@
 # CLAUDE.md — ohMyStock 專案指引
 
-> 給 LLM Agent 開新對話時的快速上手。詳細規格請依下方索引到 `docs/` 找。
+> 給 LLM Agent 開新對話時的快速上手。詳細規格請依下方索引到 `docs/` 或 `openspec/changes/archive/` 找。
 
 ---
 
@@ -9,11 +9,15 @@
 **ohMyStock** 是台股 AI 交易代理人 — 從選股、進場、出場到復盤改進，全流程由 LLM 自主完成的個人專案。
 
 - **性質**：solo developer + LLM 協作的個人專案（**非** 團隊 / 企業 / SaaS）
-- **使用者**：單一用戶本機 localhost
+- **使用者**：單一用戶本機 localhost（admin）+ 公網匿名訪客（masked feed）
 - **市場**：台灣證交所（TWSE）/ 櫃買中心（OTC）
 - **執行範圍**：Paper Trading（永豐 Shioaji 模擬倉，**第一階段不接實單**）
-- **階段**：Spec / Pre-implementation（設計文件完成，原始碼待開工）
-- **目標**：~20 週至 MVP（v3，含 LLM 復盤閉環），預計 2026-09-15 完成
+- **目前狀態**（2026-05-18）：Phase 4 / 5 mid-implementation
+  - Phase 0 – 3.5 已完成（scaffold、回測、訊號、Decider、Confirm Gate、Auto-execute 9 條防線）
+  - Phase 4 web-admin 全 23 頁實作完成（無 stub）
+  - Phase 4.5 web-public shell + masked SSE 已完成；Canvas 2D 像素辦公室 deferred
+  - Phase 5 review pipeline + proposal writer + state machine + WFA validator + admin proposals/reviews endpoints 已完成；reviews UI 與月度自動觸發 deferred
+- **目標**：~20 週至 MVP（v3，含 LLM 復盤閉環），2026-09-15 完成
 
 ### 解決什麼問題
 1. 台股研究流程仰賴人工拼接資料源（技術 / 基本 / 籌碼 / 三大法人）
@@ -28,6 +32,8 @@
 - **拆檔動機**：主要是「LLM 讀單檔太貴 / 自己找東西要快」，**不是**「合規分權」。
 - **單一權威 (SSOT)**：個人專案最怕「自己改一處忘另一處」，公式 / schema 重複是首要問題；改公式請只改 §5 表中「唯一權威」一欄。
 - **不為 hypothetical 團隊規模設計**：目錄、流程、角色分離保持精簡。
+- **直接 push main**：solo dev 不開 PR，commit 完直接 push origin main。
+- **OpenSpec 流程**：每個新 capability 開一個 `openspec/changes/<slug>/`（proposal + design + tasks + specs），完工後 `/opsx:archive` 搬到 `openspec/changes/archive/`，這是 capability 級別的歷史紀錄。
 
 ---
 
@@ -37,7 +43,7 @@
 |---|---|
 | Backend | Python 3.11+、Claude Agent SDK（**不用 LangChain**）、FastAPI |
 | Frontend | React 19 + Vite + TypeScript + Tailwind + shadcn/ui |
-| Storage | SQLite + FTS5（trade journal、memory、復盤索引） |
+| Storage | SQLite + FTS5（trade journal、memory、chat sessions、復盤索引、backtest jobs、swarm runs） |
 | Broker | 永豐金證券 Shioaji 模擬倉 |
 | Data | FinMind 贊助會員 + Shioaji 即時報價 + twstock / yfinance fallback |
 | LLM | Opus 4.7（關鍵決策）+ Sonnet 4.6（分析）+ Haiku 4.5（規則） |
@@ -49,128 +55,132 @@
 
 ## 4. 架構總覽
 
-```
-UI 層
-  ├─ web-admin/   React 18 頁工作介面（Bearer token，僅本人）
-  └─ web-public/  React + Canvas 2D 像素辦公室（公網、masked）
-       ▲
-       │ /api/admin/events (auth, raw)  /api/public/events (no auth, masked)
-       │
-Backend EventBus（asyncio Queue pub/sub）
-  ├─ AdminEventSerializer  → 全資料
-  └─ MaskedEventSerializer → 嚴格白名單
-       ▲
-       │ bus.emit(event)
-       │
-Agent 核心層（Claude Agent SDK + PreToolUse/PostToolUse Hooks 稽核）
-  └─ LLM Decider Pipeline (v3)
-       訊號 → entry_decision_team swarm
-       → 系統覆寫（Sizing / ATR 停損 / Risk Gate）
-       → Confirm Gate（OHMYSTOCK_AUTO_EXECUTE 切換）
-       → 寫 Trade Journal + 送 Broker
-  └─ Skills (~30) + Tools (~20) + Services
-       Backtest / Paper Broker / Memory + FTS5 / Swarm DAG
-       Trade Journal / Post-Trade Review / Proposal Validation
-  └─ 資料層（FinMind / Shioaji / twstock / yfinance）
-```
+由上而下分四層：
 
-### 前後台兩專案 monorepo（v3 決策 #13）
-- **`web-admin/`** — Bearer token auth；本機 / Cloudflare Tunnel；可看真 symbol/price/pnl
-- **`web-public/`** — 無認證；公網（Vercel / Cloudflare Pages）；MaskedEventSerializer 強制 strip 敏感欄
-- **`packages/`** — 共用 ui-tokens / api-types / event-types / api-client-public
+**UI 層**
+- `web-admin/`（React 19 + Vite + Tailwind v4 + shadcn）：23 頁工作介面，全部需 Bearer token；本機或 Cloudflare Tunnel 連線；可看真實 symbol / price / pnl。
+- `web-public/`（React 19 + Vite + Tailwind v4，standalone Vite project，無 shadcn 無 Radix）：免認證；公網部署（Vercel / Cloudflare Pages）；只看得到 masked 後的事件流；Canvas 2D 像素辦公室為下一個 change。
+
+**API / SSE 層**
+- `/api/admin/*` — Bearer-auth REST + SSE，envelope 一律 `{ok, data, error}`，per-request `Depends(get_db)`，401 envelope `auth_missing` / `auth_invalid`。
+- `/api/public/events` — 無認證 SSE，由 `MaskedEventSerializer` strict-whitelist 過濾（13 欄 denylist + 16 event_type 白名單 + 4-digit code → `STK-?` 替換 + `SymbolMaskTable` 把真實 symbol 換成 `STK-A..STK-Z..STK-AA`）。
+- `/healthz` — 唯一免認證 admin-side endpoint。
+
+**EventBus**
+- asyncio Queue pub/sub，process-scoped。
+- 21 個 `EventType`（screener / decider / confirm-gate / journal / auto-execute / swarm 5 種）。
+- 雙 serializer：`AdminEventSerializer`（全資料）/ `MaskedEventSerializer`（嚴格白名單）。
+
+**Agent 核心**
+- LLM Decider Pipeline（v3）：訊號 → `entry_decision_team` swarm → 系統覆寫（Sizing / ATR 停損 / Risk Gate）→ Confirm Gate（`OHMYSTOCK_AUTO_EXECUTE` 切換）→ 寫 Trade Journal + 送 Broker。
+- Skills（~10 seed registry + 仍在擴充）+ Tools（21 個 `@register_tool`）+ Services（Backtest / Paper Broker / Memory + FTS5 / Swarm DAG / Trade Journal / Post-Trade Review / Proposal Writer / WFA Validator）。
+- 資料層：FinMind / Shioaji / twstock / yfinance（fallback chain）。
 
 ### 自我改進閉環（v3 核心）
-```
-訊號偵測 → LLM 進場決策 + 倉位計算 → 結構化 Trade Journal
-       → LLM 月度復盤五節點 swarm → LLM 出策略改動提案
-       → WFA 樣本外驗證 → 人工 PR review
-       → 合併回 cheatsheet → 下一輪生效
-```
+1. 訊號偵測 → LLM 進場決策 + 倉位計算
+2. 結構化 Trade Journal 寫入（SQLite + FTS5）
+3. LLM 月度復盤 5 節點 swarm（`data_loader` → `attributor` → `aggregator` → `critic` → `proposer`）
+4. LLM 出策略改動提案（`proposals/<YYYY-MM-DD>-<topic>.md`）
+5. WFA 樣本外驗證（pass → `PENDING_REVIEW/`、fail → `rejected/`、人工 approve 後 → `merged/`）
+6. 合併回 cheatsheet → 下一輪生效
 
 ### 9 條安全防線
-含 LLM 自動下單熔斷（confidence 0.7 / 單日 5 筆 / 25% 配額 / 30% 偏離等）；詳見 `docs/safety-and-simulation.md` §2.9。
+LLM 自動下單熔斷（confidence 0.7 / 單日 5 筆 / 25% 配額 / 30% 偏離等）；詳見 `docs/safety-and-simulation.md` §2.9 與 `src/ohmystock/safety/auto_execute.py`。
 
 ---
 
-## 5. 公式 / Schema 唯一權威表（避免 solo dev 改一處忘另一處）
+## 5. SSOT 唯一權威表
+
+改公式或 schema 請只改下方對應檔；多處出現會在這裡用 `[[duplicated]]` 標註。
+
+### 5.1 業務邏輯 / Schema SSOT（思考時優先讀）
 
 | 主題 | 唯一權威 |
 |---|---|
 | Volatility Targeting sizing 公式 | `docs/workflow-cheatsheet.md` §6.6 |
 | ATR 停損公式 | `docs/workflow-cheatsheet.md` §6.6 |
+| Risk-Off 觸發條件 | `docs/workflow-cheatsheet.md` §0 |
+| K 線型態庫 | `docs/workflow-cheatsheet.md` §9 |
+| Phase 2B Swarm Input Assembler | `docs/design-zh-TW.md` §4.7.0 |
 | Trade Journal schema | `docs/llm-decision-schema.md` §4 |
 | Trade Journal 衍生欄位 | `docs/llm-decision-schema.md` §4.5 |
 | LLM Decider 輸出約束 | `docs/llm-decision-schema.md` §2.1 |
 | Phase 5 五節點 DAG 評分 | `docs/post-trade-review-rubric.md` §0–§5 |
-| Risk-Off 觸發條件 | `docs/workflow-cheatsheet.md` §0 |
-| K 線型態庫 | `docs/workflow-cheatsheet.md` §9 |
 | 21 個 Tool 的 I/O schema | `docs/tools-contracts.md` |
 | Auto-execute breaker 閾值 | `docs/safety-and-simulation.md` §2.9 |
-| Phase 2B Swarm Input Assembler | `docs/design-zh-TW.md` §4.7.0 |
 | Live provider error codes / freshness policy | `openspec/specs/live-providers/spec.md` |
-| LLM Decider PM 節點 + §2.1 系統覆寫驗證 | `openspec/specs/entry-decider/spec.md`（archive 後）+ `src/ohmystock/decider/validator.py` |
-| Confirm Gate v0 行為（human-only：confirm/reject/sweep_expired/list_pending）| `openspec/specs/confirm-gate/spec.md`（archive 後）+ `src/ohmystock/safety/confirm_gate.py` |
-| Exit Engine v0 行為（daily, full-position close on stop_loss/T1/time_stop）| `openspec/specs/exit-engine/spec.md`（archive 後）+ `src/ohmystock/exit_engine/evaluator.py` |
-| Auto-execute Phase 3.5 — breaker thresholds + audit row format（5 hard breakers + sizing clamp + flag/live defense-in-depth）| `openspec/specs/auto-execute/spec.md`（archive 後）+ `src/ohmystock/safety/auto_execute.py` + `OHMYSTOCK_AUTO_EXECUTE_*` 於 `src/ohmystock/config.py` |
-| EventBus emitters v0 — 9 of 16 event_type wired (screener / decider / confirm-gate / journal / auto-execute) + AdminEventSerializer + admin SSE subscriber | `openspec/specs/eventbus-emitters/spec.md`（archive 後）+ `src/ohmystock/eventbus/` + `src/ohmystock/api/app.py` |
-| Server action endpoints v0 — 6 admin write endpoints (screener.run / confirm-gate.{pending,confirm,reject,sweep-expired} / exit-engine.run) + unified `{ok,data,error}` envelope + per-request DB conn + no-auth invariant | `openspec/specs/server-action-endpoints/spec.md`（archive 後）+ `src/ohmystock/api/routes/` + `src/ohmystock/api/app.py` |
-| web-admin Bearer auth gate — `OHMYSTOCK_ADMIN_TOKEN` ≥ 32 chars, fail-fast in `create_app()`, `require_admin` dep on every `/api/admin/*` route (REST + SSE), `AuthError` → 401 envelope (`auth_missing` / `auth_invalid`), `secrets.compare_digest` constant-time check; `/healthz` exempt | `openspec/specs/web-admin-bearer-auth/spec.md`（archive 後）+ `src/ohmystock/api/auth.py` + `OHMYSTOCK_ADMIN_TOKEN` 於 `src/ohmystock/config.py` |
-| Admin read endpoints v0 — 4 GET endpoints (`journal/rows` paginated + filters, `journal/decisions/{id}` ASC ordering, `positions/open` reuses `journal.repository.open_positions`, `stats/today` single SQL aggregate over TPE day) + sub-500 limit clamp + nested-dict payload + same envelope/auth/per-request-conn invariants as write endpoints | `openspec/specs/admin-read-endpoints/spec.md`（archive 後）+ `src/ohmystock/api/routes/{journal,positions,stats}.py` + `src/ohmystock/api/app.py` |
-| RS-percentile production wiring — universe-closes loader (`build_universe_closes_loader` reads `universe_daily` + `bars_daily` via `select_bars`; ≥253-row floor; no `FinMindClient` calls) + `disposition_list_cache` schema + `fetch_disposition_set` stub (cache-hit returns set, miss returns `set()`, never raises; live TWSE/OTC scrape deferred to `rs-percentile-disposition-scrape-impl`) + `_lifespan` startup wiring in `api/app.py` + `scripts/backfill_rs_rating.py` (`--days N` default 252, business-day walk Mon–Fri, idempotent re-run, `>= N*100` row-count floor → exit 1 on miss) | `openspec/specs/rs-percentile/spec.md`（archive 後）+ `src/ohmystock/sepa/rs.py` + `src/ohmystock/sepa/rs_loader.py` + `src/ohmystock/data/disposition.py` + `scripts/backfill_rs_rating.py` |
-| web-admin shell — Vite 8 + React 19 + TS 6 + Tailwind v4 (zinc) + shadcn `components.json` (no CLI run) + Bearer auth lifecycle (`localStorage['ohmystock.admin.token']`, login/logout/auto-401) + `apiFetch` with `{ok,data,error}` envelope parsing + fetch-based SSE (`Authorization` header) with `[1s,2s,4s,8s,30s]` backoff and 401-abort + 18-route tree (Dashboard real, 17 stubs in `pages/stubs.tsx`) + Sidebar/TopBar/Disclaimer layout + 紅漲綠跌 semantic tokens (`--up`/`--down`/`--destructive`/`--warning`) paired with Lucide arrow glyphs (color is never the only signal) + Vite dev proxy `/api` → `localhost:8000` | `openspec/specs/web-admin-shell/spec.md`（archive 後）+ `web-admin/src/` |
-| web-admin 17 頁面視覺契約（layout slots / loading-empty-error / SSE live-update / 紅漲綠跌雙重編碼 / 鍵盤可達性）— SSOT for `/chat` `/chat/:sessionId` `/swarm` `/swarm/:preset/:runId` `/backtest` `/backtest/:jobId` `/paper` `/paper/orders` `/paper/positions` `/market` `/market/:symbol` `/skills` `/skills/:name` `/memory` `/sessions` `/settings` `/audit`；後續 per-page changes 必須引用本檔對應 section 為 implementation brief | `docs/web-admin-page-designs.md` |
-| web-admin Market pages — `/market` (filter form + screener.run + 6-col `<DataTable>` + SSE `pattern_detected` prepend + 5-row live feed) and `/market/:symbol` (header quote + K-line placeholder Card + 3 KPI cards + 三大法人 5x5 + Patterns 4-col table) + `GET /api/admin/market/symbols/{symbol}` aggregator (60-day default, ≤252 cap, fail-soft `null`/`[]`, 404 only on missing `bars_daily`) + 紅漲綠跌 dual-encoding（colour + Lucide arrow） | `openspec/specs/web-admin-market-pages/spec.md`（archive 後）+ `openspec/specs/admin-market-symbol-endpoint/spec.md`（archive 後）+ `src/ohmystock/api/routes/market.py` + `web-admin/src/pages/MarketPage.tsx` + `web-admin/src/pages/MarketSymbolPage.tsx` + `web-admin/src/lib/api.ts` (`getMarketSymbol` / `runScreener`) |
-| web-admin Backtest pages — `/backtest` (strategy `<select>` populated from `listStrategies` + chip-input symbols + 2 date inputs + initial-capital + Cmd/Ctrl+Enter + 8-col history `<DataTable>` with 紅漲綠跌 on 年化/Sharpe/MaxDD, failed rows show `—`) and `/backtest/:jobId` (header + 4 `<KpiCard>` (年化/Sharpe/MaxDD/勝率) + labelled equity/drawdown placeholder Cards (no chart lib) + 7-col trades table + 404/error/failed-degraded states) + 4 endpoints under `/api/admin/backtest/*` (Bearer auth, `{ok,data,error}` envelope, per-request `Depends(get_db)`): `GET /strategies` (registry-driven), `POST /run` (sync; 1–50 symbols / period ≤ 5y / `invalid_input`/`input_too_large`/`missing_bars`; persists row even on engine failure with status="failed"), `GET /jobs?limit=N` (clamp 1..100, ORDER BY created_at DESC, no `result_json` leak), `GET /jobs/{id}` (FIFO trade pairing + on-the-fly drawdown derivation; 404 `not_found`) + `backtest_jobs` SQLite table (id PK / strategy / period / custom_symbols_json / initial_capital / status enum / elapsed_ms / result_json / created_at) | `openspec/specs/web-admin-backtest-pages/spec.md`（archive 後）+ `openspec/specs/admin-backtest-endpoints/spec.md`（archive 後）+ `src/ohmystock/api/routes/backtest.py` + `src/ohmystock/backtest/storage.py` + `src/ohmystock/backtest/strategy/registry.py` + `web-admin/src/pages/BacktestPage.tsx` + `web-admin/src/pages/BacktestJobPage.tsx` + `web-admin/src/lib/api.ts` (`runBacktest` / `listBacktestJobs` / `getBacktestJob` / `listStrategies`) |
-| web-admin Settings page (read-only v0) — `/settings` 4-section view (API keys / Theme / Safety / Breakers) + Bearer-auth `GET /api/admin/settings`；secrets 一律以布林呈現（無前綴、無長度、無 hash）+ 白名單 redactor（**不是** `model_dump`，新增 `Settings` 欄位不會自動洩漏）+ Safety 區紅漲綠跌雙重編碼（`auto_execute=false` → `border-warning` + `AlertTriangle`；`auto_execute=true` → `border-destructive` + `AlertCircle` + 「⚠ AUTO_EXECUTE 已啟用」banner）+ 全頁 disabled 控制 + 「編輯 .env 並重啟以變更」hint；no PUT, no `.env` writeback, no theme switcher（皆為意圖性 deferred — `OHMYSTOCK_AUTO_EXECUTE` 仍以 `.env` + restart 為唯一改動路徑） | `openspec/specs/web-admin-settings-page/spec.md`（archive 後）+ `openspec/specs/admin-settings-endpoint/spec.md`（archive 後）+ `src/ohmystock/api/routes/settings.py` + `web-admin/src/pages/SettingsPage.tsx` + `web-admin/src/lib/api.ts` (`getSettings`) |
-| Skill Registry foundation — `SkillSpec`（pydantic frozen + `extra="forbid"`，欄位 `name` / `description` / `category` (7-value `Literal`) / `body` / `cited_specs`）+ filesystem loader（`load_skills(dir)` / `load_skill(dir, name)`，YAML frontmatter + Markdown body，fail-loud `SkillLoadError`）+ name=stem 強制不變式 + path-traversal 防禦（`/`, `\`, `..` 進 `name` → `SkillLoadError("invalid skill name")`，BEFORE I/O）+ 10 個 seed skill 對應已部署 capability（market-data / chip-data / technical-indicators / rs-percentile / sepa-stage / sepa-trend-template / screener / phase-2b-scoring / entry-decider / exit-engine）；本 change 無 admin endpoint、無 UI、無 enabled toggle，皆為後續 `web-admin-skills-pages` 的前置 | `openspec/specs/skill-registry/spec.md`（archive 後）+ `src/ohmystock/skills/spec.py` + `src/ohmystock/skills/loader.py` + `src/ohmystock/skills/__init__.py` + `src/ohmystock/skills/registry/<10 .md>` |
-| web-admin Skills pages (read-only v0) — `/skills` (filter bar 搜尋＋類別 select，client-side filter 無 debounce + responsive 1/2/3/4-col card grid + 卡片 click/Enter/Space 導向 detail) 與 `/skills/:name` (header back-link + h1 + `<CategoryBadge>` + cited-specs `<code>` chip 列含「（無 cited_specs）」fallback + Body `<pre>` 含 char count，**無** markdown parser，max-h-[70vh] overflow-auto) + `<CategoryBadge>` 共用 component（neutral `secondary` Badge + 7 個 Lucide icon 配對：data=Database / indicator=LineChart / signal=Zap / decider=Brain / gate=Shield / tool=Wrench / report=FileText，**不**用紅漲綠跌但仍滿足「color-is-never-the-only-signal」）+ 2 個 Bearer-auth GET endpoints（`/api/admin/skills` 回 `body_preview` ≤200 codepoints + `body_truncated` flag；`/api/admin/skills/{name:path}` 回完整 body；hardcode `_REGISTRY_DIR` 指向 `src/ohmystock/skills/registry/`）+ path-traversal 防禦：route-local `_INVALID_NAME_TOKENS_LOCAL` mirror `loader._INVALID_NAME_TOKENS`（`/`, `\`, `..`, `os.sep`）並由 invariant test 釘住相等性，BEFORE I/O 即 400 `invalid_input`；well-formed-but-missing → 404 `not_found`；malformed file → 500 `internal_error`，never leak `Traceback`/`SkillLoadError` 字面；no PUT, no enable toggle, no editor, no SSE | `openspec/specs/web-admin-skills-pages/spec.md`（archive 後）+ `openspec/specs/admin-skills-endpoints/spec.md`（archive 後）+ `src/ohmystock/api/routes/skills.py` + `web-admin/src/pages/SkillsPage.tsx` + `web-admin/src/pages/SkillDetailPage.tsx` + `web-admin/src/components/category-badge.tsx` + `web-admin/src/lib/api.ts` (`listSkills` / `getSkill` + `Skill` / `SkillDetail` / `SkillCategory`) |
-| Memory store + admin-memory-endpoints + web-admin Memory page (read-only v0) — `MemoryRow` (frozen pydantic, `extra="forbid"`，欄位 `id` / `kind` (4-value `Literal`：`note` / `lesson` / `proposal` / `review_summary`) / `content` / `tags: list[str]` / `source: str \| None` / `created_at`) + `MemoryStore.list(...)` 分頁（`created_at DESC, id DESC`、`kind` exact、`tag` 透過 `EXISTS (SELECT 1 FROM json_each(tags) WHERE value = ?)` 參數綁定、`limit ≤ 200` clamp、`offset ≥ 0`）+ `MemoryStore.search(...)` FTS5 BM25 ASC（控制字元剝除、空 `q` → `MemoryStoreError("invalid_input")`、FTS5 syntax error 從 `sqlite3.OperationalError` 攔截 remap 為 `MemoryStoreError("invalid_query", "FTS5 query syntax error")`，**不**洩漏原始 SQLite 錯誤文字）+ `init_schema(conn)` idempotent 建 `memory_rows` 主表 + 2 個 index + `memory_rows_fts`（external-content `content='memory_rows'`）+ `memory_rows_ai/au/ad` 三 trigger（INSERT/UPDATE/DELETE 同步），由 `_lifespan` 在 `backtest_storage.init_schema` 之後同 `init_conn` 連續呼叫；FTS5 不可用 → `RuntimeError` 含 `"FTS5"`。**No** writer API（`MemoryStore` 無 `add` / `update` / `delete`，`__init__.py.__all__` 僅 5 個名稱，由 `hasattr` invariant test 釘住）；2 個 Bearer-auth GET endpoints（`/api/admin/memory/rows` 回 `{items, total, limit, offset, has_more}` + 每 row `content`(完整) + `content_preview`(≤200) + `content_truncated`；`/api/admin/memory/search?q=` BM25 排名同 shape，**不**回 `bm25_score`，`kind`/`tag` query params 在 search 上被忽略）；`/memory` 頁取代 stub，segmented control「瀏覽」/「搜尋」+ 5-col `<DataTable>`（時間 / kind / tags / 內容預覽 / 來源）+ inline `expandedRowRender` 顯示完整 `content`（`<pre>` max-h 70vh + 字元數）+ 切 tab 收合展開 + Cmd/Ctrl+Enter / Enter 觸發查詢；不套紅漲綠跌（記憶無價格語意）；no insert / edit / delete UI、no `/memory/:id` route、no SSE、no tag autocomplete、no date-range、no semantic search（皆為意圖性 deferred） | `openspec/specs/memory-store/spec.md`（archive 後）+ `openspec/specs/admin-memory-endpoints/spec.md`（archive 後）+ `openspec/specs/web-admin-memory-page/spec.md`（archive 後）+ `src/ohmystock/memory/{__init__,schema,store}.py` + `src/ohmystock/api/routes/memory.py` + `src/ohmystock/api/app.py` (`memory_init_schema` in `_lifespan`) + `web-admin/src/pages/MemoryPage.tsx` + `web-admin/src/lib/api.ts` (`listMemory` / `searchMemory` + `MemoryRow` / `MemoryRowsResponse` / `MemoryKind`) |
+| web-admin 23 頁面視覺契約 | `docs/web-admin-page-designs.md` |
 
-| Phase 5 review pipeline v0 — 5-node sequential runner (`data_loader` → `attributor` → `aggregator` → `critic` → `proposer`) + `manual-<from>-to-<to>` review_id only + `--force` controls `reviews/<period>/` overwrite (proposals 永遠不被覆寫) + `dry_run=True` patches all file/cost writes + `_index.json` atomic upsert (read → in-memory replace by `review_id` → temp + `os.replace`) + `report.md` 期間概覽 + 連結 + each LLM node writes one `llm_costs` row keyed `decision_id=<review_id>`；intentionally **deferred**: §16 WFA gate / proposal state machine / web-admin /reviews 頁 / EventBus events / 排程 / `_golden/` regression set | `openspec/specs/post-trade-review-pipeline/spec.md`（archive 後）+ `src/ohmystock/review/pipeline.py` + `src/ohmystock/review/nodes/{data_loader,attributor,aggregator,critic,proposer}.py` + `src/ohmystock/review/{models,index,llm_client}.py` |
-| Proposal markdown writer v0 — `ProposalDraft` (frozen pydantic, `extra="forbid"`，欄位 `topic` (kebab-case 1-40 字) / `target_section` / `created_by` / `created_at` (timezone-aware) / `review_id: str \| None` / `priority` (`high`/`medium`/`low`) / 7 段內文 + `motivation` 必含 `metrics.json#` JSON pointer) + `write_proposal(draft, dir) -> Path` 寫 `<YYYY-MM-DD>-<topic>.md` (frontmatter + 8 個 `## N. <title>` 段落 + 「變更紀錄」`- <ts> created by <author>`) + `status: pending` 強制 (caller 無法 override) + `-2`..`-99` collision suffix + `>99` 拋 `RuntimeError("too many proposals...")` + `parse_proposal(path)` round-trip + `ProposalParseError`(缺段/缺 frontmatter)；intentionally **無**狀態轉換 API、無覆寫、無 PR 自動化（皆 deferred 到 `proposal-state-machine` change） | `openspec/specs/proposal-writer/spec.md`（archive 後）+ `src/ohmystock/proposal/{schema,writer,__init__}.py` |
-| Proposal state machine v0 — `transition_proposal(path, new_status, *, actor, reason=None, validation_report_path=None, merged_to_version=None) -> Path` + `ProposalStatus = Literal["pending","validating","approved","merged","rejected"]` + `ProposalStateError(RuntimeError)` + 5 條合法 edge（`pending→validating` / `validating→{approved,rejected}` / `approved→{merged,rejected}`；其他全拋 `illegal_transition`，含同狀態、跳躍、`merged`/`rejected` 起點）+ `current_status` 由 frontmatter 讀（**不**從 path 推）+ required-args by target（`approved` 需 `validation_report_path`、`merged` 需 `merged_to_version`、`rejected` 需非空 `reason`、空 `actor` 拋 `missing_actor`；檢查順序 `unknown_status` → `illegal_transition` → required-args）+ 自動搬檔（`approved` → `PENDING_REVIEW/`、`merged` → `merged/`、`rejected` → `rejected/`、`pending`/`validating` 留根；sink dir lazy `mkdir(parents=True, exist_ok=True)`；`new_path != path` 且 `new_path.exists()` 拋 `destination_exists`，**不**靜默覆寫）+ frontmatter mutation（既有 7 鍵順序保留，新增 `validation_report_path` / `merged_to_version` / `merged_at` / `rejected_reason` append 到 frontmatter 末尾；line-based `key: value` 格式與 writer v0 一致，**不**引入 yaml 依賴）+ 內文 7 段（`## 1.` ~ `## 7.`）byte-identical + 「## 8. 變更紀錄」append 一行 `- <iso-ts> status: <old> → <new> by <actor>[ (<reason>)]`，缺 heading 拋 `malformed_changelog` 且原檔不變 + 原子寫（`tempfile.NamedTemporaryFile(dir=new_path.parent, suffix=".md.tmp")` + `flush` + `os.fsync` + `os.replace` + `old_path.unlink()` 僅當 `path != new_path`；OSError re-raise 原例外，tmp 必清掉）+ `parse_proposal` round-trip 相容（writer v0 的 parser 忽略新 frontmatter 鍵）；intentionally **deferred**：WFA 驗證引擎 / `/api/admin/proposals/*` endpoint / web-admin /proposals 頁 / git commit / PR 自動化 / cheatsheet diff 套用 / 版本 bump / `scripts/update_proposal_stats.py` / `reverted_at` 回滾流程 | `openspec/specs/proposal-state-machine/spec.md`（archive 後）+ `src/ohmystock/proposal/state.py` + `src/ohmystock/proposal/__init__.py` (`transition_proposal` / `ProposalStatus` / `ProposalStateError` 加入 `__all__`) |
+### 5.2 已 ship capability → 對應 spec + impl 路徑
 
-| Admin proposals endpoints v0 — 3 Bearer-auth endpoints (`GET /api/admin/proposals` paginated frontmatter-only summaries with optional `?status=` filter + 4-dir walk; `GET /api/admin/proposals/{slug}` full body via `parse_proposal()` + parsed `## 8.` changelog (`transition`/`created`/`raw` discriminated union) + `extra_frontmatter` whitelist; `POST /api/admin/proposals/{slug}/transition` thin wrapper around `transition_proposal()` with `_STATE_ERROR_TO_ENVELOPE` substring map) + path-traversal `_INVALID_NAME_TOKENS` validated BEFORE I/O (returns 400 `invalid_input`) + `_PROPOSALS_ROOT_FACTORY` test-override seam (per-request `Settings().proposals_dir` lookup) + status-source-of-truth (frontmatter wins over directory) + malformed file silently skipped on list (logger.warning) but 422 `malformed_proposal` on detail + new_path always forward-slash relative to root + explicit GET-on-/transition→405 handler registered before catch-all detail; **deferred**: WFA validation engine / git commit / PR automation / cheatsheet diff / EventBus `proposal_transitioned` / markdown body renderer / bulk transition / `reverted_at` rollback | `openspec/specs/admin-proposals-endpoints/spec.md`（archive 後）+ `src/ohmystock/api/routes/proposals.py` + `Settings.proposals_dir` 於 `src/ohmystock/config.py` |
-| web-admin Proposals pages v0 — `/proposals` (6-tab status filter `全部 / pending / validating / approved / merged / rejected` 由 `?status=` URL search param 持久化 + 5-col `<DataTable>` 時間/狀態 `Badge variant="secondary"`/主題/target_section truncate/優先級 `Badge variant="outline"` + click row → `/proposals/<slug>` + 8-skeleton loading + 「尚無提案」/「目前 X 沒有提案」+「回到全部」/destructive Card+retry empty/error states) and `/proposals/:slug` (back-link + h1 topic + status/priority 中性 badges + meta line + optional `Extra metadata` Card 由 `extra_frontmatter` keys 驅動 + 7 個 body section Cards 各為 `<pre className="whitespace-pre-wrap font-mono text-sm">` (no markdown parser) + 「變更紀錄」 `<ul>` 三 kind 分流 + status-aware action row: `pending`→`[Mark Validating]` (`<ValidatingConfirmDialog>`) / `validating`→`[Approve…][Reject…]` / `approved`→`[Mark Merged…][Reject…]` / `merged|rejected`→「終局狀態」label) + `<TransitionDialog>` target-conditional fields (actor always; validation_report_path for approved; merged_to_version for merged; reason for rejected) + on-success persist actor → `localStorage['ohmystock.admin.actor']` + invalidate `['proposal', slug]` query + on-error inline `{code}: {message}` keep dialog open + 404 `not_found` empty state with back-link / 422 `malformed_proposal` destructive Card NO retry / other errors retry button + minimal `<Dialog>` primitive built inline at `components/ui/dialog.tsx` (no @radix-ui/react-dialog dep); **無**: SSE live-update / body preview column / bulk transition / Markdown renderer / YAML editor / Save button / dirty state | `openspec/specs/web-admin-proposals-pages/spec.md`（archive 後）+ `web-admin/src/pages/{ProposalsPage,ProposalDetailPage}.tsx` + `web-admin/src/components/transition-dialog.tsx` + `web-admin/src/components/ui/dialog.tsx` + `web-admin/src/lib/api.ts` (`listProposals` / `getProposal` / `transitionProposal` + `Proposal` / `ProposalDetail` / `ProposalChangelogEntry` / `ProposalStatus` 等型別) |
-| WFA validation engine v0 — `run_validation(proposal_path, *, strategy_name, period, param_overrides, universe, wfa_windows=5, in_sample_ratio=0.7, initial_capital, market_data_loader, dry_run=False) -> ValidationReport` 為 `validating → approved/rejected` 之間的純決定性閘 (`__init__.py` 公開 `ValidationReport` / `WfaValidationError` / `WfaWindow` / `run_validation`)；流程 `_split_windows` (N≥2 chunks，`floor(total_days/n)` + 最後 chunk 吸殘餘，IS=前 `ratio`、OOS=尾段，相鄰窗口嚴格 disjoint，含 invariant assertion) → `_slice_bars` per window → `_run_one` 四次/窗 (baseline_is/baseline_oos/candidate_is/candidate_oos) → `_aggregate_oos` (sharpe/win_rate=mean、max_drawdown=min) → `_evaluate_thresholds` 三條 pass 條件依宣告順序 (`sharpe_gap < 0.30` / `sharpe ≥ baseline×0.95` / `\|mdd\| ≤ \|baseline_mdd\|×1.20`，每條獨立檢查，全部失敗回 verdict=fail + 完整 `failures`) → `_write_report_atomic` (`NamedTemporaryFile` + `flush` + `os.fsync` + `os.replace`) → `_transition_after_verdict` (`transition_proposal(..., actor="wfa-validator")`，pass 帶 `validation_report_path`、fail 帶 `reason=";".join(failures)[:200]`，跨 dir 同步搬 `<slug>.validation.json`) + `ValidationReport` dataclass field order locked + 穩定 first-line token (`status_not_validating` / `unknown_strategy` / `period_too_short` / `missing_bars: <sym>` / `backtest_failed: ...` / `invalid_*`) + `dry_run=True` 完全不寫盤不轉狀態；CLI `uv run ohmystock validate-proposal <slug> --strategy --period from=...,to=... [--param k=v]* [--wfa-windows 5] [--in-sample-ratio 0.7] [--universe 2330,...] [--initial-capital N] [--dry-run]` 用 `_PROPOSALS_ROOT_FACTORY` / `_MARKET_DATA_LOADER_FACTORY` test seam，exit code 0=pass/dry-run、1=fail、2=input-error；intentionally **deferred**：admin endpoint (`admin-proposal-validate-action` 已 ship) / 月度復盤自動觸發 / EventBus event / per-window SSE / async queue | `openspec/specs/wfa-validation-engine/spec.md`（archive 後）+ `src/ohmystock/validation/{__init__,wfa}.py` + `src/ohmystock/cli/_validate_proposal.py` (`_PROPOSALS_ROOT_FACTORY` / `_MARKET_DATA_LOADER_FACTORY` seams) |
-| Admin proposal validate action v0 — `POST /api/admin/proposals/{slug:path}/validate` Bearer-auth endpoint wraps `run_validation`；body `ValidateRequest` (pydantic `extra="forbid"`，`strategy: str` / `period: PeriodModel{from,to}` with regex `^\d{4}-\d{2}-\d{2}$` + `from<=to` `@model_validator` / `param_overrides: list[str]` / `universe: list[str]` (`min_length=1`) / `wfa_windows: int=5 (ge=2)` / `in_sample_ratio: float=0.7 (gt=0,lt=1)` / `initial_capital: int \| None=None` (fallback `Settings().starting_equity_twd`) / `dry_run: bool=False`) + `_parse_param_pairs(list[str])` ≡ CLI `ast.literal_eval` (`unparseable_param: ...` 前綴) + `_MARKET_DATA_LOADER_FACTORY = lambda: (lambda sym,s,e: select_bars(get_connection(), sym, s, e))` test seam parallel to `_PROPOSALS_ROOT_FACTORY` + `_post_run_state_paths` 計 forward-slash `relative_to(root).as_posix()`，pass→`PENDING_REVIEW/<slug>{.md,.validation.json}`、fail→`rejected/...`、dry-run→`(None,None)` + envelope codes：`WfaValidationError` 開頭 `status_not_validating` → 409 `illegal_transition`、其餘 → 422 `wfa_validation_failed` 保留 `<token>: <detail>` 原文；`ProposalStateError` 走既有 `_map_state_error`；catch-all → 500 `internal_error` 不洩漏 traceback；slug path-traversal/未知 → 400 `invalid_input` / 404 `not_found`；GET on `/validate` → 405 with `Allow: POST`（GET 405 handler 註冊**於** catch-all detail 之**前**） + 16-test endpoint suite (auth / path-traversal / unknown-slug / missing-strategy / extra-field / inverted-period / empty-universe / unparseable-param / happy-pass+filemove / happy-fail+failures / dry-run-stays-validating / pending→409 / unknown-strategy→422 / missing-bars→422 / period_too_short→422 / GET→405)；web-admin：`<ValidationDialog>` (9 fields，numeric tuning 三欄 grid、Dry-run 為底部 submit-modifier、`role="alert" aria-live="polite"` 內錯、`Loader2` spinner、localStorage `ohmystock.admin.lastValidation` 持久化 `{strategy,universe,wfa_windows,in_sample_ratio,initial_capital}` (period/param/dry_run 永遠 reset)、success 觸發 `toast()` 並 invalidate `['proposal',slug]` + `['proposals']`、error 留 dialog + 內錯) + `/proposals/:slug` `validating` 分支 `[Run Validation…]` 由 `useQuery(['strategies'], listStrategies)` 預載、loading 期 disabled + tooltip、放在既有 `[Approve…][Reject…]` 之前 + `lib/toast.ts` pub/sub + `<ToastViewport>` 掛 `main.tsx` (無 sonner 依賴，4s 自動消，role=status aria-live=polite) + `validateProposal(slug, body): Promise<ValidateResponse>` helper 同 `apiFetch` 路徑；intentionally **deferred**：async/queue mode / EventBus `proposal_validated` event / SSE per-window 進度 / LLM 自動填 `param_overrides` / approved→validating 「re-validate」邊 | `openspec/specs/admin-proposals-endpoints/spec.md`（archive 後）+ `openspec/specs/web-admin-proposals-pages/spec.md`（archive 後）+ `src/ohmystock/api/routes/proposals.py` (`_MARKET_DATA_LOADER_FACTORY` / `_parse_param_pairs` / `_post_run_state_paths` / `validate_proposal_endpoint` / `reject_get_on_validate`) + `tests/api/test_admin_proposals_validate_endpoint.py` + `web-admin/src/components/validation-dialog.tsx` + `web-admin/src/components/toast-viewport.tsx` + `web-admin/src/lib/toast.ts` + `web-admin/src/pages/ProposalDetailPage.tsx` + `web-admin/src/lib/api.ts` (`validateProposal` / `ValidateRequest` / `ValidateResponse`) |
-| Public SSE channel + masked serializer + web-public shell v0 — `eventbus-public-mask`：`PUBLIC_WHITELIST: dict[str, set[str]]`（16 event_type 對應 docs §4.2）+ `DENYLIST_FIELDS: frozenset[str]` 13 鍵 (`symbol`/`company_name`/`price`/`expected_price`/`quantity`/`pnl_twd`/`account_id`/`api_key`/`broker_order_id`/`reasoning`/`query`/`symbols`/`failure_reason`) belt-and-suspenders pop AFTER whitelist (即使未來 whitelist 誤含也擋掉) + `TWSE_CODE_RE = re.compile(r"\b\d{4}\b")` 把 `reasoning` 中所有 4-digit code 換成字面 `"STK-?"` 寫進 `reasoning_summary`（年份 `2026` 同樣被換 — 寧可 false positive 也不可 false negative）+ `SymbolMaskTable(industry_lookup)` process-scoped、`mask()` base-26 rollover (`STK-A..STK-Z..STK-AA`)、`industry_of()` fallthrough `"其他"`、不同 instance counter 獨立 (process 重啟即重置，刻意避免訪客累積對映表)；`admin-public-events-endpoint`：`GET /api/public/events` SSE route in `src/ohmystock/api/routes/public_events.py` (路由模組 lowercase source **嚴禁** `auth` substring，由 `tests/api/test_public_events_route.py::test_no_auth_import_in_route_module_source` invariant test 釘住) + `set_mask_table()`/`clear_mask_table()`/`get_mask_table()` module-level singleton (lifespan 安裝、`finally` 清空使 post-shutdown reference 拋 `RuntimeError("set_mask_table")` 而非靜默返回 stale state) + `_KEEPALIVE_TIMEOUT_SECONDS = 15.0` mirror admin SSE (`asyncio.wait_for` + `ServerSentEvent(comment="keepalive")` 防 nginx/CF proxy drop) + `_lifespan` 在 `chat_init_schema → memory_init_schema → _load_industry_lookup(conn)` 後 `set_mask_table(SymbolMaskTable(industry_lookup))`，`_load_industry_lookup` 對 `universe_daily` 跑 `SELECT DISTINCT symbol, industry WHERE industry IS NOT NULL AND industry != ''` 失敗回 `{}` (fresh DB / 缺表 / OperationalError 不掛 app)，`clear_mask_table()` 在 `finally` 與 `reset_providers()` 一起跑；`_PublicCORSMiddleware` (Starlette `BaseHTTPMiddleware`) path-scoped 僅對 `/api/public/*` 加 `Access-Control-Allow-Origin` (允許 `http://localhost:5173` + `http://localhost:5174`)，admin routes 完全不受影響 (路徑判斷 BEFORE origin check)、OPTIONS preflight 回 204 + `Allow-Methods/Headers/Max-Age` headers；`web-public-shell`：`web-public/` 是與 `web-admin/` 平行的 standalone Vite project（**不**是 pnpm workspace member，自己的 `package.json`+`tsconfig.json/app.json/node.json`），React 19 + TS 6 + Tailwind v4 + react-router 7，**無** TanStack Query / Zustand / shadcn / Radix / Lucide — bundle 92 KB gzip JS + 2.45 KB CSS；`<DisclaimerBanner>` (`sticky top-0 z-50 bg-warning`, `role="alert"`, no dismiss button) 在 `App.tsx` 永久掛載於 `<Outlet />` 之上、404 view 亦顯示；`<MaskedEventsFeed>` 開 `EventSource('/api/public/events')`，`onmessage` JSON.parse → dedupe by `event_id` (`useRef<Set<string>>`) → prepend 至 `useState<MaskedEvent[]>` cap 50 oldest-evicted (eviction 也從 `seenIds` 移除避免 unbounded 增長) + client-side `PAYLOAD_DENYLIST` 13-key `Set` 鏡像 backend `DENYLIST_FIELDS` 在 render 前再 strip 一次 (defense-in-depth 抓伺服器 regression) + `Intl.DateTimeFormat('en-GB', timeZone: 'Asia/Taipei', hour12: false)` HH:MM:SS 顯示 + `eventSourceFactory` prop 為 test seam；`web-public/public/robots.txt` 三行 `User-agent: * / Allow: / / Disallow: /api/`、`index.html` `<meta name="description">` 含 "NOT investment advice" + `<noscript>` fallback；vitest 9 tests 跑 `FakeEventSource` (banner verbatim + no-dismiss / feed prepend / 50-cap eviction / event_id dedup / 客端 DENYLIST 擋 `symbol:"2330"` / EventSource close on unmount)；Playwright E2E (`e2e/test_public_mask.spec.ts` + `playwright.config.ts` + `fixtures/twse_top50_names.json` 50 公開公司名 blacklist) `page.evaluate` 30 秒 EventSource 捕獲 → 三層 assertion (`DENYLIST_KEY_TOKENS` 13 字面 / `FOURDIGIT_IN_STRING_RE` 過 ISO-shaped 白名單 / top-50 名 substring)，**非 CI**，`npm run e2e` 手動 + `npx playwright install chromium`；`scripts/smoke_public_events.py` ad-hoc 把 `decision_made` for symbol `2330` 跑過 real bus + serializer + route generator 確認 `masked_symbol: STK-A` / `reasoning_summary: STK-? 突破 20MA` / 0 個 `2330`/`symbol`/`reasoning` key；intentionally **deferred**：Canvas 2D 像素辦公室 + 9 角色 sprite (`web-public-pixel-office-mvp` 後續 change) / Vercel/Cloudflare Pages 部署 + 生產 CORS 收窄 / public endpoint rate limit (`docs/backend-eventbus.md` §5.4 10連線/IP/分鐘) / `/api/public/recent_events` cold-load endpoint / i18n en locale / `industry` 欄位 seeder (目前所有 symbol 多半 fallthrough 到 `"其他"`) / 剩 7 個 unwired emitter（屬於各自 producing capability，非本 change） | `openspec/specs/eventbus-public-mask/spec.md`（archive 後）+ `openspec/specs/admin-public-events-endpoint/spec.md`（archive 後）+ `openspec/specs/web-public-shell/spec.md`（archive 後）+ `src/ohmystock/eventbus/{mask_table.py,serializers.py,__init__.py}` + `src/ohmystock/api/routes/public_events.py` + `src/ohmystock/api/app.py` (`_PublicCORSMiddleware` + `_load_industry_lookup` + `_lifespan` set/clear_mask_table) + `tests/eventbus/{test_mask_table,test_public_serializer}.py` + `tests/api/test_public_events_route.py` + `web-public/` (Vite + React + Tailwind, 92 KB gzip) + `web-public/src/{App,router,main,index.css}.{tsx,ts,css}` + `web-public/src/components/{DisclaimerBanner,MaskedEventsFeed}.tsx` + `web-public/src/pages/{HomePage,NotFoundPage}.tsx` + `web-public/src/__tests__/{DisclaimerBanner,MaskedEventsFeed}.test.tsx` + `web-public/e2e/{playwright.config.ts,test_public_mask.spec.ts,fixtures/twse_top50_names.json}` + `web-public/public/robots.txt` + `scripts/smoke_public_events.py` |
-| Admin swarm endpoints + web-admin swarm pages v0 — `ohmystock.swarm_runs/` 套件（**注意**：用 `swarm_runs` 而非 `swarm`，後者已被 Phase 2B Swarm Input Assembler 佔用）含 `presets.py`(`PresetSpec` frozen pydantic `extra="forbid"` + `PRESETS` dict + `get_preset(name)` raise `KeyError("unknown preset: ...")`，v0 一個 entry `phase5-review` 包 `data_loader/attributor/aggregator/critic/proposer` 5 節點) + `storage.py` (`swarm_runs` 7-col SQLite 表 `id TEXT PK / preset / status CHECK(IN 'completed','failed') / params_json / result_json / elapsed_ms / created_at` + `idx_swarm_runs_created_at` index + `init_schema`/`insert_run`/`select_recent`/`select_by_id` helpers，schema 鏡像 `backtest_jobs`) + `runner.py` (`run_swarm` async 薄包裝 `review.pipeline.run_review`：preset 查找 → params 驗 (`period_from`/`period_to` ISO + `from<=to`) → `Settings().anthropic_api_key` fail-fast → `run_id="swr_<12hex>"` → emit `SWARM_RUN_STARTED` + first-node `SWARM_NODE_STARTED` BEFORE `run_review` → 同步呼叫 `run_review` → 回來後依序 emit 剩 4 節點 started/completed pairs → `SWARM_RUN_COMPLETED`，共 12 events；失敗路徑 catch `Exception`(**不**含 `BaseException`) → `_infer_failed_node` 走檔案存在順序 (`data.json/attribution.json/metrics.json/critique.md/proposals_created.md`) 推算失敗節點 (dry-run/dir 缺 → default first node) → emit `SWARM_RUN_FAILED` + insert `status="failed"` row 含 `failed_node`/`completed_nodes`/`error.code/message`，return `SwarmRunResult(status="failed",...)` 不重 raise；validation errors 拋 `SwarmRunnerError("missing_api_key:..."/"unknown_preset:..."/"invalid_params:...")` **不**入 row、**不**發任何 event) + `_lifespan` 在 `backtest_storage.init_schema → swarm_runs.init_schema → memory_init_schema` 順序加一行；4 個 Bearer-auth endpoints (`GET /api/admin/swarm/presets` 序列化 `PRESETS.values()` / `POST /api/admin/swarm/runs` body `SwarmRunRequest{preset, params}` (`extra="forbid"`)，`SwarmRunnerError` prefix 對應 envelope code (`missing_api_key:` → 422 `missing_api_key`、`invalid_params:` / `unknown_preset:` → 400 `invalid_input`、其他 → 422 `swarm_runner_failed`)，**run_swarm 失敗 row 仍回 200 with `data.status="failed"`**(與 backtest_jobs 一致) / `GET /api/admin/swarm/runs?limit=N` 預設 50、clamp 1..100、`limit<1` → 400、回 5-key summary **不**洩 `params_json/result_json` / `GET /api/admin/swarm/runs/{id:path}` 含 path-traversal `_INVALID_NAME_TOKENS = ("/", "\\", "..", os.sep)` 鏡像 `routes/proposals.py` BEFORE I/O → 400，未知 id → 404 `not_found`，回 7-key full row with parsed `params`/`result` dicts) + 25 backend tests (8 storage/preset, 5 runner, 14 endpoint, 1 emitter resilience)；EventType enum 16 → 21 (5 新成員 `SWARM_RUN_STARTED/COMPLETED/FAILED + SWARM_NODE_STARTED/COMPLETED`)；web-admin：`/swarm` (`SwarmPage.tsx` responsive 1/2/3-col Card grid `h-[180px]`，每 card 含 title/description/5-node `<Badge variant="outline">`/`[Run...]` button + `useQuery(['swarm-presets'], listSwarmPresets)` + 3-skeleton loading / 中性 EmptyPresets / destructive ErrorPanel+retry) + `<RunSwarmDialog>` (5 欄 `<label htmlFor>` period_from/period_to/limit_trades/dry_run (defaultChecked + AlertTriangle warn icon)/force + `<DialogTitle>` + `<DialogDescription>` + 成功 toast + invalidate `['swarm-runs']` + navigate `/swarm/<preset>/<id>` + 失敗 `role="alert" aria-live="polite"` 內錯 + localStorage `ohmystock.admin.lastSwarm` persist period/limit_trades only，dry_run/force 永遠 reset) + `/swarm/:preset/:runId` (`SwarmRunPage.tsx` header back-link + h1 + status `<Badge>` (completed=secondary / failed=destructive) + meta line (created_at/elapsed_ms/optional `result.review_id` cross-link `/reviews/...`) + vertical stepper 5 row 4 狀態 (`done`=CheckCircle2 text-up / `running`=Loader2 `animate-spin motion-reduce:animate-none` / `failed`=XCircle text-destructive / `queued`=Circle text-muted-foreground，icons 全 `aria-hidden="true"`)，stepper 容器 `aria-live="polite"`，每 row 為 `<button type="button"> aria-expanded aria-controls cursor-pointer focus-visible:ring-2`，click/Enter/Space 展開 `<pre max-h-[40vh]>` 顯示 `result.node_outputs[node]` JSON.stringify(2)，failed node 額外 `result.error.message`，baseline state 從 API + SSE patch via 既有 `useLiveFeedStore` filter `event_type.startsWith("swarm_") && payload.run_id===runId` (oldest-first replay 確保最終態正確)，404 → 中性 NotFoundView 含返回連結，error → destructive ErrorView+retry，loading → header skeleton + 5 row skeleton h-12) + `web-admin/src/lib/api.ts` 新增 4 types (`SwarmPreset`/`SwarmRunRequest`/`SwarmRunSummary`/`SwarmRunRow`) + 4 helpers (`listSwarmPresets`/`runSwarm`/`listSwarmRuns`/`getSwarmRun`) + `router.tsx` 路由換真檔 + `pages/stubs.tsx` 移除 `SwarmPage`/`SwarmRunPage` 兩個 export；intentionally **deferred**：第 2 個 preset (decider/screener swarm) / async/queue 模式 / 取消執行 / 中途暫停 / 重跑同 run_id / WebSocket 雙向 / proposer 自動觸發 / cron schedule / `/swarm/runs/:id/rerun` / preset YAML config / per-node 重跑 / 月度復盤自動觸發 | `openspec/specs/swarm-runs/spec.md`（archive 後）+ `openspec/specs/web-admin-swarm-pages/spec.md`（archive 後）+ `openspec/specs/eventbus-emitters/spec.md`（archive 後，extends EventType 16→21 + swarm runner emitter requirement）+ `src/ohmystock/swarm_runs/{__init__,presets,runner,storage}.py` + `src/ohmystock/api/routes/swarm.py` + `src/ohmystock/eventbus/types.py` (5 new EventType members) + `src/ohmystock/api/app.py` (`_lifespan` swarm_runs init_schema + include_router) + `tests/swarm_runs/` + `tests/api/test_admin_swarm_endpoints.py` + `tests/test_eventbus_emitter_swarm.py` + `web-admin/src/pages/{SwarmPage,SwarmRunPage}.tsx` + `web-admin/src/components/run-swarm-dialog.tsx` + `web-admin/src/lib/api.ts` (`listSwarmPresets` / `runSwarm` / `listSwarmRuns` / `getSwarmRun` + `SwarmPreset` / `SwarmRunRequest` / `SwarmRunSummary` / `SwarmRunRow`) + `web-admin/src/router.tsx` + `web-admin/src/pages/stubs.tsx` |
+每筆都是一次 `/opsx:apply` + `/opsx:archive` 的成果。完整內文在對應 archive 目錄。
 
-完整版（含「不要在這裡改」欄位）見 `docs/README.md` §2。
+| Capability | 主要 spec + impl |
+|---|---|
+| Scaffold / CLI skeleton / FastAPI bootstrap | `archive/2026-04-27-*` / `archive/2026-04-28-fastapi-bootstrap` |
+| External connectors（FinMind/Shioaji/Anthropic）+ cost tracker | `archive/2026-04-29-external-connectors-and-cost` |
+| Market data fetch + cache、Chip data、Technical indicators、SEPA trend template + stage、Screener | `archive/2026-04-30-*` |
+| Live providers（freshness policy / error codes） | `archive/2026-05-01-live-providers` + `openspec/specs/live-providers/spec.md` |
+| Phase 2B Swarm Input Assembler + scoring engine + SEPA subscorers | `archive/2026-05-01-phase-2b-*` + `src/ohmystock/scoring/` |
+| Entry Decider PM node + §2.1 系統覆寫驗證 | `archive/2026-05-02-entry-decider-pm-node` + `src/ohmystock/decider/validator.py` |
+| Confirm Gate v0（human-only confirm/reject/sweep_expired/list_pending） | `archive/2026-05-02-confirm-gate-v0` + `src/ohmystock/safety/confirm_gate.py` |
+| Exit Engine v0（daily, full-position close on stop_loss/T1/time_stop） | `archive/2026-05-02-exit-engine-v0` + `src/ohmystock/exit_engine/evaluator.py` |
+| Auto-execute Phase 3.5（5 hard breakers + sizing clamp） | `archive/2026-05-02-auto-execute-toggle-and-breakers` + `src/ohmystock/safety/auto_execute.py` + `OHMYSTOCK_AUTO_EXECUTE_*` 於 `src/ohmystock/config.py` |
+| EventBus emitters v0（9 of 21 event_type wired + AdminEventSerializer） | `archive/2026-05-02-eventbus-emitters-v0` + `src/ohmystock/eventbus/` |
+| Server action endpoints v0（6 admin write endpoints + envelope） | `archive/2026-05-02-server-action-endpoints-v0` + `src/ohmystock/api/routes/` |
+| Read-side admin endpoints v0（journal/positions/stats） | `archive/2026-05-03-read-side-admin-endpoints-v0` + `src/ohmystock/api/routes/{journal,positions,stats}.py` |
+| web-admin Bearer auth gate（`OHMYSTOCK_ADMIN_TOKEN` ≥ 32 chars） | `archive/2026-05-03-web-admin-bearer-auth-v0` + `src/ohmystock/api/auth.py` |
+| RS-percentile skill + FinMind wiring（universe-closes loader + disposition stub） | `archive/2026-05-06-rs-percentile-skill` + `archive/2026-05-07-rs-percentile-finmind-wiring` + `src/ohmystock/sepa/rs.py` |
+| web-admin shell + auth（Vite 8 + React 19 + TS 6 + Tailwind v4 + Bearer auth lifecycle + 紅漲綠跌 semantic tokens） | `archive/2026-05-07-web-admin-shell-and-auth` + `web-admin/src/` |
+| web-admin design system + 23 頁 wireframes | `archive/2026-05-08-web-admin-design-system-and-page-wireframes` + `docs/web-admin-page-designs.md` |
+| web-admin Market pages + Backtest pages + Settings page + Paper overview/orders/positions + Audit page | `archive/2026-05-08-web-admin-*` + `src/ohmystock/api/routes/{market,backtest,settings}.py` + 對應 `web-admin/src/pages/` |
+| Skill Registry foundation + web-admin Skills pages（10 seed skills） | `archive/2026-05-09-skill-registry-foundation` + `archive/2026-05-09-web-admin-skills-pages` + `src/ohmystock/skills/` |
+| Memory store + admin-memory-endpoints + web-admin Memory page（FTS5 BM25） | `archive/2026-05-09-web-admin-memory-page-and-store` + `src/ohmystock/memory/` |
+| Phase 5 review pipeline v0（5-node sequential runner + `_index.json` + `report.md`） | `archive/2026-05-10-phase5-review-mvp` + `src/ohmystock/review/` |
+| Proposal markdown writer + state machine（5 status edges + 自動搬檔 + atomic write） | `archive/2026-05-10-proposal-state-machine` + `src/ohmystock/proposal/` |
+| Admin proposals endpoints + pages（list/detail/transition） | `archive/2026-05-10-admin-proposals-endpoints-and-pages` + `src/ohmystock/api/routes/proposals.py` + `web-admin/src/pages/Proposal*.tsx` |
+| WFA validation engine（`run_validation` 純決定性閘） | `archive/2026-05-13-wfa-validation-engine` + `src/ohmystock/validation/` + `src/ohmystock/cli/_validate_proposal.py` |
+| Admin proposal validate action（`POST .../validate` + `<ValidationDialog>`） | `archive/2026-05-13-admin-proposal-validate-action` + `src/ohmystock/api/routes/proposals.py` + `web-admin/src/components/validation-dialog.tsx` |
+| Admin reviews endpoints + pages | `archive/2026-05-13-admin-reviews-endpoints-and-pages` + `web-admin/src/pages/Reviews*.tsx` |
+| Admin swarm endpoints + pages + EventType 16→21 | `archive/2026-05-13-admin-swarm-endpoints-and-pages` + `src/ohmystock/swarm_runs/` + `web-admin/src/pages/Swarm*.tsx` |
+| Admin chat sessions endpoints + pages（single-agent chat runtime） | `archive/2026-05-15-admin-chat-sessions-endpoints-and-pages` + `src/ohmystock/chat/` + `web-admin/src/pages/ChatSession*.tsx` |
+| Public SSE channel + masked serializer + web-public shell | `archive/2026-05-15-web-public-shell-and-mask` + `src/ohmystock/eventbus/{mask_table,serializers}.py` + `src/ohmystock/api/routes/public_events.py` + `web-public/` |
 
 ---
 
 ## 6. 文件索引
 
 ### 入口
-- **`README.md`** — GitHub 首頁（專案狀態、特色、架構、路線圖、免責）
-- **`docs/README.md`** — 文件導覽，**任何 LLM Agent 開新對話應先讀這個**
+- `README.md` — GitHub 首頁（專案狀態、特色、架構、路線圖、免責）
+- `docs/README.md` — 文件導覽，**任何 LLM Agent 開新對話應先讀這個**
 
 ### 核心設計（`docs/`）
+
 | 檔案 | 用途 |
 |---|---|
 | `design-zh-TW.md` | 架構、模組、Tools/Skills/Memory/Backend、目錄結構、路線圖、風險登記（核心大檔） |
 | `workflow-cheatsheet.md` | **交易業務邏輯 SSOT** — Phase 0–5 + §16 提案閘 + §17 文件關係表 |
 | `safety-and-simulation.md` | Live/Sim 防線 9 層 + verify_simulation + 對賬機制 |
 | `llm-decision-schema.md` | LLM Decider I/O JSON 規格 + Trade Journal schema（FTS5）|
-| `post-trade-review-rubric.md` | Phase 5 五節點 DAG（data → attribution → aggregator → critic → proposer）評分準則 |
+| `post-trade-review-rubric.md` | Phase 5 五節點 DAG 評分準則 |
 | `tools-contracts.md` | 21 個 `@register_tool` 工具 I/O schema 唯一權威 |
 | `v3-decisions.md` | v3 已拍板決策（13 項）+ 預算追蹤 + 個人 milestone |
-| `user-scenarios.md` | **Operator workflow** — Mark 在 admin 18 頁的 10 個使用情境（日 / 週 / 月 / 異常 / cold start） |
+| `user-scenarios.md` | **Operator workflow** — Mark 在 admin 23 頁的 10 個使用情境 |
 
-### 前端 / EventBus（v3 新增）
+### 前端 / EventBus
+
 | 檔案 | 用途 |
 |---|---|
-| `frontend.md` | **後台 web-admin/** 18 頁 wireframes、路由、Zustand、design tokens |
-| `frontend-public-pixel.md` | **公網 web-public/** Pixel 像素辦公室 UI、9 角色 sprite、動畫狀態機 |
-| `backend-eventbus.md` | EventBus 架構 + Event Schema + Admin/Masked Serializer + 14 個 event_type |
+| `frontend.md` | 後台 `web-admin/` 頁面 wireframes、路由、Zustand、design tokens |
+| `web-admin-page-designs.md` | **23 頁面視覺契約 SSOT** — layout slots / loading-empty-error / SSE / 紅漲綠跌雙重編碼 |
+| `frontend-public-pixel.md` | 公網 `web-public/` Pixel 像素辦公室 UI、9 角色 sprite、動畫狀態機 |
+| `backend-eventbus.md` | EventBus 架構 + Event Schema + Admin/Masked Serializer + 21 個 event_type |
 | `auth-and-mask.md` | Bearer token auth、Mask Spec 白名單、SITC 合規策略、部署拓樸 |
 
 ### 子系統規範
-- **`proposals/README.md`** — 策略改動提案（命名、frontmatter、WFA 驗證、merge 流程）
-- **`reviews/README.md`** — LLM 復盤輸出（五節點 schema、_index.json）
-- **`openspec/`** — OpenSpec 配置（搭配 `opsx:*` skills 使用）
+- `proposals/README.md` — 策略改動提案（命名、frontmatter、WFA 驗證、merge 流程）
+- `reviews/README.md` — LLM 復盤輸出（五節點 schema、`_index.json`）
+- `openspec/` — OpenSpec 配置（搭配 `opsx:*` skills 使用），`openspec/changes/archive/` 為 capability 級歷史
 
 ---
 
@@ -181,30 +191,40 @@ Agent 核心層（Claude Agent SDK + PreToolUse/PostToolUse Hooks 稽核）
 - 「LLM 該輸出什麼 JSON？」→ `docs/llm-decision-schema.md` §1–§3
 - 「Phase 5 復盤節點怎麼評分？」→ `docs/post-trade-review-rubric.md`
 - 「live trading 安全防線是什麼？」→ `docs/safety-and-simulation.md`
-- 「**後台**怎麼寫？」→ `docs/frontend.md`（web-admin/ 範圍）
-- 「**公網前台** pixel 辦公室？」→ `docs/frontend-public-pixel.md`
+- 「後台怎麼寫？」→ `docs/web-admin-page-designs.md`（視覺契約）+ `docs/frontend.md`
+- 「公網前台 pixel 辦公室？」→ `docs/frontend-public-pixel.md`
 - 「Backend 怎麼推 event 給前端？」→ `docs/backend-eventbus.md`
 - 「公網要 mask 哪些欄位？admin auth 怎麼設？」→ `docs/auth-and-mask.md`
 - 「`market_data_tool` 怎麼呼叫？」→ `docs/tools-contracts.md`
 - 「v3 已拍板決策 / 預算 / milestone？」→ `docs/v3-decisions.md`
 - 「台股市場細節（T+2、漲跌停、當沖稅）」→ `docs/design-zh-TW.md` §4.4.1
-- 「Mark 平常怎麼用這套系統？admin 18 頁怎麼串？」→ `docs/user-scenarios.md`
+- 「Mark 平常怎麼用這套系統？」→ `docs/user-scenarios.md`
+- 「目前哪些 capability 已 ship？」→ §5.2 或 `ls openspec/changes/archive/`
 - 「跑月度復盤？」→ `uv run ohmystock review --from <YYYY-MM-DD> --to <YYYY-MM-DD>`（先試 `--dry-run --json` 估 token / cost）
 
 ---
 
-## 8. 路線圖（簡）
+## 8. 路線圖
 
-| Phase | 範圍 | 預計完成 |
-|---|---|---|
-| 0 | Scaffold（環境、CLI 骨架、FastAPI、Shioaji+FinMind+Anthropic 三方連線、cost tracker） | 2026-05-12 |
-| 1 | 技術 / 籌碼面 Skills + 回測引擎 | 2026-05-26 |
-| 2 | Screener + 訊號偵測 + Phase 2B Swarm Input Assembler | 2026-06-16 |
-| 3 | LLM Decider + Confirm Gate + Trade Journal v3 | 2026-07-07 |
-| 3.5 | `OHMYSTOCK_AUTO_EXECUTE` 雙模式 + 9 條安全防線 | 2026-07-28 |
-| 4 | web-admin（18 頁）+ Bearer auth（2 週） | 2026-08-11 |
-| 4.5 | web-public pixel + Mask serializer + E2E 滲透測試（2 週，admin ship 後啟動） | 2026-08-25 |
-| 5 | LLM 復盤五節點 swarm + 提案 → WFA → 合併閉環（含模擬 1 週緩衝） | 2026-09-15 |
+狀態符號：✅ 已 ship / 🟡 主體完成、有 deferred 子項 / ⏳ 未開始
+
+| Phase | 範圍 | 預計完成 | 狀態 |
+|---|---|---|---|
+| 0 | Scaffold（環境、CLI 骨架、FastAPI、Shioaji+FinMind+Anthropic 三方連線、cost tracker） | 2026-05-12 | ✅ |
+| 1 | 技術 / 籌碼面 Skills + 回測引擎 | 2026-05-26 | ✅ |
+| 2 | Screener + 訊號偵測 + Phase 2B Swarm Input Assembler | 2026-06-16 | ✅ |
+| 3 | LLM Decider + Confirm Gate + Trade Journal v3 | 2026-07-07 | ✅ |
+| 3.5 | `OHMYSTOCK_AUTO_EXECUTE` 雙模式 + 9 條安全防線 | 2026-07-28 | ✅ |
+| 4 | web-admin（23 頁）+ Bearer auth | 2026-08-11 | ✅ |
+| 4.5 | web-public pixel + Mask serializer + E2E 滲透測試 | 2026-08-25 | 🟡（shell + mask ✅、pixel 辦公室 + 生產部署 ⏳） |
+| 5 | LLM 復盤五節點 swarm + 提案 → WFA → 合併閉環 | 2026-09-15 | 🟡（pipeline / proposals / WFA / validate / admin endpoints ✅、月度自動觸發 + reviews UI 強化 ⏳） |
+
+### 進度評估
+進度顯著超前原時程（今天 2026-05-18，原 Phase 4 預計 2026-08-11 完成）。剩餘未 ship 子項：
+- `web-public-pixel-office-mvp`（Canvas 2D + 9 角色 sprite + 動畫狀態機）
+- 月度復盤自動觸發（cron / scheduler）
+- EventBus 剩 7 個 unwired emitter（屬於各自 producing capability）
+- 生產部署（Cloudflare Tunnel / Vercel / 收窄 CORS / rate limit）
 
 ---
 

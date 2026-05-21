@@ -1,0 +1,47 @@
+{
+  "disclaimer": {
+    "text": "Educational demo of an AI agent system. NOT investment advice. All stock symbols (STK-A, STK-B, ...) are fictional and map to no real instrument. Past results, if any are shown, do not predict future performance."
+  },
+  "idle": {
+    "overlay": "Idle — waiting for market open 09:00 TPE"
+  },
+  "about": {
+    "title": "About ohMyStock",
+    "intro": "ohMyStock is an experimental AI trading agent for the Taiwan stock market — screening, entry, exit, and review are all driven by LLMs.",
+    "demo_note": "This public page is a live cartoon of what the backend LLM agents are doing. All stock symbols are replaced with fictional tokens (STK-A, STK-B, ...) and all price / position / P&L fields are removed from the SSE stream.",
+    "not_advice": "Nothing on this site constitutes investment advice. Any decision you make based on it is your own responsibility.",
+    "links": "Source code:",
+    "repo_label": "GitHub"
+  },
+  "agent_sheet": {
+    "title": "Agent info",
+    "state": "Current state",
+    "recent": "Recent events",
+    "total_today": "Events today",
+    "no_events": "No events yet",
+    "close": "Close"
+  },
+  "timeline": {
+    "title": "Activity timeline",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "empty": "No events yet — waiting for SSE"
+  },
+  "regions": {
+    "lobby": "Lobby",
+    "analysis": "Chart Lab",
+    "decision": "Decision Desk",
+    "library": "Library",
+    "lab": "Validation Lab",
+    "meeting": "Meeting Room"
+  },
+  "footer": {
+    "demo": "ohMyStock — open-source educational demo. Not investment advice.",
+    "about": "About"
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "zh_TW": "繁體中文"
+  }
+}

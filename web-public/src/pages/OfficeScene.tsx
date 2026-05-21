@@ -1,0 +1,110 @@
+/**
+ * The Canvas 2D pixel office page.
+ *
+ * Spec: openspec/changes/web-public-pixel-office-mvp/specs/web-public-pixel-office/spec.md
+ *       (Requirements: Office Scene Layout, Integer-Scale Pixel Rendering,
+ *        Idle Fallback Display, Agent Info Sheet)
+ */
+
+import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { startLoop } from '@/canvas/gameLoop'
+import { usePublicSSE } from '@/hooks/usePublicSSE'
+import { useSceneStore } from '@/stores/scene'
+import { AgentInfoSheet } from '@/components/AgentInfoSheet'
+import {
+  CANVAS_LOGICAL_H,
+  CANVAS_LOGICAL_W,
+  CSS_SCALE,
+  TILE_PX,
+  type Character,
+} from '@/types/public-event'
+import { GB_WALL } from '@/styles/palette'
+
+const IDLE_TIMEOUT_MS = 60_000
+
+export function OfficeScene() {
+  const { t } = useTranslation()
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [selected, setSelected] = useState<Character | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+  const [pageOpenedAt] = useState(() => Date.now())
+  const lastEventAt = useSceneStore((s) => s.lastEventAt)
+  const characters = useSceneStore((s) => s.characters)
+  const timeline = useSceneStore((s) => s.timeline)
+
+  usePublicSSE()
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const handle = startLoop({ canvas })
+    return () => handle.stop()
+  }, [])
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 5000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const idle =
+    lastEventAt === null
+      ? now - pageOpenedAt > IDLE_TIMEOUT_MS
+      : now - lastEventAt > IDLE_TIMEOUT_MS
+
+  function onCanvasClick(ev: React.MouseEvent<HTMLCanvasElement>): void {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const xLogical = ((ev.clientX - rect.left) * CANVAS_LOGICAL_W) / rect.width
+    const yLogical = ((ev.clientY - rect.top) * CANVAS_LOGICAL_H) / rect.height
+    const gx = Math.floor(xLogical / TILE_PX)
+    const gy = Math.floor(yLogical / TILE_PX)
+    const hit = characters.find((c) => c.pos.x === gx && c.pos.y === gy)
+    setSelected(hit ?? null)
+  }
+
+  return (
+    <section className="relative flex flex-col items-center">
+      <div
+        style={{
+          width: CANVAS_LOGICAL_W * CSS_SCALE,
+          height: CANVAS_LOGICAL_H * CSS_SCALE,
+        }}
+        className="relative"
+      >
+        <canvas
+          ref={canvasRef}
+          width={CANVAS_LOGICAL_W}
+          height={CANVAS_LOGICAL_H}
+          onClick={onCanvasClick}
+          data-testid="office-canvas"
+          style={{
+            imageRendering: 'pixelated',
+            transform: `scale(${CSS_SCALE})`,
+            transformOrigin: 'top left',
+            cursor: 'pointer',
+          }}
+        />
+        {idle && (
+          <div
+            data-testid="idle-overlay"
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            // GB_WALL with ~35% alpha (0x59 = 89/255). Palette-derived.
+            style={{ background: `${GB_WALL}59` }}
+          >
+            <p className="px-3 py-1 rounded bg-white text-sm font-mono">
+              {t('idle.overlay')}
+            </p>
+          </div>
+        )}
+      </div>
+      <AgentInfoSheet
+        open={selected !== null}
+        character={selected}
+        timeline={timeline}
+        onClose={() => setSelected(null)}
+      />
+    </section>
+  )
+}
