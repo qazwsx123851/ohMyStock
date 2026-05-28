@@ -1,8 +1,8 @@
-## ADDED Requirements
+﻿## ADDED Requirements
 
 ### Requirement: pattern_detected emitter — vcp_pivot sub-scorer
 
-`ohmystock.scoring.subscorers.vcp_pivot.vcp_pivot(ctx)` SHALL 在 sub-scorer 計算完成、`SubScoreResult` 的 `score > 0` 且 `evidence["pivot_price"] is not None` 時，發出一個 `pattern_detected` event。emit 透過 `emit_from_sync(event)` 完成，因 `vcp_pivot` 是 sync 函式。
+`ohmystock.scoring.subscorers.vcp_pivot.vcp_pivot(ctx)` SHALL 在 sub-scorer 計算完成、`SubScoreResult` 的 `score > 0` 且 `evidence["pivot_price"] is not None` 時，發出一個 `pattern_detected` event。emit 透過 `safe_emit_sync(event)` 完成，因 `vcp_pivot` 是 sync 函式。
 
 - `event.event_type == EventType.PATTERN_DETECTED`
 - `event.agent == Agent.PATTERN_ANALYST`
@@ -48,7 +48,7 @@
 - node 順序固定為 `["data_loader","attributor","aggregator","critic","proposer"]`。
 - `review_node_started` payload: `{"review_id": review_id, "node_name": <node>, "node_index": <0..4>}`。`node_index` SHALL 為 0-based。
 - `review_completed` payload: `{"review_id": review_id, "proposals_created_count": len(proposer_result.written_paths)}`。
-- emit 透過 `emit_from_sync(event)` 進行（`run_review` 是 sync）。
+- emit 透過 `safe_emit_sync(event)` 進行（`run_review` 是 sync）。
 - `dry_run is True` 路徑 SHALL **不**發任何 review event。
 
 #### Scenario: happy path 發 6 個 event
@@ -65,7 +65,7 @@
 
 ### Requirement: proposal_created emitter — write_proposal
 
-`ohmystock.proposal.writer.write_proposal(draft, proposals_dir)` SHALL 在 `target.write_text(...)` 成功完成、return `target` 之前 emit `proposal_created`。透過 `emit_from_sync(event)`。
+`ohmystock.proposal.writer.write_proposal(draft, proposals_dir)` SHALL 在 `target.write_text(...)` 成功完成、return `target` 之前 emit `proposal_created`。透過 `safe_emit_sync(event)`。
 
 - `event.event_type == EventType.PROPOSAL_CREATED`
 - `event.agent == Agent.PROPOSER`
@@ -81,7 +81,7 @@
 
 ### Requirement: wfa_started / wfa_passed / wfa_failed emitters — WFA validator
 
-`ohmystock.validation.wfa.run_validation(...)` SHALL 在三個時點 emit event，透過 `emit_from_sync(event)`：
+`ohmystock.validation.wfa.run_validation(...)` SHALL 在三個時點 emit event，透過 `safe_emit_sync(event)`：
 
 1. `raw_windows = _split_windows(...)` 成功之後、進入 `for window in raw_windows` 之前 → `Event(event_type=EventType.WFA_STARTED, agent=Agent.VALIDATOR, payload={"proposal_id": proposal_id})`。
 2. `_transition_after_verdict(...)` 完成、且 `verdict == "pass"` → `Event(event_type=EventType.WFA_PASSED, agent=Agent.VALIDATOR, payload={"proposal_id": proposal_id})`。
@@ -106,29 +106,3 @@
 - **WHEN** `run_validation(proposal_path, universe=[], ...)` raise `WfaValidationError("invalid_universe: ...")`
 - **THEN** queue 0 event
 
----
-
-### Requirement: emit_from_sync helper — sync-context safe emit
-
-`ohmystock.eventbus` package SHALL 公開 `emit_from_sync(event: Event) -> None`：
-
-- 偵測 current thread 是否有 running asyncio event loop（`asyncio.get_running_loop()` 不 raise）：
-  - 有 → `loop.create_task(safe_emit(event))`（fire-and-forget；不 await）。
-  - 無（純 sync caller，例 CLI / sub-scorer） → `asyncio.run(safe_emit(event))`（阻塞直到 emit 完成）。
-- 任何例外 SHALL 被 swallow（同 `safe_emit` 的 BaseException-aware 行為）。
-- caller SHALL **不**期待 emit 完成的 guarantee；emit 是 best-effort。
-
-#### Scenario: sync context 同步發 event
-- **GIVEN** 純 sync 函式 + subscribe queue 經 helper
-- **WHEN** call `emit_from_sync(Event(...))`
-- **THEN** queue.get_nowait() 立即拿到該 event
-
-#### Scenario: async context fire-and-forget
-- **GIVEN** asyncio context + subscribe queue
-- **WHEN** call `emit_from_sync(Event(...))` 後立即 `await asyncio.sleep(0)`（讓 task scheduler 跑）
-- **THEN** queue 收到該 event
-
-#### Scenario: emit 例外 SHALL 不影響 caller
-- **GIVEN** monkeypatch `safe_emit` 拋 `RuntimeError`
-- **WHEN** call `emit_from_sync(Event(...))`
-- **THEN** call 正常 return、無例外

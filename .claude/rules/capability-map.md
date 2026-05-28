@@ -18,6 +18,7 @@
 | Exit Engine v0（daily, full-position close on stop_loss/T1/time_stop） | `archive/2026-05-02-exit-engine-v0` + `src/ohmystock/exit_engine/evaluator.py` |
 | Auto-execute Phase 3.5（5 hard breakers + sizing clamp） | `archive/2026-05-02-auto-execute-toggle-and-breakers` + `src/ohmystock/safety/auto_execute.py` + `OHMYSTOCK_AUTO_EXECUTE_*` 於 `src/ohmystock/config.py` |
 | EventBus emitters v0（9 of 21 event_type wired + AdminEventSerializer） | `archive/2026-05-02-eventbus-emitters-v0` + `src/ohmystock/eventbus/` |
+| EventBus emitters v1（剩餘 8 emitters wired + 5 swarm mask whitelist；21/21 完成） | `archive/2026-05-28-eventbus-emitters-v1` + `src/ohmystock/eventbus/serializers.py` + 5 producer 點 |
 | Server action endpoints v0（6 admin write endpoints + envelope） | `archive/2026-05-02-server-action-endpoints-v0` + `src/ohmystock/api/routes/` |
 | Read-side admin endpoints v0（journal/positions/stats） | `archive/2026-05-03-read-side-admin-endpoints-v0` + `src/ohmystock/api/routes/{journal,positions,stats}.py` |
 | web-admin Bearer auth gate（`OHMYSTOCK_ADMIN_TOKEN` ≥ 32 chars） | `archive/2026-05-03-web-admin-bearer-auth-v0` + `src/ohmystock/api/auth.py` |
