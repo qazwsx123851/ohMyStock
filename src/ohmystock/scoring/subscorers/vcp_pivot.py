@@ -10,6 +10,7 @@ Spec: openspec/changes/phase-2b-sepa-subscorers/specs/phase-2b-scoring-engine/sp
 
 from __future__ import annotations
 
+from ohmystock.eventbus import Agent, Event, EventType, safe_emit_sync
 from ohmystock.scoring.context import ScoringContext
 from ohmystock.scoring.models import SubScoreResult
 from ohmystock.scoring.registry import register_subscorer
@@ -118,6 +119,19 @@ def vcp_pivot(ctx: ScoringContext) -> SubScoreResult:
         vcp_quality = "none"
         pivot_price = None
         points = 0.0
+
+    if points > 0 and pivot_price is not None:
+        safe_emit_sync(
+            Event(
+                event_type=EventType.PATTERN_DETECTED,
+                agent=Agent.PATTERN_ANALYST,
+                payload={
+                    "symbol": ctx.symbol,
+                    "pattern": "VCP",
+                    "score": float(points),
+                },
+            )
+        )
 
     return SubScoreResult(
         name="vcp_pivot",

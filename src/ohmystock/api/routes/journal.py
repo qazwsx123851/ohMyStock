@@ -33,6 +33,26 @@ from ohmystock.api.routes._envelope import (
     to_error,
     to_success,
 )
+from ohmystock.eventbus import Agent, Event, EventType, safe_emit_sync
+
+
+def _build_query_repr(
+    *,
+    kind: str | None,
+    symbol: str | None,
+    date_from: str | None,
+    date_to: str | None,
+) -> str:
+    parts: list[str] = []
+    if kind is not None:
+        parts.append(f"kind={kind}")
+    if symbol is not None:
+        parts.append(f"symbol={symbol}")
+    if date_from is not None:
+        parts.append(f"date_from={date_from}")
+    if date_to is not None:
+        parts.append(f"date_to={date_to}")
+    return "&".join(parts) if parts else "all"
 
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -210,6 +230,22 @@ def get_journal_rows(
         status, body = map_exception_to_envelope(exc)
         return JSONResponse(status_code=status, content=body)
 
+    safe_emit_sync(
+        Event(
+            event_type=EventType.JOURNAL_QUERIED,
+            agent=Agent.LIBRARIAN,
+            payload={
+                "query": _build_query_repr(
+                    kind=kind_v,
+                    symbol=symbol,
+                    date_from=date_from_v,
+                    date_to=date_to_v,
+                ),
+                "result_count": len(items),
+            },
+        )
+    )
+
     return JSONResponse(
         status_code=200,
         content=to_success(data.model_dump(mode="json")),
@@ -250,6 +286,17 @@ def get_decision_detail(
     except Exception as exc:  # noqa: BLE001
         status, body = map_exception_to_envelope(exc)
         return JSONResponse(status_code=status, content=body)
+
+    safe_emit_sync(
+        Event(
+            event_type=EventType.JOURNAL_QUERIED,
+            agent=Agent.LIBRARIAN,
+            payload={
+                "query": f"decision_id={decision_id}",
+                "result_count": len(items),
+            },
+        )
+    )
 
     return JSONResponse(
         status_code=200,

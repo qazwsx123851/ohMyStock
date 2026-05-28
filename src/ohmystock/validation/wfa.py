@@ -29,6 +29,7 @@ from typing import Any, Callable, Literal
 from ohmystock.backtest.engine import run_backtest
 from ohmystock.backtest.strategy.registry import available_strategies
 from ohmystock.data.sources.base import BarRow
+from ohmystock.eventbus import Agent, Event, EventType, safe_emit_sync
 from ohmystock.proposal import parse_proposal, transition_proposal
 
 
@@ -540,6 +541,14 @@ def run_validation(
 
     raw_windows = _split_windows(period, wfa_windows, in_sample_ratio)
 
+    safe_emit_sync(
+        Event(
+            event_type=EventType.WFA_STARTED,
+            agent=Agent.VALIDATOR,
+            payload={"proposal_id": proposal_id},
+        )
+    )
+
     all_bars: dict[str, list[BarRow]] = {}
     for sym in universe:
         bars = list(market_data_loader(sym, period["from"], period["to"]))
@@ -625,6 +634,26 @@ def run_validation(
         verdict=verdict,
         failures=failures,
     )
+
+    if verdict == "pass":
+        safe_emit_sync(
+            Event(
+                event_type=EventType.WFA_PASSED,
+                agent=Agent.VALIDATOR,
+                payload={"proposal_id": proposal_id},
+            )
+        )
+    else:
+        safe_emit_sync(
+            Event(
+                event_type=EventType.WFA_FAILED,
+                agent=Agent.VALIDATOR,
+                payload={
+                    "proposal_id": proposal_id,
+                    "failure_reason": ";".join(failures),
+                },
+            )
+        )
 
     if dry_run:
         return report

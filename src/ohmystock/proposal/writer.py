@@ -24,6 +24,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from ohmystock.eventbus import Agent, Event, EventType, safe_emit_sync
 from ohmystock.proposal.schema import ProposalDraft
 
 
@@ -79,6 +80,17 @@ def write_proposal(draft: ProposalDraft, proposals_dir: Path) -> Path:
     proposal_id = target.stem
     body = render_markdown(draft, proposal_id=proposal_id)
     target.write_text(body, encoding="utf-8", newline="\n")
+    safe_emit_sync(
+        Event(
+            event_type=EventType.PROPOSAL_CREATED,
+            agent=Agent.PROPOSER,
+            payload={
+                "proposal_id": proposal_id,
+                "priority": draft.priority,
+                "target_section": draft.target_section,
+            },
+        )
+    )
     return target
 
 

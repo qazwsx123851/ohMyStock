@@ -16,6 +16,7 @@ from typing import Literal
 from anthropic import Anthropic
 
 from ohmystock.config import Settings
+from ohmystock.eventbus import Agent, Event, EventType, safe_emit_sync
 from ohmystock.review.index import upsert_index_entry
 from ohmystock.review.llm_client import AnthropicReviewLLM, ReviewLLM
 from ohmystock.review.models import (
@@ -33,6 +34,30 @@ from ohmystock.review.nodes.proposer import ProposerResult, run_proposer
 
 _TPE = timezone(timedelta(hours=8))
 ReviewKind = Literal["manual"]
+
+_NODE_ORDER: tuple[str, ...] = (
+    "data_loader",
+    "attributor",
+    "aggregator",
+    "critic",
+    "proposer",
+)
+
+
+def _emit_node_started(review_id: str, node_name: str, dry_run: bool) -> None:
+    if dry_run:
+        return
+    safe_emit_sync(
+        Event(
+            event_type=EventType.REVIEW_NODE_STARTED,
+            agent=Agent.REVIEWER,
+            payload={
+                "review_id": review_id,
+                "node_name": node_name,
+                "node_index": _NODE_ORDER.index(node_name),
+            },
+        )
+    )
 
 
 class ReviewAlreadyExistsError(Exception):
@@ -118,6 +143,7 @@ def run_review(
     factory = llm_factory or _default_llm_factory()
     timestamp = now or datetime.now(_TPE)
 
+    _emit_node_started(review_id, "data_loader", dry_run)
     data_output = run_data_loader(
         period_from,
         period_to,
@@ -128,6 +154,7 @@ def run_review(
     if not dry_run:
         _write_json(files.data_json, data_output.model_dump(mode="json", by_alias=True))
 
+    _emit_node_started(review_id, "attributor", dry_run)
     attributor_llm = factory("attributor")
     attribution_output = run_attributor(
         data_output,
@@ -141,10 +168,12 @@ def run_review(
             files.attribution_json, attribution_output.model_dump(mode="json")
         )
 
+    _emit_node_started(review_id, "aggregator", dry_run)
     metrics_output = run_aggregator(data_output, attribution_output)
     if not dry_run:
         _write_json(files.metrics_json, metrics_output.model_dump(mode="json"))
 
+    _emit_node_started(review_id, "critic", dry_run)
     critic_llm = factory("critic")
     critique_md = run_critic(
         metrics_output,
@@ -157,6 +186,7 @@ def run_review(
     if not dry_run:
         files.critique_md.write_text(critique_md, encoding="utf-8", newline="\n")
 
+    _emit_node_started(review_id, "proposer", dry_run)
     proposer_llm = factory("proposer")
     proposer_result = run_proposer(
         critique_md,
@@ -212,6 +242,16 @@ def run_review(
                 proposals_created=proposals_created,
                 completed_at=completed_at,
             ),
+        )
+        safe_emit_sync(
+            Event(
+                event_type=EventType.REVIEW_COMPLETED,
+                agent=Agent.REVIEWER,
+                payload={
+                    "review_id": review_id,
+                    "proposals_created_count": proposals_created,
+                },
+            )
         )
 
     return ReviewResult(

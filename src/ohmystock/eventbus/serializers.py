@@ -57,6 +57,11 @@ PUBLIC_WHITELIST: dict[str, set[str]] = {
     "wfa_passed":          {"proposal_id"},
     "wfa_failed":          {"proposal_id"},  # NOT failure_reason — leaks strategy
     "risk_off_triggered":  {"reason_category", "severity"},
+    "swarm_run_started":   {"run_id", "preset", "nodes"},
+    "swarm_run_completed": {"run_id", "preset", "elapsed_ms"},
+    "swarm_run_failed":    {"run_id", "preset"},
+    "swarm_node_started":  {"run_id", "preset", "node"},
+    "swarm_node_completed": {"run_id", "preset", "node", "elapsed_ms"},
 }
 
 # Hard fail-safe: anything in this set is popped from the public payload AFTER

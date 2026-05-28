@@ -113,7 +113,7 @@ class Event:
     timestamp: datetime = field(default_factory=lambda: datetime.now(TPE))
 ```
 
-> **v0 wiring status (eventbus-emitters-v0)**: 9 of the 16 event_types below are emitted by already-shipped services (`screener_started`, `screener_completed`, `decider_thinking`, `decision_made`, `awaiting_confirm`, `order_sent`, `journal_written`, `risk_off_triggered`). The 7 deferred — `pattern_detected`, `journal_queried`, `review_node_started`, `review_completed`, `proposal_created`, `wfa_started`, `wfa_passed`, `wfa_failed` — wait for their respective producers (pattern detector, FTS5 query path, Phase 5 reviewer / proposer / WFA validator) to ship.
+> **Wiring status**: 21 of 21 event_types emitted as of `eventbus-emitters-v1` (2026-05-28). The 16 original event_types listed below plus 5 swarm event_types (`swarm_run_started`, `swarm_run_completed`, `swarm_run_failed`, `swarm_node_started`, `swarm_node_completed`) wired in by `admin-swarm-endpoints-and-pages`.
 
 ### 3.2 EVENT_TYPES 清單（v1 範圍 = 14 項）
 
