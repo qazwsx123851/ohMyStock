@@ -45,7 +45,12 @@ def get_connection() -> sqlite3.Connection:
     _probe_fts5()
     path = Path(_get_settings().ohmystock_db_path).expanduser()
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(path))
+    # check_same_thread=False: FastAPI runs sync `get_db` dependencies in a
+    # threadpool, so the connection may be opened and closed on different
+    # worker threads. Each request still gets its own connection (no sharing),
+    # so relaxing the thread guard is safe and avoids sqlite3.ProgrammingError
+    # under concurrent admin requests.
+    conn = sqlite3.connect(str(path), check_same_thread=False)
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA foreign_keys = ON")
     return conn

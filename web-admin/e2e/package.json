@@ -1,0 +1,8 @@
+{
+  "name": "web-admin-e2e",
+  "private": true,
+  "description": "Isolated Playwright install so the host pnpm node_modules stays untouched (pnpm is not on PATH).",
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

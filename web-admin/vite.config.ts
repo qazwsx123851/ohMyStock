@@ -20,4 +20,15 @@ export default defineConfig({
       },
     },
   },
+  // E2E (Playwright) runs `vite preview`; mirror the dev proxy so /api reaches
+  // the uvicorn backend started by playwright.config.ts webServer.
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: false,
+      },
+    },
+  },
 })

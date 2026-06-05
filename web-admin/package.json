@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest",
+    "e2e": "cd e2e && npx playwright test",
+    "e2e:install": "cd e2e && npm install && npx playwright install chromium",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
