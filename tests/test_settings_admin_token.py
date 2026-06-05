@@ -13,6 +13,7 @@ from ohmystock.config import Settings
 @pytest.fixture(autouse=True)
 def _isolate_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("OHMYSTOCK_ADMIN_TOKEN", raising=False)
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
 
 
 def test_admin_token_defaults_to_none_when_unset() -> None:

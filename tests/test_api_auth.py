@@ -38,6 +38,7 @@ WRONG_TOKEN = "wrong-token-32-characters-or-more-zz"  # 36 chars, well-formed bu
 
 def test_validate_admin_token_rejects_none(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("OHMYSTOCK_ADMIN_TOKEN", raising=False)
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
     settings = Settings()
     assert settings.ohmystock_admin_token is None
     with pytest.raises(RuntimeError) as exc_info:
@@ -82,6 +83,7 @@ def test_create_app_refuses_to_start_without_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("OHMYSTOCK_ADMIN_TOKEN", raising=False)
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
     with pytest.raises(RuntimeError) as exc_info:
         create_app()
     msg = str(exc_info.value)
