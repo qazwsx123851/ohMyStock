@@ -894,3 +894,85 @@ describe('SSE invalidate', () => {
     expect(adminCalls.length).toBe(0)
   })
 })
+
+// ===========================================================================
+// CG-B2 — reject reason dialog
+// ===========================================================================
+
+describe('Reject dialog', () => {
+  it('clicking ✗ 拒絕 opens dialog; submitting POSTs the entered reason', async () => {
+    const user = userEvent.setup()
+    const fetchSpy = setupFetch({
+      stats: { kind: 'ok', body: { ok: true, data: STATS_OK } },
+      positions: {
+        kind: 'ok',
+        body: { ok: true, data: { items: [], asof_iso: '...', count: 0 } },
+      },
+      pending: {
+        kind: 'ok',
+        body: {
+          ok: true,
+          data: {
+            items: [pendingItem({ decision_id: 'd1', symbol: '2330' })],
+            timeout_minutes: 30,
+          },
+        },
+      },
+      reject: {
+        kind: 'ok',
+        body: { ok: true, data: { decision_id: 'd1', reject_row_id: 1 } },
+      },
+    })
+
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /拒絕 2330/ }))
+
+    const textarea = await screen.findByLabelText('拒絕原因')
+    await user.type(textarea, '前年被套過')
+    fetchSpy.mockClear()
+    await user.click(screen.getByRole('button', { name: '確認拒絕' }))
+
+    await waitFor(() => {
+      const calls = fetchSpy.mock.calls.filter((c) =>
+        String(c[0]).includes('/api/admin/confirm-gate/reject'),
+      )
+      expect(calls.length).toBe(1)
+    })
+    const call = fetchSpy.mock.calls.find((c) =>
+      String(c[0]).includes('/api/admin/confirm-gate/reject'),
+    )!
+    const init = call[1] as RequestInit
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(init.body as string)).toEqual({
+      decision_id: 'd1',
+      user: 'mark',
+      reason: '前年被套過',
+    })
+  })
+
+  it('確認拒絕 is disabled when reason is empty', async () => {
+    const user = userEvent.setup()
+    setupFetch({
+      stats: { kind: 'ok', body: { ok: true, data: STATS_OK } },
+      positions: {
+        kind: 'ok',
+        body: { ok: true, data: { items: [], asof_iso: '...', count: 0 } },
+      },
+      pending: {
+        kind: 'ok',
+        body: {
+          ok: true,
+          data: {
+            items: [pendingItem({ decision_id: 'd1', symbol: '2330' })],
+            timeout_minutes: 30,
+          },
+        },
+      },
+    })
+
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /拒絕 2330/ }))
+    const submitBtn = await screen.findByRole('button', { name: '確認拒絕' })
+    expect(submitBtn).toBeDisabled()
+  })
+})

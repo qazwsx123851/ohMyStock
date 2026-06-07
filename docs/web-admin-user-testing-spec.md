@@ -34,7 +34,7 @@
 | CG-05 | 待確認佇列載入/空/倒數 | /paper | P1 | [可測] |
 | CG-06 | SSE 即時刷新 | /paper | P2 | [可測] |
 | CG-B1 | confirm 二次輸入張數 | /paper | P1 | [BLOCKED][偏離] |
-| CG-B2 | reject 自訂原因 | /paper | P1 | [BLOCKED][偏離] |
+| CG-B2 | reject 自訂原因 | /paper | P1 | [可測]（已實作） |
 | **Tier 1 — 提案狀態機** | | | | |
 | PR-01 | pending → validating | /proposals/:slug | P1 | [可測] |
 | PR-02 | validate（dry-run/pass/fail） | /proposals/:slug | P0 | [可測] |
@@ -89,7 +89,7 @@
 |---|---|---|---|---|
 | D1 | Confirm Gate 路由 | §2 在 `/decisions` | 內嵌在 `/paper`（PaperOverviewPage），無 `/decisions` 路由 | 改文件 |
 | D2 | confirm 二次輸入張數 | §2「觸發 ConfirmDialog 二次輸入張數」 | 直接 mutate，qty 由後端 sizing 算，無 dialog | 補實作 or 改文件（CG-B1）|
-| D3 | reject 自訂原因 | §2「寫進 reject reason」 | reason 寫死 `user_reject`，無輸入框 | 補實作（CG-B2）|
+| D3 | reject 自訂原因 | §2「寫進 reject reason」 | 已補 reject reason dialog（CG-B2 done） | 已實作 |
 | D4 | Dashboard risk gate 三色燈 | §1/§8 風險面板 | 不存在（只有 4 KPI 卡 + LiveFeed） | 補實作（DB-B1）|
 | D5 | Dashboard 月度熔斷 banner | §1/§8 紅色 banner | 不存在 | 補實作（DB-B2）|
 | D6 | Dashboard 成本進度條 | §1「≥80% 橘色進度條」 | 只有單一數字 | 補實作（DB-B3）|
@@ -226,14 +226,14 @@
   **When** （實作後）跳 ConfirmDialog 顯示後端建議張數、可手動覆寫
   **Then** 送出的 body 帶使用者輸入的 qty，後端以該 qty 下單（仍受 sizing clamp 防線約束）
 
-### CG-B2 reject 自訂原因｜`P1`｜/paper｜[BLOCKED][偏離]（D3）
+### CG-B2 reject 自訂原因｜`P1`｜/paper｜[可測]（D3，已實作）
 
-> **BLOCKED**：目前 reason 寫死 `user_reject`。以下為補實作後的驗收標準。
-
-- **Given** 點 `[拒絕]`
-  **When** （實作後）跳輸入框讓 Mark 寫原因（例如「前年在這檔被套過」）
-  **Then** `reason` 帶使用者文字，journal `reject_reason` 落該文字
-  **And** 空白 reason 時前端擋下、不送出
+- **Given** 點卡片 `[✗ 拒絕]`（或鍵盤 n）
+  **When** 開啟 reject dialog、輸入非空原因、點「確認拒絕」
+  **Then** 送 `reject` body `{ decision_id, user:"mark", reason }` 帶該文字，journal `reject_reason` 落該文字，成功後 dialog 關閉、卡片消失
+- **Given** dialog 開啟、原因空白
+  **When** 檢視「確認拒絕」按鈕
+  **Then** 按鈕 disabled、不送出
 
 ---
 

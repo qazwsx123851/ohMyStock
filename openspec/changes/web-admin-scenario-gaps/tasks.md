@@ -26,9 +26,9 @@
 
 ## 3. CG-B2 reject 自訂原因輸入（P1）
 
-- [ ] 3.1 前端：PaperOverviewPage reject 改開 dialog 收 reason、移除寫死 `user_reject`、空白前端擋下
-- [ ] 3.2 前端：Vitest 覆蓋輸入原因送出 + 空白擋下
-- [ ] 3.3 文件：CG-B2 改 [可測]
+- [x] 3.1 前端：PaperOverviewPage reject 改開 dialog 收 reason、移除寫死 `user_reject`、空白前端擋下
+- [x] 3.2 前端：Vitest 覆蓋輸入原因送出 + 空白擋下
+- [x] 3.3 文件：CG-B2 改 [可測]
 
 ## 4. CG-B1 confirm 二次輸入張數（P1）
 

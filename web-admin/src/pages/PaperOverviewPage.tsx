@@ -28,6 +28,14 @@ import { KpiCard } from '@/components/kpi-card'
 import { DataTable, type DataTableColumn } from '@/components/data-table'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
 dayjs.extend(relativeTime)
@@ -252,6 +260,10 @@ const POSITIONS_COLUMNS: DataTableColumn<PaperPositionItem>[] = [
 export function PaperOverviewPage() {
   const queryClient = useQueryClient()
 
+  // CG-B2: reject reason dialog state (reason is user-entered, not hard-coded).
+  const [rejectTarget, setRejectTarget] = React.useState<string | null>(null)
+  const [rejectReason, setRejectReason] = React.useState('')
+
   // SSE entry point on the /paper route. Layout/DashboardPage do not subscribe
   // when this route is mounted, so this page owns the single subscription.
   useAdminEvents()
@@ -290,18 +302,23 @@ export function PaperOverviewPage() {
   })
 
   const rejectM = useMutation({
-    // Backend RejectRequest requires `reason` (>=1 char). Spec body shape was
-    // `{decision_id, user}`; we add `reason: 'user_reject'` so the request
-    // validates server-side. Spec captured this gap as an amendment.
-    mutationFn: (decision_id: string) =>
+    // CG-B2: reason is collected from the user via the reject dialog (no longer
+    // hard-coded). Backend RejectRequest requires a non-empty `reason`.
+    mutationFn: ({
+      decision_id,
+      reason,
+    }: {
+      decision_id: string
+      reason: string
+    }) =>
       apiFetch('/api/admin/confirm-gate/reject', {
         method: 'POST',
-        body: JSON.stringify({
-          decision_id,
-          user: 'mark',
-          reason: 'user_reject',
-        }),
+        body: JSON.stringify({ decision_id, user: 'mark', reason }),
       }),
+    onSuccess: () => {
+      setRejectTarget(null)
+      setRejectReason('')
+    },
     onSettled: invalidateAll,
   })
 
@@ -318,10 +335,10 @@ export function PaperOverviewPage() {
     (decision_id: string) => confirmM.mutate(decision_id),
     [confirmM],
   )
-  const onReject = React.useCallback(
-    (decision_id: string) => rejectM.mutate(decision_id),
-    [rejectM],
-  )
+  const onReject = React.useCallback((decision_id: string) => {
+    setRejectReason('')
+    setRejectTarget(decision_id)
+  }, [])
   const onSweep = React.useCallback(() => {
     if (!window.confirm('確定要 sweep 所有過期的待確認單？')) return
     sweepM.mutate()
@@ -558,6 +575,60 @@ export function PaperOverviewPage() {
           )}
         </section>
       </div>
+
+      <Dialog
+        open={rejectTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setRejectTarget(null)
+            setRejectReason('')
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>拒絕決策</DialogTitle>
+            <DialogDescription>
+              輸入拒絕原因後送出（會寫入 journal）。
+            </DialogDescription>
+          </DialogHeader>
+          <label className="block space-y-1 text-sm">
+            <span className="text-muted-foreground">拒絕原因（必填）</span>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={3}
+              placeholder="例：這檔我前年被套過，先觀望"
+              aria-label="拒絕原因"
+              className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </label>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setRejectTarget(null)
+                setRejectReason('')
+              }}
+              disabled={rejectM.isPending}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                const reason = rejectReason.trim()
+                if (!rejectTarget || !reason) return
+                rejectM.mutate({ decision_id: rejectTarget, reason })
+              }}
+              disabled={rejectM.isPending || rejectReason.trim().length === 0}
+            >
+              確認拒絕
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
