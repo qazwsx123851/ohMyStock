@@ -27,6 +27,11 @@ from typing import Literal, Protocol
 from ohmystock.eventbus import Agent, Event, EventType, safe_emit_sync
 from ohmystock.journal import emit_journal_written
 from ohmystock.paper.broker import BrokerError, Fill, PaperBroker
+from ohmystock.safety.sizing_clamp import (
+    clamp_to_conservative,
+    exceeds_deviation,
+    exceeds_notional_limit,
+)
 
 
 _TPE_TZ = timezone(timedelta(hours=8))
@@ -58,6 +63,7 @@ _ErrorCode = Literal[
     "not_pending",
     "payload_invalid",
     "broker_failed",
+    "qty_exceeds_notional_limit",
 ]
 
 
@@ -70,10 +76,14 @@ class ConfirmGateError(Exception):
         message: str,
         *,
         cause: Exception | None = None,
+        extra: dict | None = None,
     ) -> None:
         super().__init__(message)
         self.code: _ErrorCode = code
         self.cause: Exception | None = cause
+        # Optional structured fields surfaced in the error envelope (e.g. the
+        # allowed notional cap for qty_exceeds_notional_limit).
+        self.extra: dict = extra or {}
 
 
 @dataclass(frozen=True)
@@ -81,6 +91,7 @@ class ConfirmResult:
     decision_id: str
     fill: Fill
     qty: int
+    clamped: bool = False
 
 
 @dataclass(frozen=True)
@@ -113,6 +124,9 @@ def confirm(
     default_capital_twd: int,
     user: str,
     auto_executed: bool = False,
+    override_qty: int | None = None,
+    max_notional_pct: float = 0.25,
+    max_sizing_deviation: float = 0.30,
     clock: Clock = system_clock,
 ) -> ConfirmResult:
     """Promote a pending_confirm entry to confirmed via the paper broker.
@@ -121,6 +135,14 @@ def confirm(
     ``auto_executed=True`` marks the row as the auto-execute path
     (``ohmystock.safety.auto_execute.try_auto_execute``); breakers must have
     been checked by that caller before invoking this with ``True``.
+
+    ``override_qty`` (human path) lets the operator overwrite the system-sized
+    quantity. It MUST still clear the two sizing defenses (shared with
+    auto-execute, see ``sizing_clamp``): a notional above ``max_notional_pct``
+    of capital is refused (``qty_exceeds_notional_limit``); a value deviating
+    from the system formula by more than ``max_sizing_deviation`` is clamped to
+    the more conservative qty and ``ConfirmResult.clamped`` is set. When
+    ``override_qty`` is ``None`` the behaviour is unchanged (system sizing).
     """
 
     _begin_immediate(conn)
@@ -151,7 +173,15 @@ def confirm(
                 f"atr_14_pct: {exc}",
             ) from exc
 
-        qty = _compute_qty(default_capital_twd, sizing_pct, current_price)
+        system_qty = _compute_qty(default_capital_twd, sizing_pct, current_price)
+        qty, clamped = _resolve_qty(
+            system_qty=system_qty,
+            override_qty=override_qty,
+            current_price=current_price,
+            equity_twd=default_capital_twd,
+            max_notional_pct=max_notional_pct,
+            max_sizing_deviation=max_sizing_deviation,
+        )
 
         try:
             fill = broker.submit_market_order(
@@ -208,7 +238,9 @@ def confirm(
         )
     )
 
-    return ConfirmResult(decision_id=decision_id, fill=fill, qty=qty)
+    return ConfirmResult(
+        decision_id=decision_id, fill=fill, qty=qty, clamped=clamped
+    )
 
 
 def _compute_qty(
@@ -222,6 +254,55 @@ def _compute_qty(
     raw_shares = notional / current_price
     lots = math.floor(raw_shares / _LOT_SIZE)
     return max(_LOT_SIZE, lots * _LOT_SIZE)
+
+
+def _resolve_qty(
+    *,
+    system_qty: int,
+    override_qty: int | None,
+    current_price: float,
+    equity_twd: float,
+    max_notional_pct: float,
+    max_sizing_deviation: float,
+) -> tuple[int, bool]:
+    """Resolve the final order qty, applying the two sizing defenses to a
+    human ``override_qty``. Returns ``(qty, clamped)``.
+
+    No override → system qty, never clamped. Override over the notional cap →
+    raise ``qty_exceeds_notional_limit`` (hard界). Override within the cap but
+    deviating from the formula by > ``max_sizing_deviation`` → clamp to the
+    more conservative qty (soft界, ``clamped=True``).
+    """
+    if override_qty is None:
+        return system_qty, False
+
+    if override_qty <= 0:
+        raise ConfirmGateError(
+            "payload_invalid",
+            f"override_qty must be a positive number of shares, got {override_qty}",
+        )
+
+    if exceeds_notional_limit(
+        override_qty, current_price, equity_twd, max_notional_pct
+    ):
+        max_notional = equity_twd * max_notional_pct
+        raise ConfirmGateError(
+            "qty_exceeds_notional_limit",
+            (
+                f"override_qty notional {override_qty * current_price:.0f} TWD "
+                f"exceeds the {max_notional_pct:.0%} cap ({max_notional:.0f} TWD)"
+            ),
+            extra={
+                "max_notional_twd": max_notional,
+                "max_notional_pct": max_notional_pct,
+            },
+        )
+
+    if exceeds_deviation(override_qty, system_qty, max_sizing_deviation):
+        clamped_qty = int(clamp_to_conservative(override_qty, system_qty))
+        return clamped_qty, clamped_qty != override_qty
+
+    return override_qty, False
 
 
 # ---------------------------------------------------------------------------

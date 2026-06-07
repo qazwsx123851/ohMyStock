@@ -21,11 +21,15 @@ Spec: openspec/changes/web-admin-settings-page/specs/admin-settings-endpoint/spe
 from __future__ import annotations
 
 import json
+import sqlite3
+from collections.abc import Iterator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from ohmystock.api.app import create_app
+from ohmystock.api.routes._deps import get_db
+from ohmystock.journal.schema import init_schema
 from tests.conftest import VALID_ADMIN_TOKEN
 
 
@@ -38,15 +42,35 @@ pytestmark = pytest.mark.asyncio
 
 
 @pytest.fixture()
-def client_factory():
+def db_conn() -> Iterator[sqlite3.Connection]:
+    """In-memory journal DB so the settings budget block reads a deterministic
+    (empty by default) ``llm_costs`` table instead of the real on-disk DB."""
+
+    c = sqlite3.connect(":memory:", check_same_thread=False)
+    init_schema(c)
+    try:
+        yield c
+    finally:
+        c.close()
+
+
+@pytest.fixture()
+def client_factory(db_conn: sqlite3.Connection):
     """Return a builder that yields an AsyncClient bound to a fresh app.
 
     Per-test factory so individual tests can override env vars via
     ``monkeypatch.setenv`` *before* ``create_app()`` reads ``Settings()``.
+    ``get_db`` is overridden to the in-memory ``db_conn`` so the budget block
+    is deterministic and no real DB file is touched.
     """
 
     def build(*, headers: dict[str, str] | None = None) -> AsyncClient:
         app = create_app()
+
+        def _override_get_db() -> Iterator[sqlite3.Connection]:
+            yield db_conn
+
+        app.dependency_overrides[get_db] = _override_get_db
         transport = ASGITransport(app=app)
         return AsyncClient(
             transport=transport,
@@ -113,6 +137,7 @@ async def test_default_settings_all_four_sections(
         "safety",
         "breakers",
         "chat",
+        "budget",
     }
     assert data["api_keys"] == {
         "anthropic": False,
@@ -297,3 +322,110 @@ async def test_put_returns_405(client_factory) -> None:
             headers={"Content-Type": "application/json"},
         )
     assert r.status_code == 405
+
+
+# ---------------------------------------------------------------------------
+# budget block (ST-B2)
+# ---------------------------------------------------------------------------
+
+
+async def test_budget_block_empty(
+    client_factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OHMYSTOCK_MONTHLY_BUDGET_USD", "100")
+    async with client_factory() as c:
+        r = await c.get("/api/admin/settings")
+    budget = r.json()["data"]["budget"]
+    assert budget["used_usd"] == 0.0
+    assert budget["budget_usd"] == 100.0
+    assert budget["remaining_usd"] == 100.0
+    assert budget["model_mix"] == {"opus": 0.0, "sonnet": 0.0, "haiku": 0.0}
+
+
+async def test_budget_block_with_spend(
+    client_factory,
+    db_conn: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import datetime as _dt
+
+    ym = _dt.datetime.now(
+        _dt.timezone(_dt.timedelta(hours=8))
+    ).date().isoformat()[:7]
+    db_conn.execute(
+        "INSERT INTO llm_costs(model, input_tokens, output_tokens, cost_usd, "
+        "created_at) VALUES (?, ?, ?, ?, ?)",
+        ("claude-opus-4-7", 1, 1, 60.0, f"{ym}-05T09:00:00+08:00"),
+    )
+    db_conn.execute(
+        "INSERT INTO llm_costs(model, input_tokens, output_tokens, cost_usd, "
+        "created_at) VALUES (?, ?, ?, ?, ?)",
+        ("claude-sonnet-4-6", 1, 1, 20.0, f"{ym}-05T09:00:00+08:00"),
+    )
+    db_conn.commit()
+    monkeypatch.setenv("OHMYSTOCK_MONTHLY_BUDGET_USD", "100")
+
+    async with client_factory() as c:
+        r = await c.get("/api/admin/settings")
+    budget = r.json()["data"]["budget"]
+    assert budget["used_usd"] == pytest.approx(80.0)
+    assert budget["remaining_usd"] == pytest.approx(20.0)
+    assert budget["model_mix"]["opus"] == pytest.approx(0.75)
+    assert budget["model_mix"]["sonnet"] == pytest.approx(0.25)
+
+
+# ---------------------------------------------------------------------------
+# POST /test-connection (ST-B1)
+# ---------------------------------------------------------------------------
+
+
+async def test_connection_success(
+    client_factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import ohmystock.api.routes.settings as settings_module
+
+    monkeypatch.setitem(settings_module._PROBES, "finmind", lambda: None)
+    async with client_factory() as c:
+        r = await c.post(
+            "/api/admin/settings/test-connection",
+            content=json.dumps({"provider": "finmind"}),
+            headers={"Content-Type": "application/json"},
+        )
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["ok"] is True
+    assert "latency_ms" in data
+
+
+async def test_connection_failure_no_key_leak(
+    client_factory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import ohmystock.api.routes.settings as settings_module
+
+    def _boom() -> None:
+        raise RuntimeError("Shioaji login failed: connection refused")
+
+    monkeypatch.setitem(settings_module._PROBES, "shioaji", _boom)
+    async with client_factory() as c:
+        r = await c.post(
+            "/api/admin/settings/test-connection",
+            content=json.dumps({"provider": "shioaji"}),
+            headers={"Content-Type": "application/json"},
+        )
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["ok"] is False
+    assert "connection refused" in data["error"]
+    # key material never appears
+    assert "secret" not in r.text.lower() or "secret_key" not in r.text
+
+
+async def test_connection_invalid_provider(client_factory) -> None:
+    async with client_factory() as c:
+        r = await c.post(
+            "/api/admin/settings/test-connection",
+            content=json.dumps({"provider": "bogus"}),
+            headers={"Content-Type": "application/json"},
+        )
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_input"

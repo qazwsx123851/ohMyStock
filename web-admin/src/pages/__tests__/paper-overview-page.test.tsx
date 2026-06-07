@@ -42,6 +42,7 @@ function pendingItem(overrides: Record<string, unknown> = {}) {
     ttl_seconds: 1800,
     current_price: 980,
     final_sizing_pct: 0.05,
+    suggested_qty: 5000, // 5 張
     ...overrides,
   }
 }
@@ -359,7 +360,7 @@ describe('Pending list', () => {
     expect(screen.getByText('2454')).toBeInTheDocument()
   })
 
-  it('clicking ✓ 確認 → POST /confirm-gate/confirm with {decision_id, user:"mark"}', async () => {
+  it('clicking ✓ 確認 opens dialog; submitting suggested qty POSTs override_qty', async () => {
     const user = userEvent.setup()
     const fetchSpy = setupFetch({
       stats: { kind: 'ok', body: { ok: true, data: STATS_OK } },
@@ -372,21 +373,32 @@ describe('Pending list', () => {
         body: {
           ok: true,
           data: {
-            items: [pendingItem({ decision_id: 'd1', symbol: '2330' })],
+            items: [
+              pendingItem({
+                decision_id: 'd1',
+                symbol: '2330',
+                suggested_qty: 5000,
+              }),
+            ],
             timeout_minutes: 30,
           },
         },
       },
       confirm: {
         kind: 'ok',
-        body: { ok: true, data: { decision_id: 'd1', fill: {}, qty: 100 } },
+        body: {
+          ok: true,
+          data: { decision_id: 'd1', fill: {}, qty: 5000, clamped: false },
+        },
       },
     })
 
     renderPage()
-    const btn = await screen.findByRole('button', { name: /確認 2330/ })
+    await user.click(await screen.findByRole('button', { name: /確認 2330/ }))
+    // dialog opened — submit with the pre-filled suggested 5 張
+    const submit = await screen.findByRole('button', { name: '確認下單' })
     fetchSpy.mockClear()
-    await user.click(btn)
+    await user.click(submit)
 
     await waitFor(() => {
       const calls = fetchSpy.mock.calls.filter((c) =>
@@ -402,7 +414,90 @@ describe('Pending list', () => {
     expect(JSON.parse(init.body as string)).toEqual({
       decision_id: 'd1',
       user: 'mark',
+      override_qty: 5000, // 5 張 × 1000
     })
+  })
+
+  it('overriding 張數 sends the edited override_qty', async () => {
+    const user = userEvent.setup()
+    const fetchSpy = setupFetch({
+      stats: { kind: 'ok', body: { ok: true, data: STATS_OK } },
+      positions: {
+        kind: 'ok',
+        body: { ok: true, data: { items: [], asof_iso: '...', count: 0 } },
+      },
+      pending: {
+        kind: 'ok',
+        body: {
+          ok: true,
+          data: {
+            items: [pendingItem({ decision_id: 'd1', suggested_qty: 5000 })],
+            timeout_minutes: 30,
+          },
+        },
+      },
+      confirm: {
+        kind: 'ok',
+        body: {
+          ok: true,
+          data: { decision_id: 'd1', fill: {}, qty: 3000, clamped: false },
+        },
+      },
+    })
+
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /確認 2330/ }))
+    const input = await screen.findByLabelText('下單張數')
+    await user.clear(input)
+    await user.type(input, '3')
+    fetchSpy.mockClear()
+    await user.click(screen.getByRole('button', { name: '確認下單' }))
+
+    await waitFor(() => {
+      const call = fetchSpy.mock.calls.find((c) =>
+        String(c[0]).includes('/api/admin/confirm-gate/confirm'),
+      )
+      expect(call).toBeTruthy()
+      expect(JSON.parse((call![1] as RequestInit).body as string)).toEqual({
+        decision_id: 'd1',
+        user: 'mark',
+        override_qty: 3000,
+      })
+    })
+  })
+
+  it('shows a clamped notice when the server clamps the qty', async () => {
+    const user = userEvent.setup()
+    setupFetch({
+      stats: { kind: 'ok', body: { ok: true, data: STATS_OK } },
+      positions: {
+        kind: 'ok',
+        body: { ok: true, data: { items: [], asof_iso: '...', count: 0 } },
+      },
+      pending: {
+        kind: 'ok',
+        body: {
+          ok: true,
+          data: {
+            items: [pendingItem({ decision_id: 'd1', suggested_qty: 5000 })],
+            timeout_minutes: 30,
+          },
+        },
+      },
+      confirm: {
+        kind: 'ok',
+        body: {
+          ok: true,
+          data: { decision_id: 'd1', fill: {}, qty: 5000, clamped: true },
+        },
+      },
+    })
+
+    renderPage()
+    await user.click(await screen.findByRole('button', { name: /確認 2330/ }))
+    await user.click(await screen.findByRole('button', { name: '確認下單' }))
+
+    expect(await screen.findByText(/已依風控調整為 5 張/)).toBeInTheDocument()
   })
 })
 
@@ -434,6 +529,7 @@ describe('Hotkeys', () => {
       },
     })
 
+    const user = userEvent.setup()
     renderPage()
     await screen.findByText('2330')
     fetchSpy.mockClear()
@@ -444,9 +540,11 @@ describe('Hotkeys', () => {
     expect(card).not.toBeNull()
     card.focus()
 
+    // Y opens the confirm dialog; submitting then POSTs.
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'y' }))
     })
+    await user.click(await screen.findByRole('button', { name: '確認下單' }))
 
     await waitFor(() => {
       const calls = fetchSpy.mock.calls.filter((c) =>

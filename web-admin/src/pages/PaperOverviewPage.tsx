@@ -62,7 +62,16 @@ type PendingItem = {
   ttl_seconds: number
   current_price: number
   final_sizing_pct: number
+  suggested_qty: number
 }
+
+type ConfirmResponse = {
+  decision_id: string
+  qty: number
+  clamped: boolean
+}
+
+const LOT_SIZE = 1000
 
 type PendingResponse = {
   items: PendingItem[]
@@ -264,6 +273,14 @@ export function PaperOverviewPage() {
   const [rejectTarget, setRejectTarget] = React.useState<string | null>(null)
   const [rejectReason, setRejectReason] = React.useState('')
 
+  // CG-B1: confirm qty dialog state. The dialog pre-fills the suggested lots
+  // and lets the operator overwrite; the server still applies the clamp.
+  const [confirmTarget, setConfirmTarget] = React.useState<PendingItem | null>(
+    null,
+  )
+  const [confirmQtyLots, setConfirmQtyLots] = React.useState('')
+  const [clampedNotice, setClampedNotice] = React.useState<string | null>(null)
+
   // SSE entry point on the /paper route. Layout/DashboardPage do not subscribe
   // when this route is mounted, so this page owns the single subscription.
   useAdminEvents()
@@ -293,11 +310,26 @@ export function PaperOverviewPage() {
   }, [queryClient])
 
   const confirmM = useMutation({
-    mutationFn: (decision_id: string) =>
-      apiFetch('/api/admin/confirm-gate/confirm', {
+    mutationFn: ({
+      decision_id,
+      override_qty,
+    }: {
+      decision_id: string
+      override_qty: number
+    }) =>
+      apiFetch<ConfirmResponse>('/api/admin/confirm-gate/confirm', {
         method: 'POST',
-        body: JSON.stringify({ decision_id, user: 'mark' }),
+        body: JSON.stringify({ decision_id, user: 'mark', override_qty }),
       }),
+    onSuccess: (res) => {
+      setConfirmTarget(null)
+      setConfirmQtyLots('')
+      setClampedNotice(
+        res.clamped
+          ? `${res.decision_id}：已依風控調整為 ${res.qty / LOT_SIZE} 張下單`
+          : null,
+      )
+    },
     onSettled: invalidateAll,
   })
 
@@ -332,8 +364,15 @@ export function PaperOverviewPage() {
   })
 
   const onConfirm = React.useCallback(
-    (decision_id: string) => confirmM.mutate(decision_id),
-    [confirmM],
+    (decision_id: string) => {
+      const item = pendingQ.data?.items.find(
+        (p) => p.decision_id === decision_id,
+      )
+      if (!item) return
+      setConfirmTarget(item)
+      setConfirmQtyLots(String(Math.round(item.suggested_qty / LOT_SIZE)))
+    },
+    [pendingQ.data],
   )
   const onReject = React.useCallback((decision_id: string) => {
     setRejectReason('')
@@ -437,6 +476,25 @@ export function PaperOverviewPage() {
           全部 sweep 過期
         </Button>
       </header>
+
+      {clampedNotice && (
+        <div
+          role="status"
+          className="flex items-center justify-between gap-2 rounded-lg border border-warning/50 bg-warning/10 p-3 text-sm text-warning-foreground"
+        >
+          <span className="flex items-center gap-2">
+            <AlertCircle className="size-4 shrink-0" aria-hidden />
+            {clampedNotice}
+          </span>
+          <button
+            type="button"
+            className="text-xs text-muted-foreground hover:underline"
+            onClick={() => setClampedNotice(null)}
+          >
+            知道了
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {statsQ.error ? (
@@ -625,6 +683,87 @@ export function PaperOverviewPage() {
               disabled={rejectM.isPending || rejectReason.trim().length === 0}
             >
               確認拒絕
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={confirmTarget !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setConfirmTarget(null)
+            setConfirmQtyLots('')
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>確認進場</DialogTitle>
+            <DialogDescription>
+              確認張數後送出。實際成交以伺服器套用 sizing 防線後為準。
+            </DialogDescription>
+          </DialogHeader>
+          {confirmTarget && (
+            <div className="space-y-3 text-sm">
+              <div className="flex items-baseline justify-between">
+                <span className="font-mono font-semibold">
+                  {confirmTarget.symbol}
+                </span>
+                <span className="text-muted-foreground">
+                  @ {priceFmt.format(confirmTarget.current_price)}
+                </span>
+              </div>
+              <p className="text-muted-foreground">
+                建議張數：
+                <span className="tabular font-medium text-foreground">
+                  {Math.round(confirmTarget.suggested_qty / LOT_SIZE)}
+                </span>{' '}
+                張
+              </p>
+              <label className="block space-y-1">
+                <span className="text-muted-foreground">下單張數</span>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={confirmQtyLots}
+                  onChange={(e) => setConfirmQtyLots(e.target.value)}
+                  aria-label="下單張數"
+                  className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm tabular focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </label>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setConfirmTarget(null)
+                setConfirmQtyLots('')
+              }}
+              disabled={confirmM.isPending}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (!confirmTarget) return
+                const lots = Number(confirmQtyLots)
+                if (!Number.isFinite(lots) || lots < 1) return
+                confirmM.mutate({
+                  decision_id: confirmTarget.decision_id,
+                  override_qty: Math.round(lots) * LOT_SIZE,
+                })
+              }}
+              disabled={
+                confirmM.isPending ||
+                !(Number(confirmQtyLots) >= 1)
+              }
+            >
+              確認下單
             </Button>
           </DialogFooter>
         </DialogContent>

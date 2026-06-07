@@ -28,6 +28,7 @@ from ohmystock.api.routes._envelope import (
 from ohmystock.config import Settings
 from ohmystock.paper import FakePaperBroker
 from ohmystock.safety.confirm_gate import (
+    _compute_qty,
     confirm,
     list_pending,
     reject,
@@ -42,6 +43,10 @@ router = APIRouter(dependencies=[Depends(require_admin)])
 class ConfirmRequest(BaseModel):
     decision_id: str = Field(..., min_length=1)
     user: str = Field(..., min_length=1)
+    # CG-B1: optional human override of the system-sized quantity (shares).
+    # The server is the sole arbiter — it still applies the sizing clamp
+    # defenses regardless of what the dialog sends.
+    override_qty: int | None = Field(default=None, gt=0)
 
 
 class RejectRequest(BaseModel):
@@ -92,6 +97,17 @@ def get_pending(
             "ttl_seconds": p.ttl_seconds,
             "current_price": p.current_price,
             "final_sizing_pct": p.final_sizing_pct,
+            # CG-B1: system-sized suggestion (shares) so the confirm dialog can
+            # pre-fill 建議張數 without the frontend needing the capital base.
+            "suggested_qty": (
+                _compute_qty(
+                    settings.ohmystock_default_capital_twd,
+                    p.final_sizing_pct,
+                    p.current_price,
+                )
+                if p.current_price > 0
+                else 0
+            ),
         }
         for p in items
     ]
@@ -121,6 +137,9 @@ def post_confirm(
             default_capital_twd=settings.ohmystock_default_capital_twd,
             user=req.user,
             auto_executed=False,
+            override_qty=req.override_qty,
+            max_notional_pct=settings.ohmystock_auto_execute_max_notional_pct,
+            max_sizing_deviation=settings.ohmystock_auto_execute_max_sizing_deviation,
             clock=system_clock,
         )
     except Exception as exc:
@@ -134,6 +153,7 @@ def post_confirm(
                 "decision_id": result.decision_id,
                 "fill": asdict(result.fill),
                 "qty": result.qty,
+                "clamped": result.clamped,
             }
         ),
     )

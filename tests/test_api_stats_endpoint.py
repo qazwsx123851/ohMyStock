@@ -27,7 +27,8 @@ from httpx import ASGITransport, AsyncClient
 
 import ohmystock.api.routes.stats as stats_module
 from ohmystock.api.app import create_app
-from ohmystock.api.routes._deps import get_db
+from ohmystock.api.routes._deps import get_db, get_settings_dep
+from ohmystock.config import Settings
 from ohmystock.journal.schema import init_schema
 from tests.conftest import VALID_ADMIN_TOKEN
 
@@ -217,6 +218,130 @@ async def test_audit_rows_dedicated_counter(
     assert data["auto_execute_audits"] == 2
     # decisions_made counts only kind='entry'.
     assert data["decisions_made"] == 0
+
+
+def _build_client_with_settings(
+    conn: sqlite3.Connection, settings: Settings
+) -> AsyncClient:
+    app = create_app()
+
+    def _override_get_db() -> Iterator[sqlite3.Connection]:
+        yield conn
+
+    app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_settings_dep] = lambda: settings
+    transport = ASGITransport(app=app)
+    return AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {VALID_ADMIN_TOKEN}"},
+    )
+
+
+def _insert_closed_trade(
+    conn: sqlite3.Connection,
+    *,
+    decision_id: str,
+    symbol: str,
+    entry_price: float,
+    qty_lots: int,
+    pnl_pct: float,
+    when: str,
+) -> None:
+    _insert(
+        conn,
+        decision_id=decision_id,
+        kind="entry",
+        symbol=symbol,
+        created_at=when,
+        payload={"actual_entry_price": entry_price, "actual_qty": qty_lots},
+    )
+    _insert(
+        conn,
+        decision_id=decision_id,
+        kind="exit",
+        symbol=symbol,
+        created_at=when,
+        payload={"pnl_pct": pnl_pct},
+    )
+
+
+async def test_monthly_breaker_tripped(
+    conn: sqlite3.Connection, freeze_today: None
+) -> None:
+    # entry 600 * 1 lot * 1000 = 600,000 notional; pnl -15% → -90,000 TWD.
+    # equity 1,000,000 → -9.0% ≤ -8.0% threshold → tripped.
+    _insert_closed_trade(
+        conn,
+        decision_id="d1",
+        symbol="2330",
+        entry_price=600.0,
+        qty_lots=1,
+        pnl_pct=-15.0,
+        when="2026-05-03T09:00:00+08:00",
+    )
+    settings = Settings(
+        starting_equity_twd=1_000_000,
+        ohmystock_monthly_breaker_pct=-8.0,
+        ohmystock_monthly_budget_usd=100.0,
+    )
+    async with _build_client_with_settings(conn, settings) as client:
+        r = await client.get("/api/admin/stats/today")
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["monthly_breaker"]["tripped"] is True
+    assert data["monthly_breaker"]["month_pnl_pct"] == pytest.approx(-9.0)
+
+
+async def test_monthly_breaker_not_tripped(
+    conn: sqlite3.Connection, freeze_today: None
+) -> None:
+    _insert_closed_trade(
+        conn,
+        decision_id="d1",
+        symbol="2330",
+        entry_price=600.0,
+        qty_lots=1,
+        pnl_pct=-1.0,  # -6,000 TWD → -0.6% > -8%
+        when="2026-05-03T09:00:00+08:00",
+    )
+    settings = Settings(
+        starting_equity_twd=1_000_000,
+        ohmystock_monthly_breaker_pct=-8.0,
+        ohmystock_monthly_budget_usd=100.0,
+    )
+    async with _build_client_with_settings(conn, settings) as client:
+        r = await client.get("/api/admin/stats/today")
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert data["monthly_breaker"]["tripped"] is False
+
+
+async def test_cost_fields(
+    conn: sqlite3.Connection, freeze_today: None
+) -> None:
+    conn.execute(
+        "INSERT INTO llm_costs"
+        "(model, input_tokens, output_tokens, cost_usd, created_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        ("claude-opus-4-7", 100, 100, 40.0, "2026-05-03T09:00:00+08:00"),
+    )
+    conn.execute(
+        "INSERT INTO llm_costs"
+        "(model, input_tokens, output_tokens, cost_usd, created_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        ("claude-haiku-4-5-20251001", 100, 100, 10.0, "2026-04-30T09:00:00+08:00"),
+    )
+    conn.commit()
+    settings = Settings(ohmystock_monthly_budget_usd=100.0)
+    async with _build_client_with_settings(conn, settings) as client:
+        r = await client.get("/api/admin/stats/today")
+    assert r.status_code == 200
+    data = r.json()["data"]
+    # only the May row counts toward 2026-05 month-to-date.
+    assert data["cost"]["used_usd"] == pytest.approx(40.0)
+    assert data["cost"]["budget_usd"] == pytest.approx(100.0)
+    assert data["cost"]["pct"] == pytest.approx(40.0)
 
 
 async def test_internal_error_redacts_path_and_sql() -> None:

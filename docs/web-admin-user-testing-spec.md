@@ -33,7 +33,7 @@
 | CG-04 | 鍵盤快捷 y/n/sweep | /paper | P1 | [可測] |
 | CG-05 | 待確認佇列載入/空/倒數 | /paper | P1 | [可測] |
 | CG-06 | SSE 即時刷新 | /paper | P2 | [可測] |
-| CG-B1 | confirm 二次輸入張數 | /paper | P1 | [BLOCKED][偏離] |
+| CG-B1 | confirm 二次輸入張數 | /paper | P1 | [可測]（已實作） |
 | CG-B2 | reject 自訂原因 | /paper | P1 | [可測]（已實作） |
 | **Tier 1 — 提案狀態機** | | | | |
 | PR-01 | pending → validating | /proposals/:slug | P1 | [可測] |
@@ -55,8 +55,8 @@
 | DB-01 | Dashboard KPI 四卡 | / | P1 | [可測] |
 | DB-02 | LiveFeed SSE | / | P2 | [可測] |
 | DB-B1 | risk gate 三色燈 | / | P0 | [BLOCKED][偏離] |
-| DB-B2 | 月度熔斷 banner | / | P0 | [BLOCKED][偏離] |
-| DB-B3 | LLM 成本進度條變色 | / | P2 | [BLOCKED][偏離] |
+| DB-B2 | 月度熔斷 banner | / | P0 | [可測]（已實作） |
+| DB-B3 | LLM 成本進度條變色 | / | P2 | [可測]（已實作） |
 | AU-01 | 多選 kind filter（回歸鎖定） | /audit | P1 | [可測] |
 | AU-02 | 空結果 / 錯誤 / 分頁 | /audit | P2 | [可測] |
 | AU-03 | status badge 推斷 | /audit | P2 | [可測] |
@@ -68,13 +68,13 @@
 | ST-02 | API key badge（不洩漏明文） | /settings | P1 | [可測] |
 | ST-03 | Safety 視覺分化 | /settings | P1 | [可測] |
 | ST-04 | Breaker 格式化 | /settings | P2 | [可測] |
-| ST-B1 | Shioaji/FinMind 連線測試 | /settings | P1 | [BLOCKED][偏離] |
-| ST-B2 | 剩餘額度 / 模型分布 | /settings | P2 | [BLOCKED][偏離] |
+| ST-B1 | Shioaji/FinMind 連線測試 | /settings | P1 | [可測]（已實作） |
+| ST-B2 | 剩餘額度 / 模型分布 | /settings | P2 | [可測]（已實作） |
 | ME-01 | 瀏覽 + kind/tag filter | /memory | P2 | [可測] |
 | ME-02 | FTS5 搜尋(BM25) | /memory | P2 | [可測] |
 | ME-03 | 搜尋語法錯誤 | /memory | P2 | [可測] |
 | ME-04 | 分頁 / 展開 / 空結果 | /memory | P2 | [可測] |
-| ME-B1 | 寫入個人偏好 | /memory | P1 | [BLOCKED][偏離] |
+| ME-B1 | 寫入個人偏好 | /memory | P1 | [可測]（已實作） |
 | **跨頁** | | | | |
 | GATE-01 | 未授權導向 /login | 全部 | P0 | [可測]（smoke 已有） |
 | GATE-02 | 全頁載入無 console error | 全部 | P1 | [可測]（smoke 已有） |

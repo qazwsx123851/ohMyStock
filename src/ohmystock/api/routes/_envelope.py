@@ -59,6 +59,10 @@ def map_exception_to_envelope(exc: BaseException) -> tuple[int, dict[str, Any]]:
             return 409, to_error("not_pending", str(exc))
         if exc.code == "payload_invalid":
             return 409, to_error("payload_invalid", str(exc))
+        if exc.code == "qty_exceeds_notional_limit":
+            return 409, to_error(
+                "qty_exceeds_notional_limit", str(exc), **exc.extra
+            )
         if exc.code == "broker_failed":
             return 502, to_error("broker_failed", str(exc))
         return 500, to_error("internal_error", _GENERIC_INTERNAL_MESSAGE)

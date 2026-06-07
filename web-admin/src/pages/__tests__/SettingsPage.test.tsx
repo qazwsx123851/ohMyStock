@@ -7,7 +7,7 @@ import {
   vi,
   type Mock,
 } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
 import { SettingsPage } from '../SettingsPage'
@@ -34,6 +34,12 @@ const DEFAULT_PAYLOAD = {
     loss_lockout_hours: 24,
     loss_pct_threshold: -0.05,
     account_equity_twd: 1_000_000,
+  },
+  budget: {
+    used_usd: 40,
+    budget_usd: 100,
+    remaining_usd: 60,
+    model_mix: { opus: 0.5, sonnet: 0.3, haiku: 0.2 },
   },
 }
 
@@ -187,6 +193,80 @@ describe('SettingsPage with auto_execute=true', () => {
     await screen.findByText('API keys')
     const setBadges = screen.getAllByText('已設定')
     expect(setBadges).toHaveLength(3)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Budget / model mix (ST-B2)
+// ---------------------------------------------------------------------------
+
+describe('SettingsPage budget block', () => {
+  it('renders used / budget / remaining and model mix percentages', async () => {
+    const { container } = renderPage()
+    await screen.findByText('本月額度與模型分布')
+    expect(screen.getByText('40.00')).toBeInTheDocument()
+    expect(screen.getByText('60.00')).toBeInTheDocument()
+    const opus = container.querySelector('[data-model="opus"]')
+    expect(opus?.textContent).toMatch(/50%/)
+    const haiku = container.querySelector('[data-model="haiku"]')
+    expect(haiku?.textContent).toMatch(/20%/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Connection test (ST-B1)
+// ---------------------------------------------------------------------------
+
+describe('SettingsPage connection test', () => {
+  function urlAwareMock(testResult: unknown, status = 200) {
+    return vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : (input as Request).url
+      if (url.includes('/test-connection')) {
+        return jsonResponse(testResult, status)
+      }
+      return jsonResponse({ ok: true, data: DEFAULT_PAYLOAD })
+    })
+  }
+
+  it('shows success and latency on ok:true', async () => {
+    fetchMock.mockReset()
+    fetchMock = urlAwareMock({ ok: true, data: { ok: true, latency_ms: 42 } })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as never)
+
+    const { container } = renderPage()
+    await screen.findByText('連線測試')
+    const shioajiRow = container.querySelector('[data-provider="shioaji"]')!
+    const btn = shioajiRow.querySelector('button')!
+    fireEvent.click(btn)
+
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-testid="result-shioaji"]')?.textContent,
+      ).toMatch(/連線成功/),
+    )
+    expect(
+      container.querySelector('[data-testid="result-shioaji"]')?.textContent,
+    ).toMatch(/42 ms/)
+  })
+
+  it('shows failure error on ok:false without leaking keys', async () => {
+    fetchMock.mockReset()
+    fetchMock = urlAwareMock({
+      ok: true,
+      data: { ok: false, error: 'connection refused' },
+    })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock as never)
+
+    const { container } = renderPage()
+    await screen.findByText('連線測試')
+    const finmindRow = container.querySelector('[data-provider="finmind"]')!
+    fireEvent.click(finmindRow.querySelector('button')!)
+
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-testid="result-finmind"]')?.textContent,
+      ).toMatch(/connection refused/),
+    )
   })
 })
 

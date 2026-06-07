@@ -65,6 +65,17 @@ class Settings(BaseSettings):
     # tools-contracts.md §backtest defaults.
     starting_equity_twd: int = 1_000_000
 
+    # Monthly circuit-breaker threshold (% of starting equity). SSOT for the
+    # value is docs/workflow-cheatsheet.md §0 (單月 -8% 全平 + 停止新進場).
+    # Dashboard summary surfaces it as monthly_breaker.tripped; enforcement
+    # (禁新進場/全平/validator) is out of scope for this display-only change.
+    ohmystock_monthly_breaker_pct: float = -8.0
+
+    # Monthly LLM cost budget ceiling in USD. Dashboard cost progress bar and
+    # settings budget block read this. No prior SSOT; default is a personal
+    # paper-trading ceiling, override via OHMYSTOCK_MONTHLY_BUDGET_USD.
+    ohmystock_monthly_budget_usd: float = 100.0
+
     # Confirm Gate v0 — see openspec/specs/confirm-gate/spec.md (after archive).
     # Timeout for pending_confirm entries (sweep_expired uses this). Default 30
     # min mirrors v3-decisions #11. Capital used by gate to compute qty until

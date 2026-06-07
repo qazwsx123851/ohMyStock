@@ -104,3 +104,45 @@ def get_monthly_cost_usd(year_month: str) -> float:
         return float(row[0]) if row and row[0] is not None else 0.0
     finally:
         conn.close()
+
+
+def _model_family(model: str) -> str | None:
+    """Map a model id to its opus/sonnet/haiku family, or None if unknown."""
+    lower = model.lower()
+    for family in ("opus", "sonnet", "haiku"):
+        if family in lower:
+            return family
+    return None
+
+
+def monthly_cost_summary(
+    conn: sqlite3.Connection, year_month: str
+) -> tuple[float, dict[str, float]]:
+    """Month-to-date LLM cost + per-family cost share from ``llm_costs``.
+
+    Uses the passed-in connection (caller owns its lifecycle) so the dashboard
+    summary and settings budget block stay testable with an injected DB.
+    Returns ``(used_usd, model_mix)`` where ``model_mix`` maps each of
+    ``opus``/``sonnet``/``haiku`` to its fraction of total cost (0.0 when no
+    spend). Fractions sum to ≤ 1.0 (unknown models excluded from the mix).
+    """
+    rows = conn.execute(
+        "SELECT model, COALESCE(SUM(cost_usd), 0.0) FROM llm_costs "
+        "WHERE created_at LIKE ? GROUP BY model",
+        (f"{year_month}%",),
+    ).fetchall()
+
+    used_usd = 0.0
+    by_family: dict[str, float] = {"opus": 0.0, "sonnet": 0.0, "haiku": 0.0}
+    for model, cost in rows:
+        cost_f = float(cost or 0.0)
+        used_usd += cost_f
+        family = _model_family(str(model))
+        if family is not None:
+            by_family[family] += cost_f
+
+    if used_usd > 0:
+        model_mix = {k: v / used_usd for k, v in by_family.items()}
+    else:
+        model_mix = {k: 0.0 for k in by_family}
+    return used_usd, model_mix

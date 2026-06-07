@@ -10,13 +10,17 @@
  *
  * Spec: openspec/changes/web-admin-settings-page/specs/web-admin-settings-page/spec.md
  */
-import { useQuery } from '@tanstack/react-query'
-import { AlertCircle, AlertTriangle } from 'lucide-react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { AlertCircle, AlertTriangle, CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import {
   ApiError,
   getSettings,
+  testConnection,
+  type ConnectionProvider,
   type SettingsBreakers,
+  type SettingsBudget,
   type SettingsPayload,
+  type TestConnectionResult,
 } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -26,6 +30,7 @@ import { cn } from '@/lib/utils'
 
 const ENV_HINT = '編輯 .env 並重啟以變更'
 const intFmt = new Intl.NumberFormat('zh-TW')
+const usdFmt = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function pctDisplay(v: number): string {
   // 0.25 -> "25"; -0.05 -> "-5". One-decimal precision dropped when integer.
@@ -250,6 +255,138 @@ function BreakersCard({ data }: { data: SettingsBreakers }) {
 }
 
 // ---------------------------------------------------------------------------
+// Section: Connection test (ST-B1)
+// ---------------------------------------------------------------------------
+
+function ProviderTestRow({
+  provider,
+  label,
+}: {
+  provider: ConnectionProvider
+  label: string
+}) {
+  const m = useMutation<TestConnectionResult, ApiError>({
+    mutationFn: () => testConnection(provider),
+  })
+  const result = m.data
+  return (
+    <div
+      className="flex items-center justify-between gap-4 border-b pb-3 last:border-b-0 last:pb-0"
+      data-provider={provider}
+    >
+      <span className="text-sm font-medium">{label}</span>
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 text-sm" data-testid={`result-${provider}`}>
+          {m.isPending ? (
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden /> 測試中…
+            </span>
+          ) : m.error ? (
+            <span className="flex items-center gap-1 text-destructive">
+              <XCircle className="size-3.5" aria-hidden /> {m.error.message}
+            </span>
+          ) : result ? (
+            result.ok ? (
+              <span className="flex items-center gap-1 text-up">
+                <CheckCircle2 className="size-3.5" aria-hidden /> 連線成功
+                {result.latency_ms != null && (
+                  <span className="text-muted-foreground">
+                    （{result.latency_ms} ms）
+                  </span>
+                )}
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-destructive">
+                <XCircle className="size-3.5" aria-hidden /> 失敗：
+                {result.error ?? '未知錯誤'}
+              </span>
+            )
+          ) : null}
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={m.isPending}
+          onClick={() => m.mutate()}
+        >
+          測試連線
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function ConnectionTestCard() {
+  return (
+    <Card className="p-6">
+      <h2 className="text-base font-semibold">連線測試</h2>
+      <div className="mt-4 space-y-3">
+        <ProviderTestRow provider="shioaji" label="Shioaji（模擬倉登入）" />
+        <ProviderTestRow provider="finmind" label="FinMind（最小查詢）" />
+      </div>
+      <p className="mt-4 text-xs text-muted-foreground">
+        測試僅做輕量呼叫，不下單、不消耗顯著額度。
+      </p>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Section: Budget / model mix (ST-B2)
+// ---------------------------------------------------------------------------
+
+const MODEL_MIX_ROWS: Array<{ label: string; key: keyof SettingsBudget['model_mix'] }> = [
+  { label: 'Opus', key: 'opus' },
+  { label: 'Sonnet', key: 'sonnet' },
+  { label: 'Haiku', key: 'haiku' },
+]
+
+function BudgetCard({ data }: { data: SettingsBudget }) {
+  return (
+    <Card className="p-6">
+      <h2 className="text-base font-semibold">本月額度與模型分布</h2>
+      <div className="mt-4 grid grid-cols-3 gap-4">
+        <div>
+          <span className="block text-xs text-muted-foreground">已用</span>
+          <span className="mt-1 block tabular text-lg font-semibold">
+            {usdFmt.format(data.used_usd)}
+          </span>
+        </div>
+        <div>
+          <span className="block text-xs text-muted-foreground">預算</span>
+          <span className="mt-1 block tabular text-lg font-semibold">
+            {usdFmt.format(data.budget_usd)}
+          </span>
+        </div>
+        <div>
+          <span className="block text-xs text-muted-foreground">剩餘</span>
+          <span className="mt-1 block tabular text-lg font-semibold">
+            {usdFmt.format(data.remaining_usd)}
+          </span>
+        </div>
+      </div>
+      <div className="mt-4 space-y-2">
+        <span className="block text-xs text-muted-foreground">模型分布</span>
+        {MODEL_MIX_ROWS.map((r) => (
+          <div
+            key={r.key}
+            className="flex items-center justify-between text-sm"
+            data-model={r.key}
+          >
+            <span>{r.label}</span>
+            <span className="tabular text-muted-foreground">
+              {(data.model_mix[r.key] * 100).toFixed(0)}%
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-xs text-muted-foreground">USD · 本月累計（唯讀）</p>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // SettingsPage
 // ---------------------------------------------------------------------------
 
@@ -313,6 +450,8 @@ export function SettingsPage() {
         </p>
       </header>
       <ApiKeysCard data={data.api_keys} />
+      <ConnectionTestCard />
+      {data.budget && <BudgetCard data={data.budget} />}
       <ThemeCard />
       <SafetyCard data={data.safety} />
       <BreakersCard data={data.breakers} />

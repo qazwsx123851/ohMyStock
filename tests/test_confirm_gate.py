@@ -621,3 +621,69 @@ def test_list_pending_excludes_rejected_and_expired() -> None:
         timeout_minutes=30,
     )
     assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# confirm() — override_qty sizing defenses (CG-B1)
+# ---------------------------------------------------------------------------
+
+
+def _seed_override_case(conn: sqlite3.Connection) -> str:
+    # sizing 10% of 1M @ price 10 → system qty = 10,000 shares; notional cap
+    # (25% of 1M) = 250,000 TWD = 25,000 shares.
+    return _seed_pending(
+        conn, final_sizing_pct=10.0, current_price=10.0, atr_14_pct=2.85
+    )
+
+
+def _confirm_override(conn: sqlite3.Connection, did: str, qty: int | None):
+    clock = _FakeClock("2026-05-02T10:15:00+08:00")
+    return confirm(
+        conn,
+        decision_id=did,
+        broker=FakePaperBroker(clock=clock),
+        default_capital_twd=_DEFAULT_CAPITAL,
+        user="mark@local",
+        override_qty=qty,
+        clock=clock,
+    )
+
+
+def test_override_qty_within_range_passes_through() -> None:
+    conn = _conn()
+    did = _seed_override_case(conn)
+    result = _confirm_override(conn, did, 11000)  # +10% dev, notional 110k < cap
+    assert result.qty == 11000
+    assert result.clamped is False
+
+
+def test_override_qty_exceeds_notional_raises() -> None:
+    conn = _conn()
+    did = _seed_override_case(conn)
+    with pytest.raises(ConfirmGateError) as exc_info:
+        _confirm_override(conn, did, 30000)  # notional 300k > 250k cap
+    assert exc_info.value.code == "qty_exceeds_notional_limit"
+    assert "max_notional_twd" in exc_info.value.extra
+    # nothing was filled — entry remains pending_confirm
+    status = conn.execute(
+        "SELECT json_extract(payload_json, '$.decision_status') "
+        "FROM journal_entries WHERE kind='entry'"
+    ).fetchone()[0]
+    assert status == "pending_confirm"
+
+
+def test_override_qty_deviation_clamps_and_flags() -> None:
+    conn = _conn()
+    did = _seed_override_case(conn)
+    # +50% deviation (15,000 vs system 10,000), notional 150k < cap → clamp.
+    result = _confirm_override(conn, did, 15000)
+    assert result.qty == 10000  # clamped to the conservative system qty
+    assert result.clamped is True
+
+
+def test_no_override_qty_is_backward_compatible() -> None:
+    conn = _conn()
+    did = _seed_override_case(conn)
+    result = _confirm_override(conn, did, None)
+    assert result.qty == 10000  # system sizing
+    assert result.clamped is False

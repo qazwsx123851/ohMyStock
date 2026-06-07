@@ -18,11 +18,11 @@
 
 ## 2. DB-B2 Dashboard 月度熔斷 banner（P0）
 
-- [ ] 2.1 後端：dashboard summary 加 `monthly_breaker:{ tripped, month_pnl_pct }`
-- [ ] 2.2 後端：熔斷觸發/未觸發測試
-- [ ] 2.3 前端：DashboardPage 加紅色 banner（禁新進場提示 + 須跑月度復盤）
-- [ ] 2.4 前端：Vitest 覆蓋 tripped true/false
-- [ ] 2.5 文件：DB-B2 改 [可測]
+- [x] 2.1 後端：dashboard summary 加 `monthly_breaker:{ tripped, month_pnl_pct }`
+- [x] 2.2 後端：熔斷觸發/未觸發測試
+- [x] 2.3 前端：DashboardPage 加紅色 banner（禁新進場提示 + 須跑月度復盤）
+- [x] 2.4 前端：Vitest 覆蓋 tripped true/false
+- [x] 2.5 文件：DB-B2 改 [可測]
 
 ## 3. CG-B2 reject 自訂原因輸入（P1）
 
@@ -32,20 +32,20 @@
 
 ## 4. CG-B1 confirm 二次輸入張數（P1）
 
-- [ ] 4.1 後端：提取 sizing clamp 為共用函式（human/auto path 共用），不改 auto path 既有行為
-- [ ] 4.2 後端：ConfirmRequest 加 optional `override_qty`；confirm 套防線（超 25% 名目→409、偏離公式 >30%→clamp+標記）
-- [ ] 4.3 後端：測試（範圍內 / 名目超限 409 / 偏離 clamp+標記 / 不帶 override 向後相容）
-- [ ] 4.4 前端：PaperOverviewPage confirm 加 ConfirmDialog（顯示建議張數、可覆寫、送 override_qty、顯示 clamped 提示）
-- [ ] 4.5 前端：Vitest 覆蓋覆寫送出 + 沿用建議 + clamped 提示
-- [ ] 4.6 文件：CG-B1 改 [可測]
+- [x] 4.1 後端：提取 sizing clamp 為共用函式（human/auto path 共用），不改 auto path 既有行為
+- [x] 4.2 後端：ConfirmRequest 加 optional `override_qty`；confirm 套防線（超 25% 名目→409、偏離公式 >30%→clamp+標記）
+- [x] 4.3 後端：測試（範圍內 / 名目超限 409 / 偏離 clamp+標記 / 不帶 override 向後相容）
+- [x] 4.4 前端：PaperOverviewPage confirm 加 ConfirmDialog（顯示建議張數、可覆寫、送 override_qty、顯示 clamped 提示）
+- [x] 4.5 前端：Vitest 覆蓋覆寫送出 + 沿用建議 + clamped 提示
+- [x] 4.6 文件：CG-B1 改 [可測]
 
 ## 5. ST-B1 Settings 連線測試（P1）
 
-- [ ] 5.1 後端：新增 `POST /api/admin/settings/test-connection`（shioaji/finmind 輕量呼叫，不下單/不耗額度）
-- [ ] 5.2 後端：測試（成功 / 失敗不洩漏金鑰 / 不支援 provider 400）
-- [ ] 5.3 前端：SettingsPage 各 provider 連線測試按鈕 + 結果呈現
-- [ ] 5.4 前端：Vitest 覆蓋成功/失敗呈現
-- [ ] 5.5 文件：ST-B1 改 [可測]
+- [x] 5.1 後端：新增 `POST /api/admin/settings/test-connection`（shioaji/finmind 輕量呼叫，不下單/不耗額度）
+- [x] 5.2 後端：測試（成功 / 失敗不洩漏金鑰 / 不支援 provider 400）
+- [x] 5.3 前端：SettingsPage 各 provider 連線測試按鈕 + 結果呈現
+- [x] 5.4 前端：Vitest 覆蓋成功/失敗呈現
+- [x] 5.5 文件：ST-B1 改 [可測]
 
 ## 6. ME-B1 Memory 寫入個人偏好（P1）
 
@@ -53,21 +53,21 @@
 - [x] 6.2 後端：新增 `POST /api/admin/memory/rows`（kind 限制、content 非空驗證）+ 測試
 - [x] 6.3 前端：MemoryPage 加寫入表單（kind/content/tags/source）+ 成功刷新 + 必填驗證
 - [x] 6.4 前端：Vitest 覆蓋寫入成功刷新 + 必填擋下
-- [ ] 6.5 文件：ME-B1 改 [可測]
+- [x] 6.5 文件：ME-B1 改 [可測]
 
 ## 7. DB-B3 Dashboard 成本進度條（P2）
 
-- [ ] 7.1 後端：dashboard summary 加 `cost:{ used_usd, budget_usd, pct }`（讀 cost-tracking + 預算上限 config）
-- [ ] 7.2 前端：DashboardPage 成本改進度條（≥80% 橘色）
-- [ ] 7.3 前端：Vitest 覆蓋變色閾值
-- [ ] 7.4 文件：DB-B3 改 [可測]
+- [x] 7.1 後端：dashboard summary 加 `cost:{ used_usd, budget_usd, pct }`（讀 cost-tracking + 預算上限 config）
+- [x] 7.2 前端：DashboardPage 成本改進度條（≥80% 橘色）
+- [x] 7.3 前端：Vitest 覆蓋變色閾值
+- [x] 7.4 文件：DB-B3 改 [可測]
 
 ## 8. ST-B2 Settings 剩餘額度 / 模型分布（P2）
 
-- [ ] 8.1 後端：settings payload 加 `budget:{ used_usd, budget_usd, remaining_usd, model_mix }`（讀 cost-tracking）
-- [ ] 8.2 後端：測試欄位
-- [ ] 8.3 前端：SettingsPage 唯讀顯示額度與模型分布
-- [ ] 8.4 文件：ST-B2 改 [可測]
+- [x] 8.1 後端：settings payload 加 `budget:{ used_usd, budget_usd, remaining_usd, model_mix }`（讀 cost-tracking）
+- [x] 8.2 後端：測試欄位
+- [x] 8.3 前端：SettingsPage 唯讀顯示額度與模型分布
+- [x] 8.4 文件：ST-B2 改 [可測]
 
 ## 9. PR-B1 Proposal Re-validate 按鈕（P2）— 現況已滿足
 

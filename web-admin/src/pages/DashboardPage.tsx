@@ -1,15 +1,28 @@
 import { useQuery } from '@tanstack/react-query'
-import { Activity, AlertCircle, Briefcase, DollarSign, Hourglass } from 'lucide-react'
+import { Activity, AlertCircle, AlertTriangle, Briefcase, DollarSign, Hourglass } from 'lucide-react'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-tw'
-import { apiFetch, type LiveEvent, type StatsToday } from '@/lib/api'
+import { apiFetch, type LiveEvent, type StatsSummary, type StatsToday } from '@/lib/api'
 import { useAdminEvents } from '@/hooks/useAdminEvents'
 import { useLiveFeedStore } from '@/stores'
 import { KpiCard, directionOf } from '@/components/kpi-card'
+import { cn } from '@/lib/utils'
 
 dayjs.extend(relativeTime)
 dayjs.locale('zh-tw')
+
+// ---------------------------------------------------------------------------
+// Shared summary query — all dashboard widgets read GET /api/admin/stats/today
+// ---------------------------------------------------------------------------
+
+function useSummary() {
+  return useQuery({
+    queryKey: ['stats', 'today'],
+    queryFn: () => apiFetch<StatsSummary>('/api/admin/stats/today'),
+    refetchInterval: 30_000,
+  })
+}
 
 // ---------------------------------------------------------------------------
 // KpiRow - fetches /api/admin/stats/today
@@ -17,6 +30,7 @@ dayjs.locale('zh-tw')
 
 const numFmt = new Intl.NumberFormat('zh-TW')
 const signedTwdFmt = new Intl.NumberFormat('zh-TW', { signDisplay: 'exceptZero' })
+const pctFmt = new Intl.NumberFormat('zh-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
 const usdFmt = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function KpiRow() {
@@ -36,7 +50,7 @@ function KpiRow() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <KpiCard
         label="今日已實現損益"
         value={data ? signedTwdFmt.format(data.realized_pnl_twd) : ''}
@@ -54,12 +68,73 @@ function KpiRow() {
         value={data ? numFmt.format(data.pending_confirms) : ''}
         loading={isLoading}
       />
-      <KpiCard
-        label="今日 LLM 成本"
-        value={data ? usdFmt.format(data.llm_cost_usd) : ''}
-        unit="USD"
-        loading={isLoading}
-      />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// MonthlyBreakerBanner — red banner when month PnL hit the breaker threshold
+// ---------------------------------------------------------------------------
+
+function MonthlyBreakerBanner() {
+  const { data } = useSummary()
+  if (!data?.monthly_breaker?.tripped) return null
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-2 rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive"
+    >
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <div>
+        <p className="font-semibold">
+          月度熔斷已觸發（本月 {pctFmt.format(data.monthly_breaker.month_pnl_pct)}%）
+        </p>
+        <p className="mt-0.5 text-destructive/90">
+          禁止新進場至月底，並請執行月度復盤。
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// CostBar — month-to-date LLM cost vs budget; turns orange at ≥80%
+// ---------------------------------------------------------------------------
+
+function CostBar() {
+  const { data, isLoading } = useSummary()
+  const cost = data?.cost
+  const pct = cost ? Math.max(0, cost.pct) : 0
+  const clamped = Math.min(100, pct)
+  const warn = pct >= 80
+  return (
+    <div className="rounded-lg border bg-card p-4 shadow-sm">
+      <div className="flex items-baseline justify-between">
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">
+          本月 LLM 成本
+        </span>
+        <span className="tabular text-sm text-muted-foreground">
+          {cost
+            ? `${usdFmt.format(cost.used_usd)} / ${usdFmt.format(cost.budget_usd)} USD`
+            : isLoading
+              ? '載入中…'
+              : '—'}
+        </span>
+      </div>
+      <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          role="progressbar"
+          aria-valuenow={Math.round(pct)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          data-warn={warn ? 'true' : 'false'}
+          className={cn(
+            'h-full rounded-full transition-all',
+            warn ? 'bg-orange-500' : 'bg-primary',
+          )}
+          style={{ width: `${clamped}%` }}
+        />
+      </div>
     </div>
   )
 }
@@ -118,7 +193,9 @@ export function DashboardPage() {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr] lg:items-start">
       <div className="space-y-4">
+        <MonthlyBreakerBanner />
         <KpiRow />
+        <CostBar />
       </div>
       <div className="lg:row-span-2 lg:h-[calc(100vh-10rem)]">
         <LiveFeed />

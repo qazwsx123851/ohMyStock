@@ -134,10 +134,13 @@ async def test_pending_serialises_one_row(
         "ttl_seconds",
         "current_price",
         "final_sizing_pct",
+        "suggested_qty",
     }
     assert item["symbol"] == _SYMBOL
     assert item["current_price"] == 50.0
     assert item["final_sizing_pct"] == 25.0
+    # sizing 25% of 1M @ 50 → floor(250000/50/1000)*1000 = 5000 shares
+    assert item["suggested_qty"] == 5000
 
 
 async def test_pending_timeout_zero_returns_400(
@@ -171,6 +174,64 @@ async def test_confirm_success_returns_fill_and_qty(
     assert data["fill"]["fill_price"] == 50.0
     assert data["fill"]["filled_qty"] == data["qty"]
     assert data["qty"] > 0
+
+
+async def test_confirm_override_qty_within_range(
+    conn: sqlite3.Connection, fresh_bus: EventBus
+) -> None:
+    # system qty 10,000 (10% of 1M @ 10); override +10% stays within notional.
+    _seed_pending(conn, final_sizing_pct=10.0, current_price=10.0)
+    async with _build_client(conn) as client:
+        r = await client.post(
+            "/api/admin/confirm-gate/confirm",
+            json={
+                "decision_id": _DECISION_ID,
+                "user": "mark",
+                "override_qty": 11000,
+            },
+        )
+    assert r.status_code == 200, r.json()
+    data = r.json()["data"]
+    assert data["qty"] == 11000
+    assert data["clamped"] is False
+
+
+async def test_confirm_override_qty_exceeds_notional_returns_409(
+    conn: sqlite3.Connection, fresh_bus: EventBus
+) -> None:
+    _seed_pending(conn, final_sizing_pct=10.0, current_price=10.0)
+    async with _build_client(conn) as client:
+        r = await client.post(
+            "/api/admin/confirm-gate/confirm",
+            json={
+                "decision_id": _DECISION_ID,
+                "user": "mark",
+                "override_qty": 30000,  # notional 300k > 250k cap
+            },
+        )
+    assert r.status_code == 409
+    err = r.json()["error"]
+    assert err["code"] == "qty_exceeds_notional_limit"
+    assert "max_notional_twd" in err
+
+
+async def test_confirm_override_qty_deviation_clamps(
+    conn: sqlite3.Connection, fresh_bus: EventBus
+) -> None:
+    _seed_pending(conn, final_sizing_pct=10.0, current_price=10.0)
+    async with _build_client(conn) as client:
+        r = await client.post(
+            "/api/admin/confirm-gate/confirm",
+            json={
+                "decision_id": _DECISION_ID,
+                "user": "mark",
+                "override_qty": 15000,  # +50% dev, notional 150k < cap
+            },
+        )
+    assert r.status_code == 200, r.json()
+    data = r.json()["data"]
+    assert data["qty"] == 10000  # clamped to system qty
+    assert data["clamped"] is True
 
 
 async def test_confirm_unknown_decision_returns_404(

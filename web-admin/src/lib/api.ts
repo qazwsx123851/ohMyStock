@@ -23,6 +23,40 @@ export type StatsToday = {
   llm_cost_usd: number
 }
 
+// Dashboard summary additions from GET /api/admin/stats/today
+// (web-admin-scenario-gaps: DB-B1/B2/B3). risk_gate is optional until the
+// market risk gate backend ships.
+export type RiskGateStatus = 'green' | 'yellow' | 'red'
+
+export type RiskGate = {
+  status: RiskGateStatus
+  triggers: string[]
+}
+
+export type MonthlyBreaker = {
+  tripped: boolean
+  month_pnl_pct: number
+}
+
+export type CostSummary = {
+  used_usd: number
+  budget_usd: number
+  pct: number
+}
+
+export type StatsSummary = {
+  asof_date: string
+  decisions_made: number
+  entries_pending: number
+  entries_filled: number
+  rejects: number
+  expires: number
+  auto_execute_audits: number
+  monthly_breaker: MonthlyBreaker
+  cost: CostSummary
+  risk_gate?: RiskGate
+}
+
 // Open position row from GET /api/admin/positions/open
 export type OpenPosition = {
   symbol: string
@@ -284,11 +318,33 @@ export type SettingsBreakers = {
   account_equity_twd: number
 }
 
+export type SettingsModelMix = {
+  opus: number
+  sonnet: number
+  haiku: number
+}
+
+export type SettingsBudget = {
+  used_usd: number
+  budget_usd: number
+  remaining_usd: number
+  model_mix: SettingsModelMix
+}
+
 export type SettingsPayload = {
   api_keys: SettingsApiKeys
   theme: SettingsTheme
   safety: SettingsSafety
   breakers: SettingsBreakers
+  budget: SettingsBudget
+}
+
+export type ConnectionProvider = 'shioaji' | 'finmind'
+
+export type TestConnectionResult = {
+  ok: boolean
+  latency_ms?: number
+  error?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -713,6 +769,19 @@ export function getBacktestJob(jobId: string): Promise<BacktestJobDetail> {
 
 export function getSettings(): Promise<SettingsPayload> {
   return apiFetch<SettingsPayload>('/api/admin/settings')
+}
+
+export function testConnection(
+  provider: ConnectionProvider,
+): Promise<TestConnectionResult> {
+  return apiFetch<TestConnectionResult>(
+    '/api/admin/settings/test-connection',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider }),
+    },
+  )
 }
 
 // ---------------------------------------------------------------------------

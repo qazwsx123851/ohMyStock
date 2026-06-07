@@ -19,21 +19,30 @@ Spec: openspec/changes/web-admin-settings-page/specs/admin-settings-endpoint/spe
 
 from __future__ import annotations
 
+import sqlite3
+from datetime import datetime
+from time import perf_counter
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from ohmystock.api.auth import require_admin
-from ohmystock.api.routes._deps import get_settings_dep
+from ohmystock.api.routes._deps import get_db, get_settings_dep
 from ohmystock.api.routes._envelope import (
     map_exception_to_envelope,
+    to_error,
     to_success,
 )
 from ohmystock.config import Settings
+from ohmystock.observability.cost_tracker import monthly_cost_summary
 
 
 router = APIRouter(dependencies=[Depends(require_admin)])
+
+_TPE = ZoneInfo("Asia/Taipei")
 
 
 def _is_set(value: str | None) -> bool:
@@ -87,14 +96,100 @@ def _redact(settings: Settings) -> dict[str, Any]:
     }
 
 
+def _budget_block(
+    conn: sqlite3.Connection, settings: Settings
+) -> dict[str, Any]:
+    """Read-only month-to-date LLM spend vs budget + per-model mix (ST-B2).
+
+    Same cost-tracking source as the dashboard cost bar; surfaced here so the
+    operator sees remaining quota and where spend is going without leaving
+    Settings.
+    """
+    year_month = datetime.now(_TPE).date().isoformat()[:7]
+    used_usd, model_mix = monthly_cost_summary(conn, year_month=year_month)
+    budget_usd = settings.ohmystock_monthly_budget_usd
+    return {
+        "used_usd": used_usd,
+        "budget_usd": budget_usd,
+        "remaining_usd": max(0.0, budget_usd - used_usd),
+        "model_mix": model_mix,
+    }
+
+
 @router.get("/api/admin/settings")
 def get_settings(
+    conn: sqlite3.Connection = Depends(get_db),
     settings: Settings = Depends(get_settings_dep),
 ) -> JSONResponse:
     try:
         data = _redact(settings)
+        data["budget"] = _budget_block(conn, settings)
     except Exception as exc:  # noqa: BLE001
         status, body = map_exception_to_envelope(exc)
         return JSONResponse(status_code=status, content=body)
 
     return JSONResponse(status_code=200, content=to_success(data))
+
+
+# ---------------------------------------------------------------------------
+# POST /api/admin/settings/test-connection — lightweight provider ping
+# ---------------------------------------------------------------------------
+
+_VALID_PROVIDERS = ("shioaji", "finmind")
+
+
+class TestConnectionRequest(BaseModel):
+    provider: str = Field(..., min_length=1)
+
+
+def _probe_finmind() -> None:
+    """Minimal FinMind query (one symbol, one day) — does not consume notable
+    quota. Lazily imports the client so missing optional deps don't break
+    module import in test/CLI scopes."""
+    from ohmystock.data.finmind_client import FinMindClient
+
+    client = FinMindClient()
+    client.get_taiwan_stock_price("2330", "2024-01-02", "2024-01-02")
+
+
+def _probe_shioaji() -> None:
+    """Shioaji sim login only — no order, no snapshot. Lazily imported because
+    the shioaji package may be absent in non-broker environments."""
+    from ohmystock.paper.shioaji_client import ShioajiPaperClient
+
+    client = ShioajiPaperClient()
+    client.login()
+
+
+_PROBES = {"finmind": _probe_finmind, "shioaji": _probe_shioaji}
+
+
+@router.post("/api/admin/settings/test-connection")
+def post_test_connection(
+    req: TestConnectionRequest,
+) -> JSONResponse:
+    if req.provider not in _VALID_PROVIDERS:
+        body = to_error(
+            "invalid_input",
+            f"provider must be one of {_VALID_PROVIDERS}, got {req.provider!r}",
+        )
+        return JSONResponse(status_code=400, content=body)
+
+    probe = _PROBES[req.provider]
+    start = perf_counter()
+    try:
+        probe()
+    except Exception as exc:  # noqa: BLE001
+        # The connectors raise *ConnectionError with messages that describe the
+        # transport/login failure but never echo the API key. Cap length so an
+        # unexpected verbose error can't bloat the response.
+        return JSONResponse(
+            status_code=200,
+            content=to_success({"ok": False, "error": str(exc)[:300]}),
+        )
+
+    latency_ms = int((perf_counter() - start) * 1000)
+    return JSONResponse(
+        status_code=200,
+        content=to_success({"ok": True, "latency_ms": latency_ms}),
+    )

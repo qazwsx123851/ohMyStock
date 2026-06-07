@@ -41,6 +41,11 @@ from ohmystock.safety.confirm_gate import (
     _compute_qty,
     confirm,
 )
+from ohmystock.safety.sizing_clamp import (
+    clamp_to_conservative,
+    exceeds_deviation,
+    exceeds_notional_limit,
+)
 
 
 _TPE_TZ = timezone(timedelta(hours=8))
@@ -214,7 +219,12 @@ def try_auto_execute(
     qty = _compute_qty(equity, final_sizing_pct, current_price)
     notional = qty * current_price
     max_notional = equity * settings.ohmystock_auto_execute_max_notional_pct
-    if notional > max_notional:
+    if exceeds_notional_limit(
+        qty,
+        current_price,
+        equity,
+        settings.ohmystock_auto_execute_max_notional_pct,
+    ):
         evidence = {
             "notional_twd": notional,
             "max_notional_twd": max_notional,
@@ -285,12 +295,15 @@ def try_auto_execute(
     # Step 8 — sizing clamp (NOT a fallback)
     stage = int(payload["stage"])
     sys_pct = _system_sizing_pct(stage)
-    deviation = abs(final_sizing_pct - sys_pct) / sys_pct
     raw_sizing = final_sizing_pct
     clamped_sizing: float | None = None
     outcome_label: AutoExecuteOutcome = "pass"
-    if deviation > settings.ohmystock_auto_execute_max_sizing_deviation:
-        clamped_sizing = min(final_sizing_pct, sys_pct)
+    if exceeds_deviation(
+        final_sizing_pct,
+        sys_pct,
+        settings.ohmystock_auto_execute_max_sizing_deviation,
+    ):
+        clamped_sizing = clamp_to_conservative(final_sizing_pct, sys_pct)
         # UPDATE the entry payload in-place so confirm() sees the clamped value.
         _patch_entry_payload(
             conn,
