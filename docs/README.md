@@ -21,6 +21,7 @@
 | `tools-contracts.md` | **21 個 `@register_tool` 工具的 I/O schema 唯一權威**（input / output / errors） | 中 |
 | `v3-decisions.md` | v3 已拍板決策（13 項）+ 預算追蹤 + 個人 milestone（取代舊 v3-review-summary.md「給主管」框架） | 小 |
 | `user-scenarios.md` | **Operator workflow** — Mark 在 admin 18 頁中的 10 個使用情境（日 / 週 / 月 / 異常 / cold start） | 中 |
+| `web-admin-user-testing-spec.md` | **後台使用者情境測試規格** — Tier 0–4 的 GWT 測試案例（可 1:1 轉 E2E）+ doc-vs-impl 落差總表 | 中 |
 
 ---
 
