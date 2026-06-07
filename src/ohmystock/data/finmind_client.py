@@ -45,6 +45,16 @@ class FinMindClient:
             "TaiwanStockMarginPurchaseShortSale", symbol, start, end
         )
 
+    def get_futures_institutional_investors(
+        self, futures_id: str, start: str, end: str
+    ) -> list[dict[str, Any]]:
+        """TaiwanFuturesInstitutionalInvestors rows for a futures contract
+        (e.g. ``TX`` for the TAIFEX index future). Used by the dashboard
+        market Risk-Off gate to read foreign net-short open interest."""
+        return self._fetch_dataset(
+            "TaiwanFuturesInstitutionalInvestors", futures_id, start, end
+        )
+
     def get_taiwan_stock_info(self) -> list[dict[str, Any]]:
         """Full TW market symbol roster (TaiwanStockInfo). No symbol/date filter."""
         params: dict[str, str] = {"dataset": "TaiwanStockInfo"}

@@ -14,6 +14,7 @@ type StatsData = {
   open_positions: number
   pending_confirms: number
   llm_cost_usd: number
+  risk_gate: { status: string; triggers: string[] }
   monthly_breaker: { tripped: boolean; month_pnl_pct: number }
   cost: { used_usd: number; budget_usd: number; pct: number }
 }
@@ -23,6 +24,7 @@ const DEFAULT_STATS: StatsData = {
   open_positions: 4,
   pending_confirms: 2,
   llm_cost_usd: 0.83,
+  risk_gate: { status: 'green', triggers: [] },
   monthly_breaker: { tripped: false, month_pnl_pct: -1.2 },
   cost: { used_usd: 40, budget_usd: 100, pct: 40 },
 }
@@ -94,6 +96,42 @@ describe('DashboardPage', () => {
     })
     // The companion symbol cell renders the payload symbol
     expect(screen.getByText('2454')).toBeInTheDocument()
+  })
+})
+
+describe('RiskGateLight', () => {
+  it('green status shows Risk-On and no triggers', async () => {
+    statsData = { ...DEFAULT_STATS, risk_gate: { status: 'green', triggers: [] } }
+    renderWithQuery(<DashboardPage />)
+    // wait for the loaded label (avoids the loading-state default-green race)
+    expect(await screen.findByText(/Risk-On/)).toBeInTheDocument()
+  })
+
+  it('yellow status shows the 注意 note', async () => {
+    statsData = {
+      ...DEFAULT_STATS,
+      risk_gate: { status: 'yellow', triggers: [] },
+    }
+    const { container } = renderWithQuery(<DashboardPage />)
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-risk-status="yellow"]'),
+      ).not.toBeNull(),
+    )
+    expect(screen.getByText(/部分訊號暫無資料/)).toBeInTheDocument()
+  })
+
+  it('red status lists the triggered conditions', async () => {
+    statsData = {
+      ...DEFAULT_STATS,
+      risk_gate: { status: 'red', triggers: ['vix_high', 'twd_depreciation'] },
+    }
+    const { container } = renderWithQuery(<DashboardPage />)
+    await waitFor(() =>
+      expect(container.querySelector('[data-risk-status="red"]')).not.toBeNull(),
+    )
+    expect(screen.getByText(/VIX 警戒/)).toBeInTheDocument()
+    expect(screen.getByText(/台幣單日貶值/)).toBeInTheDocument()
   })
 })
 

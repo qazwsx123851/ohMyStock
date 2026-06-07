@@ -9,12 +9,12 @@
 
 > 決策：成本遠高於其餘 8 項且觸及 market data 核心（VIX/TWD symbol 格式不符 `get_kline` regex，需改核心或繞 cache）+ 新增 forex source / FinMind 期貨方法。其餘 8 項（第 2–9 組）先完成。採接法 A（獨立模組純顯示，不動 risk_off）。
 
-- [ ] 1.1 後端：新增 market risk gate 判定模組，補齊 4 條 stub 條件（SPY 5日跌幅 / VIX 門檻 / TWD 貶值 / 外資台指期淨空連3日新高），資料源依 0.4；判定沿用 `workflow-cheatsheet.md` §0，不重抄公式
-- [ ] 1.2 後端：三色燈映射（green/yellow/red）+ 組裝 `risk_gate:{ status, triggers }` 進 dashboard summary（admin-read-endpoints）
-- [ ] 1.3 後端：判定模組單元測試（各條件觸發 + 組合 + 三態映射）+ endpoint 欄位測試
-- [ ] 1.4 前端：DashboardPage 加三色燈元件 + triggers 清單（red 可見觸發條件）
-- [ ] 1.5 前端：Vitest 覆蓋三狀態渲染
-- [ ] 1.6 文件：web-admin-user-testing-spec.md DB-B1 由 [BLOCKED] 改 [可測]
+- [x] 1.1 後端：新增 market risk gate 判定模組，補齊 4 條 stub 條件（SPY 5日跌幅 / VIX 門檻 / TWD 貶值 / 外資台指期淨空連3日新高），資料源依 0.4；判定沿用 `workflow-cheatsheet.md` §0，不重抄公式
+- [x] 1.2 後端：三色燈映射（green/yellow/red）+ 組裝 `risk_gate:{ status, triggers }` 進 dashboard summary（admin-read-endpoints）
+- [x] 1.3 後端：判定模組單元測試（各條件觸發 + 組合 + 三態映射）+ endpoint 欄位測試
+- [x] 1.4 前端：DashboardPage 加三色燈元件 + triggers 清單（red 可見觸發條件）
+- [x] 1.5 前端：Vitest 覆蓋三狀態渲染
+- [x] 1.6 文件：web-admin-user-testing-spec.md DB-B1 由 [BLOCKED] 改 [可測]
 
 ## 2. DB-B2 Dashboard 月度熔斷 banner（P0）
 
@@ -77,7 +77,7 @@
 
 ## 10. 收尾
 
-- [ ] 10.1 lib/api.ts 補齊新 endpoint 型別
-- [ ] 10.2 同步 web-admin-user-testing-spec.md 落差總表（已補實作的 D 標記 done）
-- [ ] 10.3 capability-map.md 加一列指向本 change archive
-- [ ] 10.4 全測試綠（後端 pytest + web-admin Vitest + 受影響 E2E）
+- [x] 10.1 lib/api.ts 補齊新 endpoint 型別
+- [x] 10.2 同步 web-admin-user-testing-spec.md 落差總表（已補實作的 D 標記 done）
+- [x] 10.3 capability-map.md 加一列指向本 change archive
+- [x] 10.4 全測試綠（後端 pytest + web-admin Vitest + 受影響 E2E）

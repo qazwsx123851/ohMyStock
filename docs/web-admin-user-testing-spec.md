@@ -54,7 +54,7 @@
 | **Tier 3 — 讀取面** | | | | |
 | DB-01 | Dashboard KPI 四卡 | / | P1 | [可測] |
 | DB-02 | LiveFeed SSE | / | P2 | [可測] |
-| DB-B1 | risk gate 三色燈 | / | P0 | [BLOCKED][偏離] |
+| DB-B1 | risk gate 三色燈 | / | P0 | [可測]（已實作） |
 | DB-B2 | 月度熔斷 banner | / | P0 | [可測]（已實作） |
 | DB-B3 | LLM 成本進度條變色 | / | P2 | [可測]（已實作） |
 | AU-01 | 多選 kind filter（回歸鎖定） | /audit | P1 | [可測] |
@@ -88,16 +88,16 @@
 | # | 主題 | user-scenarios.md | 實作現況 | 建議 |
 |---|---|---|---|---|
 | D1 | Confirm Gate 路由 | §2 在 `/decisions` | 內嵌在 `/paper`（PaperOverviewPage），無 `/decisions` 路由 | 改文件 |
-| D2 | confirm 二次輸入張數 | §2「觸發 ConfirmDialog 二次輸入張數」 | 直接 mutate，qty 由後端 sizing 算，無 dialog | 補實作 or 改文件（CG-B1）|
+| D2 | confirm 二次輸入張數 | §2「觸發 ConfirmDialog 二次輸入張數」 | 已補 ConfirmDialog + override_qty（伺服器 clamp） | 已實作（CG-B1 done）|
 | D3 | reject 自訂原因 | §2「寫進 reject reason」 | 已補 reject reason dialog（CG-B2 done） | 已實作 |
-| D4 | Dashboard risk gate 三色燈 | §1/§8 風險面板 | 不存在（只有 4 KPI 卡 + LiveFeed） | 補實作（DB-B1）|
-| D5 | Dashboard 月度熔斷 banner | §1/§8 紅色 banner | 不存在 | 補實作（DB-B2）|
-| D6 | Dashboard 成本進度條 | §1「≥80% 橘色進度條」 | 只有單一數字 | 補實作（DB-B3）|
+| D4 | Dashboard risk gate 三色燈 | §1/§8 風險面板 | 已補 5 條件三色燈（顯示用，接法 A） | 已實作（DB-B1 done）|
+| D5 | Dashboard 月度熔斷 banner | §1/§8 紅色 banner | 已補 banner（顯示用） | 已實作（DB-B2 done）|
+| D6 | Dashboard 成本進度條 | §1「≥80% 橘色進度條」 | 已補進度條（≥80% 橘） | 已實作（DB-B3 done）|
 | D7 | proposal 驗證後人工確認 | §6 看完 WFA 報告才點 merge/reject | validate 實跑後**自動**轉 approved/rejected | 改文件 or 加 dry-run 預設 |
 | D8 | proposal Re-validate 按鈕 | §6「[Re-validate] 換參數重跑」 | Run Validation 已帶上次參數重驗；rejected 後端不可重驗 | 現況已滿足（PR-B1 done），文件對齊 |
-| D9 | Settings 連線測試 | §9「點連線測試」 | 唯讀 snapshot，無測試鈕 | 補實作（ST-B1）|
-| D10 | Settings 剩餘額度/模型分布 | §9/§10 | payload 無此欄位 | 補實作（ST-B2）|
-| D11 | Memory 寫入偏好 | §10「在 /memory 寫入偏好」 | v0 刻意 read-only，無寫入 UI | 補實作（ME-B1）|
+| D9 | Settings 連線測試 | §9「點連線測試」 | 已補 test-connection endpoint + 按鈕 | 已實作（ST-B1 done）|
+| D10 | Settings 剩餘額度/模型分布 | §9/§10 | 已補 budget 區塊（唯讀） | 已實作（ST-B2 done）|
+| D11 | Memory 寫入偏好 | §10「在 /memory 寫入偏好」 | 已補寫入表單 + endpoint | 已實作（ME-B1 done）|
 
 ---
 

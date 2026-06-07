@@ -47,10 +47,20 @@ class YFinanceSource:
         """Resolve to a yfinance ticker.
 
         - Index codes ("TAIEX", "OTC") map to ``^TWII`` / ``^TWOII`` directly.
+        - Macro Risk-Off symbols (web-admin-scenario-gaps DB-B1): "SPY"
+          (US ETF, no suffix), "VIX" → ``^VIX``, "USDTWD" → ``USDTWD=X`` (the
+          get_kline symbol regex forbids ``^`` / ``=`` so the dashboard passes
+          the bare alias and we resolve the Yahoo ticker here).
         - Numeric stock codes try `.TW` (TWSE) then `.TWO` (OTC).
         Returns the first non-empty df, else None.
         """
-        index_map = {"TAIEX": "^TWII", "OTC": "^TWOII"}
+        index_map = {
+            "TAIEX": "^TWII",
+            "OTC": "^TWOII",
+            "SPY": "SPY",
+            "VIX": "^VIX",
+            "USDTWD": "USDTWD=X",
+        }
         if symbol in index_map:
             df = Ticker(index_map[symbol]).history(
                 start=start, end=end, interval="1d"

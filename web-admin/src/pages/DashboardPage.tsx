@@ -73,6 +73,68 @@ function KpiRow() {
 }
 
 // ---------------------------------------------------------------------------
+// RiskGateLight — green/yellow/red market Risk-Off light + triggers (DB-B1)
+// ---------------------------------------------------------------------------
+
+const RISK_TRIGGER_LABELS: Record<string, string> = {
+  taiex_below_ma60: '加權指數跌破 60MA',
+  spy_5d_drop: '美股 SPY 5 日跌幅 >3%',
+  vix_high: 'VIX 警戒（>25 或單日 +30%）',
+  twd_depreciation: '台幣單日貶值 >0.5%',
+  taifex_foreign_short_streak: '外資台指期淨空連 3 日新高',
+}
+
+const RISK_STATUS_META: Record<
+  string,
+  { dot: string; label: string; tone: string }
+> = {
+  green: { dot: 'bg-emerald-500', label: 'Risk-On（綠）', tone: 'border-border' },
+  yellow: { dot: 'bg-amber-500', label: '注意（黃）', tone: 'border-amber-500/50' },
+  red: { dot: 'bg-red-600', label: 'Risk-Off（紅）', tone: 'border-red-600/60 bg-red-600/5' },
+}
+
+function RiskGateLight() {
+  const { data, isLoading } = useSummary()
+  const rg = data?.risk_gate
+  const status = rg?.status ?? 'green'
+  const meta = RISK_STATUS_META[status] ?? RISK_STATUS_META.green
+  return (
+    <div
+      className={cn('rounded-lg border bg-card p-4 shadow-sm', meta.tone)}
+      data-risk-status={status}
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">
+          市場風險閘
+        </span>
+        <span className="flex items-center gap-2 text-sm font-medium">
+          <span
+            className={cn('inline-block size-2.5 rounded-full', meta.dot)}
+            aria-hidden
+          />
+          {isLoading && !rg ? '載入中…' : meta.label}
+        </span>
+      </div>
+      {rg && rg.triggers.length > 0 && (
+        <ul className="mt-3 space-y-1 text-sm text-red-700 dark:text-red-400">
+          {rg.triggers.map((t) => (
+            <li key={t} className="flex items-center gap-1.5">
+              <AlertTriangle className="size-3.5 shrink-0" aria-hidden />
+              {RISK_TRIGGER_LABELS[t] ?? t}
+            </li>
+          ))}
+        </ul>
+      )}
+      {status === 'yellow' && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          部分訊號暫無資料；評分目前僅採 TAIEX。
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // MonthlyBreakerBanner — red banner when month PnL hit the breaker threshold
 // ---------------------------------------------------------------------------
 
@@ -193,6 +255,7 @@ export function DashboardPage() {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr] lg:items-start">
       <div className="space-y-4">
+        <RiskGateLight />
         <MonthlyBreakerBanner />
         <KpiRow />
         <CostBar />

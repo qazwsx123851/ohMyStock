@@ -49,6 +49,18 @@ def conn() -> Iterator[sqlite3.Connection]:
         c.close()
 
 
+@pytest.fixture(autouse=True)
+def stub_risk_gate(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stub the market Risk-Off gate so stats tests never touch the network.
+    Individual tests can re-patch ``_risk_gate_for`` for risk_gate assertions."""
+
+    monkeypatch.setattr(
+        stats_module,
+        "_risk_gate_for",
+        lambda asof: stats_module.RiskGate(status="green", triggers=[]),
+    )
+
+
 @pytest.fixture()
 def freeze_today(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pin ``datetime.now(_TPE)`` inside the stats handler to 2026-05-03."""
@@ -342,6 +354,38 @@ async def test_cost_fields(
     assert data["cost"]["used_usd"] == pytest.approx(40.0)
     assert data["cost"]["budget_usd"] == pytest.approx(100.0)
     assert data["cost"]["pct"] == pytest.approx(40.0)
+
+
+async def test_risk_gate_field_passthrough(
+    conn: sqlite3.Connection,
+    freeze_today: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        stats_module,
+        "_risk_gate_for",
+        lambda asof: stats_module.RiskGate(
+            status="red", triggers=["vix_high", "spy_5d_drop"]
+        ),
+    )
+    settings = Settings()
+    async with _build_client_with_settings(conn, settings) as client:
+        r = await client.get("/api/admin/stats/today")
+    assert r.status_code == 200
+    rg = r.json()["data"]["risk_gate"]
+    assert rg["status"] == "red"
+    assert rg["triggers"] == ["vix_high", "spy_5d_drop"]
+
+
+async def test_risk_gate_default_green(
+    conn: sqlite3.Connection, freeze_today: None
+) -> None:
+    settings = Settings()
+    async with _build_client_with_settings(conn, settings) as client:
+        r = await client.get("/api/admin/stats/today")
+    rg = r.json()["data"]["risk_gate"]
+    assert rg["status"] == "green"
+    assert rg["triggers"] == []
 
 
 async def test_internal_error_redacts_path_and_sql() -> None:

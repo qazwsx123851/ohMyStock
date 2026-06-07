@@ -34,6 +34,13 @@ router = APIRouter(dependencies=[Depends(require_admin)])
 _TPE = ZoneInfo("Asia/Taipei")
 
 
+class RiskGate(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    status: str
+    triggers: list[str]
+
+
 class MonthlyBreaker(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -59,6 +66,7 @@ class StatsTodayData(BaseModel):
     rejects: int
     expires: int
     auto_execute_audits: int
+    risk_gate: RiskGate
     monthly_breaker: MonthlyBreaker
     cost: CostInfo
 
@@ -84,6 +92,23 @@ _AGGREGATE_SQL = """
 """
 
 
+def _risk_gate_for(asof: str) -> "RiskGate":
+    """Best-effort market Risk-Off gate. Never raises — a total failure maps to
+    yellow with no triggers so the dashboard counters stay unaffected."""
+    try:
+        from ohmystock.swarm.market_risk_gate import (
+            build_finmind_futures_fn,
+            evaluate_risk_gate_cached,
+        )
+
+        result = evaluate_risk_gate_cached(
+            asof, futures_fn=build_finmind_futures_fn()
+        )
+        return RiskGate(status=result.status, triggers=result.triggers)
+    except Exception:  # noqa: BLE001
+        return RiskGate(status="yellow", triggers=[])
+
+
 @router.get("/api/admin/stats/today")
 def get_stats_today(
     conn: sqlite3.Connection = Depends(get_db),
@@ -98,6 +123,10 @@ def get_stats_today(
             counts = (0, 0, 0, 0, 0, 0)
         else:
             counts = tuple(int(v or 0) for v in row)
+
+        # Market Risk-Off gate (DB-B1) — display only, never blocks the fast
+        # counters: any failure degrades to yellow/all-unknown.
+        risk_gate = _risk_gate_for(today_str)
 
         # Monthly circuit-breaker — display only (enforcement out of scope).
         # Threshold + PnL formula are SSOT (workflow-cheatsheet §0); we only
@@ -127,6 +156,7 @@ def get_stats_today(
             rejects=counts[3],
             expires=counts[4],
             auto_execute_audits=counts[5],
+            risk_gate=risk_gate,
             monthly_breaker=breaker,
             cost=cost,
         )
