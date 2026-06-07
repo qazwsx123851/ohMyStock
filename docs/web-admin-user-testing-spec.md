@@ -94,7 +94,7 @@
 | D5 | Dashboard 月度熔斷 banner | §1/§8 紅色 banner | 不存在 | 補實作（DB-B2）|
 | D6 | Dashboard 成本進度條 | §1「≥80% 橘色進度條」 | 只有單一數字 | 補實作（DB-B3）|
 | D7 | proposal 驗證後人工確認 | §6 看完 WFA 報告才點 merge/reject | validate 實跑後**自動**轉 approved/rejected | 改文件 or 加 dry-run 預設 |
-| D8 | proposal Re-validate 按鈕 | §6「[Re-validate] 換參數重跑」 | 無此鈕，須重開 ValidationDialog | 改文件 or 補鈕（PR-B1）|
+| D8 | proposal Re-validate 按鈕 | §6「[Re-validate] 換參數重跑」 | Run Validation 已帶上次參數重驗；rejected 後端不可重驗 | 現況已滿足（PR-B1 done），文件對齊 |
 | D9 | Settings 連線測試 | §9「點連線測試」 | 唯讀 snapshot，無測試鈕 | 補實作（ST-B1）|
 | D10 | Settings 剩餘額度/模型分布 | §9/§10 | payload 無此欄位 | 補實作（ST-B2）|
 | D11 | Memory 寫入偏好 | §10「在 /memory 寫入偏好」 | v0 刻意 read-only，無寫入 UI | 補實作（ME-B1）|
@@ -326,9 +326,16 @@
 - **Given** 目標路徑已存在同名檔
   **Then** 409 `conflict`
 
-### PR-B1 Re-validate 按鈕｜`P2`｜[BLOCKED][偏離]（D8）
+### PR-B1 Re-validate 按鈕｜`P2`｜[可測]（D8，現況已滿足）
 
-> **BLOCKED**：無 Re-validate 鈕。補實作後：rejected/validating 下提供一鍵帶入上次參數重開 ValidationDialog。
+> 現況已滿足：validating 狀態的 `[Run Validation…]` 開啟 ValidationDialog 時即從 localStorage `ohmystock.admin.lastValidation` 帶入上次參數（strategy/universe/wfa_windows/in_sample_ratio/initial_capital），等同 Re-validate。rejected 為終態且後端 validate 要求 `status=validating`，不可重驗（PR-05 終態守恆）。
+
+- **Given** validating 提案、localStorage 有上次驗證紀錄
+  **When** 點 `[Run Validation…]`
+  **Then** ValidationDialog 預填上次參數
+- **Given** 無 localStorage 紀錄
+  **When** 開 ValidationDialog
+  **Then** 使用預設值
 
 ---
 

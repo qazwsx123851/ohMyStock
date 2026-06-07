@@ -43,9 +43,8 @@
 - 決策：settings payload 新增 `budget` 區塊回 `{ used_usd, budget_usd, remaining_usd, model_mix:{ opus, sonnet, haiku } }`，讀 cost-tracking。前端唯讀顯示。
 - 理由：與 D-1 cost 同源，集中於 cost-tracking 既有統計。
 
-**D-6 Re-validate（PR-B1）**
-- 決策：純前端。ProposalDetailPage 在 validating（及 rejected，若允許重驗）狀態加 `[Re-validate]` 按鈕，帶入 localStorage `ohmystock.admin.lastValidation` 參數重開 ValidationDialog。無後端改動。
-- 理由：validate endpoint 已存在，只缺前端入口。
+**D-6 Re-validate（PR-B1）— 現況已滿足，無需改動**
+- 調查結論：`ValidationDialog` 開啟時已從 localStorage `ohmystock.admin.lastValidation` 帶入上次參數；validating 的 `[Run Validation…]` 即重驗。rejected 後端 validate 要求 `status=validating`（不可重驗）+ PR-05 終態守恆。PR-B1 兩個 scenario 已被現有 Run Validation 覆蓋，標 done、不寫多餘程式。
 
 **D-7 reject 原因輸入（CG-B2）**
 - 決策：PaperOverviewPage reject 改為開小 dialog 收 `reason`，移除寫死的 `user_reject`。後端契約不變（reason 已必填）。

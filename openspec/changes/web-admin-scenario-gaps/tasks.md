@@ -69,11 +69,11 @@
 - [ ] 8.3 前端：SettingsPage 唯讀顯示額度與模型分布
 - [ ] 8.4 文件：ST-B2 改 [可測]
 
-## 9. PR-B1 Proposal Re-validate 按鈕（P2）
+## 9. PR-B1 Proposal Re-validate 按鈕（P2）— 現況已滿足
 
-- [ ] 9.1 前端：ProposalDetailPage 可重驗狀態加 `[Re-validate]`，帶入 localStorage lastValidation 重開 ValidationDialog
-- [ ] 9.2 前端：Vitest 覆蓋帶入上次參數 / 無紀錄用預設
-- [ ] 9.3 文件：PR-B1 改 [可測]
+- [x] 9.1 調查結論：ValidationDialog 開啟即從 localStorage `ohmystock.admin.lastValidation` 帶入上次參數（strategy/universe/wfa_windows/in_sample_ratio/initial_capital）；validating 的 Run Validation 即重驗。rejected 後端不可重驗（validate 要求 status=validating）+ PR-05 終態守恆。無需新增程式。
+- [x] 9.2 現有 ValidationDialog（loadPersisted）行為已涵蓋「帶入上次參數 / 無紀錄用預設」。
+- [x] 9.3 文件：web-admin-user-testing-spec.md PR-B1 註記為現況已滿足
 
 ## 10. 收尾
 
