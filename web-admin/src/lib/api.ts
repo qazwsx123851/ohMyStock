@@ -40,6 +40,13 @@ export type OpenPosition = {
   entry_at: string
 }
 
+// Envelope returned by GET /api/admin/positions/open ({ items, asof_iso, count }).
+export type PositionsOpenResponse = {
+  items: OpenPosition[]
+  asof_iso: string
+  count: number
+}
+
 // Single row in GET /api/admin/journal/rows
 export type JournalRow = {
   id: number | string

@@ -78,7 +78,10 @@ describe('PaperPositionsPage', () => {
 
   it('resolved: renders both rows with --up/--down dual-encoding (color + arrow svg)', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ ok: true, data: POSITIONS_OK }),
+      jsonResponse({
+        ok: true,
+        data: { items: POSITIONS_OK, asof_iso: '2026-05-10T09:30:00+08:00', count: POSITIONS_OK.length },
+      }),
     )
 
     const { container } = renderWithQuery(<PaperPositionsPage />)
@@ -111,7 +114,10 @@ describe('PaperPositionsPage', () => {
 
   it('detail panel toggles when a row is clicked', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ ok: true, data: POSITIONS_OK }),
+      jsonResponse({
+        ok: true,
+        data: { items: POSITIONS_OK, asof_iso: '2026-05-10T09:30:00+08:00', count: POSITIONS_OK.length },
+      }),
     )
 
     const { container } = renderWithQuery(<PaperPositionsPage />)
@@ -132,7 +138,10 @@ describe('PaperPositionsPage', () => {
 
   it('empty: renders 目前無開倉 + ListOrdered icon when API returns []', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse({ ok: true, data: [] }),
+      jsonResponse({
+        ok: true,
+        data: { items: [], asof_iso: '2026-05-10T09:30:00+08:00', count: 0 },
+      }),
     )
 
     const { container } = renderWithQuery(<PaperPositionsPage />)

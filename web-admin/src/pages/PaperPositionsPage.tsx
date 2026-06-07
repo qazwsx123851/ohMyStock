@@ -9,7 +9,7 @@ import {
   RefreshCcw,
 } from 'lucide-react'
 import dayjs from 'dayjs'
-import { apiFetch, type OpenPosition } from '@/lib/api'
+import { apiFetch, type OpenPosition, type PositionsOpenResponse } from '@/lib/api'
 import { DataTable, type DataTableColumn } from '@/components/data-table'
 import { directionOf, type KpiDirection } from '@/components/kpi-card'
 import { Button } from '@/components/ui/button'
@@ -267,14 +267,15 @@ export function PaperPositionsPage() {
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null)
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['admin', 'positions', 'open'],
-    queryFn: () => apiFetch<OpenPosition[]>('/api/admin/positions/open'),
+    queryFn: () =>
+      apiFetch<PositionsOpenResponse>('/api/admin/positions/open'),
     refetchInterval: 30_000,
   })
 
   if (isLoading) return <LoadingState />
   if (error)
     return <ErrorState error={error as Error} onRetry={() => refetch()} />
-  const rows = data ?? []
+  const rows = data?.items ?? []
   if (rows.length === 0) return <EmptyState />
 
   const selected = rows.find((r) => r.symbol === selectedSymbol) ?? null

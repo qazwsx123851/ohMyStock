@@ -74,13 +74,11 @@ test.describe('web-admin smoke', () => {
     })
   }
 
-  // KNOWN BUG (not a harness defect): PaperPositionsPage types
-  // /api/admin/positions/open as OpenPosition[] and does `(data ?? []).find(...)`,
-  // but the endpoint returns the envelope { items: [...], asof_iso, count }. The
-  // object has no .find, so the page throws and unmounts the whole tree (nav
-  // disappears). Fix: mirror PaperOverviewPage — apiFetch<PositionsOpenResponse>
-  // and read `.items`. Un-fixme once fixed.
-  test.fixme('page loads: /paper/positions', async ({ page }) => {
+  // FIXED: PaperPositionsPage now reads the { items, asof_iso, count } envelope
+  // via apiFetch<PositionsOpenResponse> and `data?.items ?? []`, mirroring
+  // PaperOverviewPage. (Field-name mismatch between OpenPosition and the backend
+  // PositionItem is a separate, pre-existing concern — see api.ts.)
+  test('page loads: /paper/positions', async ({ page }) => {
     const errors = trackErrors(page)
     const resp = await page.goto('/paper/positions', {
       waitUntil: 'domcontentloaded',
