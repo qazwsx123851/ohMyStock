@@ -22,7 +22,7 @@ function row(
 const ROWS_OK: JournalRow[] = [
   row({
     id: 11,
-    kind: 'fill',
+    kind: 'exit',
     symbol: '2454',
     created_at: '2026-05-08T14:03:12+08:00',
     payload: { side: 'long', qty: 100, price: 1180 },
@@ -151,7 +151,7 @@ describe('PaperOrdersPage', () => {
     expect(screen.getByRole('button', { name: /重試/ })).toBeInTheDocument()
   })
 
-  it('filter: unchecking fill+reject and pressing 套用 fires fetch with kind=entry & kind=exit only', async () => {
+  it('filter: unchecking reject and pressing 套用 fires fetch with kind=entry & kind=exit only', async () => {
     const user = userEvent.setup()
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
@@ -162,16 +162,11 @@ describe('PaperOrdersPage', () => {
 
     fetchSpy.mockClear()
 
-    const fillCheckbox = document.querySelector(
-      'input[type="checkbox"][name="fill"]',
-    ) as HTMLInputElement
     const rejectCheckbox = document.querySelector(
       'input[type="checkbox"][name="reject"]',
     ) as HTMLInputElement
-    expect(fillCheckbox).not.toBeNull()
     expect(rejectCheckbox).not.toBeNull()
 
-    await user.click(fillCheckbox)
     await user.click(rejectCheckbox)
     await user.click(screen.getByRole('button', { name: '套用' }))
 
@@ -180,18 +175,17 @@ describe('PaperOrdersPage', () => {
     const url = String(lastCall[0])
     expect(url).toContain('kind=entry')
     expect(url).toContain('kind=exit')
-    expect(url).not.toContain('kind=fill')
     expect(url).not.toContain('kind=reject')
   })
 
-  it('filter bar renders 4 checkboxes whose names match JOURNAL_KIND_ENTRY_LIKE order', () => {
+  it('filter bar renders 3 checkboxes whose names match JOURNAL_KIND_ENTRY_LIKE order', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       () => new Promise(() => undefined),
     )
     const { container } = renderPage()
     const checkboxes = container.querySelectorAll('input[type="checkbox"]')
-    expect(checkboxes).toHaveLength(4)
+    expect(checkboxes).toHaveLength(3)
     const names = Array.from(checkboxes).map((c) => c.getAttribute('name'))
-    expect(names).toEqual(['entry', 'fill', 'exit', 'reject'])
+    expect(names).toEqual(['entry', 'exit', 'reject'])
   })
 })

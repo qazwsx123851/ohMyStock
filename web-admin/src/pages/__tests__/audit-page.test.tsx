@@ -23,7 +23,7 @@ function row(
 const ROWS_OK: JournalRow[] = [
   row({
     id: 101,
-    kind: 'fill',
+    kind: 'exit',
     payload: { side: 'long', qty: 100, price: 1180 },
   }),
   row({
@@ -33,7 +33,7 @@ const ROWS_OK: JournalRow[] = [
   }),
   row({
     id: 103,
-    kind: 'awaiting_confirm',
+    kind: 'expire',
     payload: { confidence: 0.82 },
   }),
 ]
@@ -162,7 +162,7 @@ describe('AuditPage', () => {
     expect(screen.getByText('comfortable')).toBeInTheDocument()
   })
 
-  it('renders 11 kind checkboxes whose names equal JOURNAL_KIND_ALL', () => {
+  it('renders 5 kind checkboxes whose names equal JOURNAL_KIND_ALL', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       () => new Promise(() => undefined),
     )

@@ -38,14 +38,14 @@ from ohmystock.eventbus import Agent, Event, EventType, safe_emit_sync
 
 def _build_query_repr(
     *,
-    kind: str | None,
+    kind: list[str] | None,
     symbol: str | None,
     date_from: str | None,
     date_to: str | None,
 ) -> str:
     parts: list[str] = []
     if kind is not None:
-        parts.append(f"kind={kind}")
+        parts.append(f"kind={','.join(kind)}")
     if symbol is not None:
         parts.append(f"symbol={symbol}")
     if date_from is not None:
@@ -104,15 +104,16 @@ def _parse_payload(payload_json: str, row_id: int) -> dict[str, Any]:
     return parsed
 
 
-def _validate_kind(kind: str | None) -> str | None:
-    if kind is None:
+def _validate_kinds(kinds: list[str] | None) -> list[str] | None:
+    if not kinds:
         return None
-    if kind not in _VALID_KINDS:
-        raise ValueError(
-            f"invalid kind {kind!r}; expected one of "
-            f"{sorted(_VALID_KINDS)}"
-        )
-    return kind
+    for kind in kinds:
+        if kind not in _VALID_KINDS:
+            raise ValueError(
+                f"invalid kind {kind!r}; expected one of "
+                f"{sorted(_VALID_KINDS)}"
+            )
+    return kinds
 
 
 def _validate_date(value: str | None, name: str) -> str | None:
@@ -127,7 +128,7 @@ def _validate_date(value: str | None, name: str) -> str | None:
 
 def _build_filters(
     *,
-    kind: str | None,
+    kind: list[str] | None,
     symbol: str | None,
     date_from: str | None,
     date_to: str | None,
@@ -135,9 +136,10 @@ def _build_filters(
     """Return ``(where_clause, params)`` — empty clause when no filter."""
     clauses: list[str] = []
     params: list[Any] = []
-    if kind is not None:
-        clauses.append("kind = ?")
-        params.append(kind)
+    if kind:
+        placeholders = ",".join("?" * len(kind))
+        clauses.append(f"kind IN ({placeholders})")
+        params.extend(kind)
     if symbol is not None:
         clauses.append("symbol = ?")
         params.append(symbol)
@@ -171,7 +173,7 @@ def _row_to_item(row: tuple[Any, ...]) -> JournalRowItem:
 
 @router.get("/api/admin/journal/rows")
 def get_journal_rows(
-    kind: str | None = Query(default=None),
+    kind: list[str] | None = Query(default=None),
     symbol: str | None = Query(default=None),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
@@ -180,7 +182,7 @@ def get_journal_rows(
     conn: sqlite3.Connection = Depends(get_db),
 ) -> JSONResponse:
     try:
-        kind_v = _validate_kind(kind)
+        kind_v = _validate_kinds(kind)
         date_from_v = _validate_date(date_from, "date_from")
         date_to_v = _validate_date(date_to, "date_to")
         if (

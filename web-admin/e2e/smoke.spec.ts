@@ -95,12 +95,11 @@ test.describe('web-admin smoke', () => {
     expect(unexpected).toEqual([])
   })
 
-  // KNOWN BUG (not a harness defect): /audit calls /api/admin/journal/rows with
-  // the frontend's 11-value JOURNAL_KIND_ALL, but the backend _VALID_KINDS only
-  // accepts 5 (entry/exit/reject/expire/auto_execute_audit), so the request
-  // 400s. Needs an SSOT decision on the journal `kind` taxonomy
-  // (docs/llm-decision-schema.md §4) before enabling. Un-fixme once resolved.
-  test.fixme('page loads: /audit', async ({ page }) => {
+  // FIXED: journal `kind` taxonomy is now SSOT-aligned — JOURNAL_KIND_ALL holds
+  // exactly the 5 backend _VALID_KINDS (docs/llm-decision-schema.md §4), and the
+  // backend accepts a repeatable `kind` query param (IN-clause) so the multi-
+  // select filter actually filters instead of 400-ing on the last value.
+  test('page loads: /audit', async ({ page }) => {
     const errors = trackErrors(page)
     const resp = await page.goto('/audit', { waitUntil: 'domcontentloaded' })
     expect(resp?.status() ?? 0).toBeLessThan(400)

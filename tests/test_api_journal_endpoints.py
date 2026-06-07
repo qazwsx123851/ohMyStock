@@ -163,9 +163,51 @@ async def test_rows_filter_by_kind(conn: sqlite3.Connection) -> None:
     assert body["data"]["items"][0]["kind"] == "entry"
 
 
+async def test_rows_filter_by_multiple_kinds(conn: sqlite3.Connection) -> None:
+    _insert(
+        conn,
+        decision_id="d1",
+        kind="entry",
+        symbol="2330",
+        created_at="2026-05-01T09:00:00+08:00",
+    )
+    _insert(
+        conn,
+        decision_id="d1",
+        kind="exit",
+        symbol="2330",
+        created_at="2026-05-02T09:00:00+08:00",
+    )
+    _insert(
+        conn,
+        decision_id="d2",
+        kind="reject",
+        symbol="2454",
+        created_at="2026-05-02T10:00:00+08:00",
+    )
+    async with _build_client(conn) as client:
+        r = await client.get("/api/admin/journal/rows?kind=entry&kind=exit")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["data"]["total"] == 2
+    kinds = {item["kind"] for item in body["data"]["items"]}
+    assert kinds == {"entry", "exit"}
+
+
 async def test_rows_invalid_kind_returns_400(conn: sqlite3.Connection) -> None:
     async with _build_client(conn) as client:
         r = await client.get("/api/admin/journal/rows?kind=fill")
+    assert r.status_code == 400
+    body = r.json()
+    assert body["ok"] is False
+    assert body["error"]["code"] == "invalid_input"
+
+
+async def test_rows_partially_invalid_kinds_returns_400(
+    conn: sqlite3.Connection,
+) -> None:
+    async with _build_client(conn) as client:
+        r = await client.get("/api/admin/journal/rows?kind=entry&kind=fill")
     assert r.status_code == 400
     body = r.json()
     assert body["ok"] is False

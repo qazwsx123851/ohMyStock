@@ -39,7 +39,7 @@ TBD - created by archiving change read-side-admin-endpoints-v0. Update Purpose a
 
 系統 SHALL 提供 `GET /api/admin/journal/rows` 端點。Query string 接受所有選填欄位：
 
-- `kind: str | None`（合法值僅為 `"entry" | "exit" | "reject" | "expire" | "auto_execute_audit"`；其他 → 400 `invalid_input`）
+- `kind: list[str] | None`（可重複的 query param；每個值合法範圍僅為 `"entry" | "exit" | "reject" | "expire" | "auto_execute_audit"`，任一值非法 → 400 `invalid_input`。多值時以 `kind IN (...)` OR 過濾；未帶則不過濾 kind）
 - `symbol: str | None`（exact match，case-sensitive）
 - `date_from: str | None`（`"YYYY-MM-DD"`）
 - `date_to: str | None`（`"YYYY-MM-DD"`）
@@ -72,8 +72,13 @@ Handler SHALL：
 - **WHEN** 發 `GET /api/admin/journal/rows?kind=entry`
 - **THEN** HTTP 200；`items` 長度 1；唯一一筆 `kind == "entry"`；`total == 1`
 
+#### Scenario: 多個 kind 過濾回 union（entry + exit）
+- **GIVEN** journal 內 entry / exit / reject 各一筆
+- **WHEN** 發 `GET /api/admin/journal/rows?kind=entry&kind=exit`
+- **THEN** HTTP 200；`items` 長度 2；`kind` 集合為 `{"entry", "exit"}`；`total == 2`
+
 #### Scenario: 不合法 kind 回 400 `invalid_input`
-- **WHEN** 發 `GET /api/admin/journal/rows?kind=fill`
+- **WHEN** 發 `GET /api/admin/journal/rows?kind=fill`（或多值中任一非法如 `?kind=entry&kind=fill`）
 - **THEN** HTTP 400；`["error"]["code"] == "invalid_input"`
 
 #### Scenario: limit > 500 silently clamps to 500
