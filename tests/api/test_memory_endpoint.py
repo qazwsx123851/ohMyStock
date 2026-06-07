@@ -399,7 +399,7 @@ async def test_search_malformed_query_returns_400_invalid_query(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("method", ["post", "put", "delete", "patch"])
+@pytest.mark.parametrize("method", ["put", "delete", "patch"])
 async def test_405_on_rows(conn: sqlite3.Connection, method: str) -> None:
     async with _build_client(conn) as c:
         fn = getattr(c, method)
@@ -481,3 +481,59 @@ async def test_lifespan_creates_memory_schema(
 
     assert table_names == {"memory_rows", "memory_rows_fts"}
     assert hasattr(routes_memory, "router")
+
+
+# ---------------------------------------------------------------------------
+# Create (POST /rows) — ME-B1
+# ---------------------------------------------------------------------------
+
+
+async def test_create_memory_row_success(conn: sqlite3.Connection) -> None:
+    async with _build_client(conn) as c:
+        r = await c.post(
+            "/api/admin/memory/rows",
+            json={
+                "kind": "note",
+                "content": "VCP breakout",
+                "tags": ["vcp"],
+                "source": "manual",
+            },
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is True
+    assert body["data"]["kind"] == "note"
+    assert body["data"]["tags"] == ["vcp"]
+
+    async with _build_client(conn) as c:
+        listed = await c.get("/api/admin/memory/rows")
+    assert listed.json()["data"]["total"] == 1
+
+
+async def test_create_invalid_kind_returns_400(conn: sqlite3.Connection) -> None:
+    async with _build_client(conn) as c:
+        r = await c.post(
+            "/api/admin/memory/rows",
+            json={"kind": "garbage", "content": "x"},
+        )
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_input"
+
+
+async def test_create_empty_content_returns_400(conn: sqlite3.Connection) -> None:
+    async with _build_client(conn) as c:
+        r = await c.post(
+            "/api/admin/memory/rows",
+            json={"kind": "note", "content": "  "},
+        )
+    assert r.status_code == 400
+    assert r.json()["error"]["code"] == "invalid_input"
+
+
+async def test_create_no_auth_returns_401(conn: sqlite3.Connection) -> None:
+    async with _build_client(conn, with_auth=False) as c:
+        r = await c.post(
+            "/api/admin/memory/rows",
+            json={"kind": "note", "content": "x"},
+        )
+    assert r.status_code == 401

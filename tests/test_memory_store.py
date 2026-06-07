@@ -366,3 +366,48 @@ def test_search_clamps_limit_to_200(
     assert result.limit == 200
     assert result.total == 250
     assert result.has_more is True
+
+
+# ---------------------------------------------------------------------------
+# insert() — ME-B1
+# ---------------------------------------------------------------------------
+
+
+def test_insert_then_listable_and_searchable(store: MemoryStore) -> None:
+    row = store.insert(
+        kind="note", content="VCP breakout setup", tags=["vcp"], source="manual"
+    )
+    assert row.id > 0
+    assert row.kind == "note"
+    assert row.tags == ["vcp"]
+    assert row.source == "manual"
+
+    listed = store.list()
+    assert [r.id for r in listed.items] == [row.id]
+
+    found = store.search(q="breakout")
+    assert {r.id for r in found.items} == {row.id}
+
+
+def test_insert_sets_created_at_tpe(store: MemoryStore) -> None:
+    row = store.insert(kind="note", content="x")
+    assert row.created_at
+    assert "+08:00" in row.created_at
+
+
+def test_insert_defaults_tags_and_source(store: MemoryStore) -> None:
+    row = store.insert(kind="lesson", content="lesson body")
+    assert row.tags == []
+    assert row.source is None
+
+
+def test_insert_invalid_kind_raises(store: MemoryStore) -> None:
+    with pytest.raises(MemoryStoreError) as excinfo:
+        store.insert(kind="garbage", content="x")
+    assert excinfo.value.code == "invalid_input"
+
+
+def test_insert_empty_content_raises(store: MemoryStore) -> None:
+    with pytest.raises(MemoryStoreError) as excinfo:
+        store.insert(kind="note", content="   ")
+    assert excinfo.value.code == "invalid_input"

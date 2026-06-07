@@ -24,6 +24,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from ohmystock.api.auth import require_admin
 from ohmystock.api.routes._deps import get_db
@@ -112,6 +113,40 @@ def list_memory_rows(
             )
         ),
     )
+
+
+class _CreateMemoryRequest(BaseModel):
+    kind: str
+    content: str
+    tags: list[str] | None = None
+    source: str | None = None
+
+
+@router.post("/api/admin/memory/rows")
+def create_memory_row(
+    req: _CreateMemoryRequest,
+    conn: sqlite3.Connection = Depends(get_db),
+) -> JSONResponse:
+    try:
+        row = MemoryStore(conn).insert(
+            kind=req.kind,
+            content=req.content,
+            tags=req.tags,
+            source=req.source,
+        )
+    except MemoryStoreError as exc:
+        if exc.code == "invalid_input":
+            return JSONResponse(
+                status_code=400,
+                content=to_error("invalid_input", str(exc.message or exc.code)),
+            )
+        status, body = map_exception_to_envelope(exc)
+        return JSONResponse(status_code=status, content=body)
+    except Exception as exc:  # noqa: BLE001 — generic mapper redacts message
+        status, body = map_exception_to_envelope(exc)
+        return JSONResponse(status_code=status, content=body)
+
+    return JSONResponse(status_code=200, content=to_success(_row_to_json(row)))
 
 
 @router.get("/api/admin/memory/search")

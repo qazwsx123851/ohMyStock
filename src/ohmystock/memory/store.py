@@ -9,8 +9,10 @@ Public API (re-exported from ``ohmystock.memory.__init__``):
 * ``ListResult`` — frozen pydantic model holding ``items / total / limit /
   offset / has_more`` for paginated reads.
 * ``MemoryStore`` — wraps a ``sqlite3.Connection`` and exposes ``list(...)`` /
-  ``search(...)``. Deliberately has NO writers — producers (Phase 5 復盤,
-  proposal jobs) will land in their own changes.
+  ``search(...)`` / ``insert(...)``. ``insert`` was added by the
+  web-admin-scenario-gaps change (ME-B1) so the admin Memory page can write
+  personal preferences; the FTS5 index stays in sync via the AFTER INSERT
+  trigger.
 * ``MemoryStoreError`` — single exception type. ``code`` is one of
   ``invalid_input`` / ``invalid_query``.
 """
@@ -20,6 +22,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -31,6 +34,8 @@ _ALLOWED_KINDS: tuple[str, ...] = ("note", "lesson", "proposal", "review_summary
 
 _LIMIT_MAX = 200
 _LIMIT_DEFAULT = 50
+
+_TPE_TZ = timezone(timedelta(hours=8))
 
 # ASCII control characters (0x00..0x1F + 0x7F). Stripped from FTS5 query input
 # before binding so a paste of an accidental NUL or DEL char doesn't reach the
@@ -129,6 +134,12 @@ def _validate_kind(kind: str | None) -> str | None:
     return kind
 
 
+def _now_tpe_iso() -> str:
+    """Current time as a TPE (UTC+8) ISO 8601 string, second precision."""
+
+    return datetime.now(_TPE_TZ).isoformat(timespec="seconds")
+
+
 def _sanitise_q(q: str) -> str:
     """Strip whitespace + ASCII control chars from FTS5 ``q``.
 
@@ -171,8 +182,8 @@ class MemoryStore:
 
     Construction takes a ``sqlite3.Connection`` (the route layer hands one
     via ``Depends(get_db)``); the store does NOT manage the connection
-    lifecycle. NO writer methods are exposed by design — see spec
-    "Requirement: 不暴露寫入 API".
+    lifecycle. ``insert`` (ME-B1) is the sole writer; reads remain
+    ``list`` / ``search``.
     """
 
     def __init__(self, conn: sqlite3.Connection) -> None:
@@ -273,4 +284,47 @@ class MemoryStore:
             limit=effective_limit,
             offset=effective_offset,
             has_more=effective_offset + len(items) < total,
+        )
+
+    def insert(
+        self,
+        *,
+        kind: str,
+        content: str,
+        tags: list[str] | None = None,
+        source: str | None = None,
+    ) -> MemoryRow:
+        """Insert one memory row and return it.
+
+        Validates ``kind`` against the closed enum and requires non-empty
+        ``content`` (raises ``MemoryStoreError("invalid_input")`` otherwise).
+        The FTS5 index syncs automatically via the ``memory_rows_ai`` trigger.
+        """
+
+        kind_v = _validate_kind(kind)
+        if kind_v is None:
+            raise MemoryStoreError("invalid_input", "kind is required")
+        content_v = content.strip()
+        if not content_v:
+            raise MemoryStoreError(
+                "invalid_input", "content must not be empty"
+            )
+        tags_list = list(tags) if tags else []
+        tags_json = json.dumps(tags_list, ensure_ascii=False)
+        created_at = _now_tpe_iso()
+
+        with self._conn:
+            cur = self._conn.execute(
+                "INSERT INTO memory_rows (kind, content, tags, source, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (kind_v, content_v, tags_json, source, created_at),
+            )
+
+        return MemoryRow(
+            id=int(cur.lastrowid),
+            kind=kind_v,  # type: ignore[arg-type]
+            content=content_v,
+            tags=tags_list,
+            source=source,
+            created_at=created_at,
         )
