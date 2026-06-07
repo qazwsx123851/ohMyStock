@@ -764,6 +764,20 @@ export function searchMemory(
   return apiFetch<MemoryRowsResponse>(`/api/admin/memory/search${qs}`)
 }
 
+export function createMemory(
+  body: {
+    kind: MemoryKind
+    content: string
+    tags?: string[]
+    source?: string | null
+  },
+): Promise<MemoryRow> {
+  return apiFetch<MemoryRow>('/api/admin/memory/rows', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Proposal wrappers
 // ---------------------------------------------------------------------------

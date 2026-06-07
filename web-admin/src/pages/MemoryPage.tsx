@@ -18,10 +18,11 @@
  * Spec: openspec/changes/web-admin-memory-page-and-store/specs/web-admin-memory-page/spec.md
  */
 import * as React from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, X } from 'lucide-react'
 import {
   ApiError,
+  createMemory,
   listMemory,
   searchMemory,
   type MemoryKind,
@@ -301,6 +302,121 @@ function InlineQuerySyntaxError() {
 }
 
 // ---------------------------------------------------------------------------
+// Create form (ME-B1) — manual write of notes / preferences
+// ---------------------------------------------------------------------------
+
+function CreateMemoryForm() {
+  const queryClient = useQueryClient()
+  const [open, setOpen] = React.useState(false)
+  const [kind, setKind] = React.useState<MemoryKind>('note')
+  const [content, setContent] = React.useState('')
+  const [tagsRaw, setTagsRaw] = React.useState('')
+  const [source, setSource] = React.useState('')
+
+  const m = useMutation<MemoryRow, ApiError>({
+    mutationFn: () =>
+      createMemory({
+        kind,
+        content: content.trim(),
+        tags: tagsRaw
+          .split(',')
+          .map((t) => t.trim())
+          .filter(Boolean),
+        source: source.trim() || null,
+      }),
+    onSuccess: () => {
+      setContent('')
+      setTagsRaw('')
+      setSource('')
+      setOpen(false)
+      queryClient.invalidateQueries({ queryKey: ['memory', 'rows'] })
+    },
+  })
+
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => setOpen(true)}
+      >
+        + 新增 memory
+      </Button>
+    )
+  }
+
+  const canSubmit = content.trim().length > 0 && !m.isPending
+
+  return (
+    <Card className="space-y-3 p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-muted-foreground">Kind</span>
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value as MemoryKind)}
+            aria-label="新增 memory kind"
+            className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {(Object.keys(KIND_LABELS) as MemoryKind[]).map((k) => (
+              <option key={k} value={k}>
+                {KIND_LABELS[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <input
+          type="text"
+          value={tagsRaw}
+          onChange={(e) => setTagsRaw(e.target.value)}
+          placeholder="tags（逗號分隔，可選）"
+          aria-label="新增 memory tags"
+          className="w-56 rounded-md border border-input bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+        <input
+          type="text"
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          placeholder="來源（可選）"
+          aria-label="新增 memory 來源"
+          className="w-40 rounded-md border border-input bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        />
+      </div>
+      <textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="內容（必填）"
+        aria-label="新增 memory 內容"
+        rows={3}
+        className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      {m.error ? (
+        <p className="text-sm text-destructive">儲存失敗 — {m.error.message}</p>
+      ) : null}
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => m.mutate()}
+          disabled={!canSubmit}
+        >
+          儲存
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => setOpen(false)}
+        >
+          取消
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Browse view
 // ---------------------------------------------------------------------------
 
@@ -353,6 +469,7 @@ function BrowseView() {
       aria-labelledby="memory-browse-tab"
       className="space-y-3"
     >
+      <CreateMemoryForm />
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm">
           <span className="text-muted-foreground">Kind</span>
@@ -540,7 +657,7 @@ export function MemoryPage() {
       <header>
         <h1 className="text-xl font-semibold tracking-tight">長期記憶</h1>
         <p className="text-sm text-muted-foreground">
-          僅供瀏覽。內容由 Phase 5 復盤與 proposal 任務寫入；本頁不提供新增 / 編輯 / 刪除。
+          內容由 Phase 5 復盤與 proposal 任務寫入，也可在此手動新增筆記 / 偏好。編輯 / 刪除待後續。
         </p>
       </header>
 

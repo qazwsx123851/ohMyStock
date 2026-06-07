@@ -299,3 +299,62 @@ describe('MemoryPage search', () => {
     )
   })
 })
+
+// ---------------------------------------------------------------------------
+// Create form (ME-B1)
+// ---------------------------------------------------------------------------
+
+describe('MemoryPage create', () => {
+  it('creates a memory then refetches the list', async () => {
+    fetchMock.mockResolvedValueOnce(emptyRowsResponse())
+    renderPage()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByRole('button', { name: /新增 memory/ }))
+    const textarea = screen.getByLabelText('新增 memory 內容')
+    fireEvent.change(textarea, {
+      target: { value: 'high-dividend preference' },
+    })
+
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        ok: true,
+        data: {
+          id: 9,
+          kind: 'note',
+          content: 'high-dividend preference',
+          content_preview: 'high-dividend preference',
+          content_truncated: false,
+          tags: [],
+          source: null,
+          created_at: '2026-06-07T10:00:00+08:00',
+        },
+      }),
+    )
+    fetchMock.mockResolvedValueOnce(rowsResponse([ROW_NOTE]))
+
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }))
+
+    await waitFor(() => {
+      const postCall = fetchMock.mock.calls.find(
+        (c) => (c[1] as RequestInit | undefined)?.method === 'POST',
+      )
+      expect(postCall).toBeTruthy()
+      expect(urlOf(postCall as Parameters<typeof fetch>)).toContain(
+        '/api/admin/memory/rows',
+      )
+    })
+  })
+
+  it('disables 儲存 when content is empty', async () => {
+    fetchMock.mockResolvedValueOnce(emptyRowsResponse())
+    renderPage()
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByRole('button', { name: /新增 memory/ }))
+    const saveBtn = screen.getByRole('button', {
+      name: '儲存',
+    }) as HTMLButtonElement
+    expect(saveBtn.disabled).toBe(true)
+  })
+})

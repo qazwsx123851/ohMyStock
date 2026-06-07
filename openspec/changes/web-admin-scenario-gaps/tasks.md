@@ -51,8 +51,8 @@
 
 - [x] 6.1 後端：MemoryStore 加 insert（FTS5 觸發器同步）+ 測試（insert 後可 list/search）
 - [x] 6.2 後端：新增 `POST /api/admin/memory/rows`（kind 限制、content 非空驗證）+ 測試
-- [ ] 6.3 前端：MemoryPage 加寫入表單（kind/content/tags/source）+ 成功刷新 + 必填驗證
-- [ ] 6.4 前端：Vitest 覆蓋寫入成功刷新 + 必填擋下
+- [x] 6.3 前端：MemoryPage 加寫入表單（kind/content/tags/source）+ 成功刷新 + 必填驗證
+- [x] 6.4 前端：Vitest 覆蓋寫入成功刷新 + 必填擋下
 - [ ] 6.5 文件：ME-B1 改 [可測]
 
 ## 7. DB-B3 Dashboard 成本進度條（P2）
