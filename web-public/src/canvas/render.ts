@@ -18,7 +18,13 @@ import {
   type GridPos,
 } from '@/types/public-event'
 import { INK, WHITE } from '@/styles/palette'
-import { MOVABLE_SPRITES, spriteDrawPos } from './assets'
+import {
+  FACING_ROW,
+  MOVABLE_SPRITES,
+  SHEET_COLS,
+  WALK_FRAME_MS,
+  spriteDrawPos,
+} from './assets'
 
 function gridToPx(p: GridPos): { x: number; y: number } {
   return { x: p.x * TILE_PX, y: p.y * TILE_PX }
@@ -80,12 +86,23 @@ export function drawScene(
     const img = snap.sprites.get(char.id)
     const dest = lerpPos(char, now)
     const draw = spriteDrawPos(meta, dest.x, dest.y)
-    // 2-frame walking bob keeps single-pose sprites lively
-    if (char.state.kind === 'walking' && Math.floor(now / 150) % 2 === 1) {
-      draw.y -= 1
-    }
+    const row = FACING_ROW[char.facing]
+    const col =
+      char.state.kind === 'walking'
+        ? Math.floor(now / WALK_FRAME_MS) % SHEET_COLS
+        : 0
     if (imageReady(img)) {
-      ctx.drawImage(img, draw.x, draw.y)
+      ctx.drawImage(
+        img,
+        col * meta.w,
+        row * meta.h,
+        meta.w,
+        meta.h,
+        draw.x,
+        draw.y,
+        meta.w,
+        meta.h,
+      )
     }
     if (char.state.kind === 'acting' && char.state.bubble) {
       bubbles.push({ x: draw.x + meta.w / 2, y: draw.y, text: char.state.bubble })

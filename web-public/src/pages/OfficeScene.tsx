@@ -31,6 +31,7 @@ import {
   UNIFORM_NAVY,
 } from '@/styles/palette'
 import { hitTestCharacters } from '@/canvas/assets'
+import { isDemoMode, startDemo } from '@/lib/demoScenario'
 
 const LEGEND: ReadonlyArray<readonly [string, string]> = [
   ['Scanner', BLUE],
@@ -68,6 +69,11 @@ export function OfficeScene() {
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 5000)
     return () => window.clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    if (!isDemoMode()) return
+    return startDemo()
   }, [])
 
   const idle =

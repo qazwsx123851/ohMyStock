@@ -6,6 +6,7 @@
  */
 
 import { pathfind } from './pathfind'
+import { DEFAULT_FACINGS } from './characters/seats'
 import {
   type Character,
   type CharacterAction,
@@ -41,15 +42,24 @@ function startMovement(
   char: Character,
   target: GridPos,
   obstacles: ReadonlySet<GridKey>,
-  pendingAction: CharacterAction,
+  pendingAction: CharacterAction | undefined,
   now: number,
 ): void {
   const path = pathfind(char.pos, target, obstacles)
   if (path === null || path.length === 0) {
-    startAction(char, pendingAction, now)
+    if (pendingAction) {
+      startAction(char, pendingAction, now)
+    }
     return
   }
   char.state = { kind: 'walking', path, pathIdx: 0, lastStepAt: now }
+}
+
+function settleAtRest(char: Character): void {
+  if (char.pos.x === char.seat.x && char.pos.y === char.seat.y) {
+    // back home — restore the mockup rest pose
+    char.facing = DEFAULT_FACINGS[char.id]
+  }
 }
 
 export interface TickContext {
@@ -84,6 +94,7 @@ export function tick(char: Character, now: number, ctx: TickContext): void {
           startAction(char, pending, now)
         } else {
           char.state = { kind: 'idle' }
+          settleAtRest(char)
         }
         return
       }
@@ -103,6 +114,7 @@ export function tick(char: Character, now: number, ctx: TickContext): void {
           startAction(char, pending, now)
         } else {
           char.state = { kind: 'idle' }
+          settleAtRest(char)
         }
       }
       return
@@ -110,6 +122,13 @@ export function tick(char: Character, now: number, ctx: TickContext): void {
     case 'acting': {
       if (now - char.state.startedAt < char.state.durationMs) return
       char.state = { kind: 'idle' }
+      // Done performing away from home with nothing queued — walk back.
+      if (
+        !ctx.peekNext() &&
+        (char.pos.x !== char.seat.x || char.pos.y !== char.seat.y)
+      ) {
+        startMovement(char, char.seat, ctx.obstacles, undefined, now)
+      }
       return
     }
   }

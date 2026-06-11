@@ -32,7 +32,7 @@ export const DEFAULT_SEATS: Record<CharacterId, GridPos> = {
 export const DEFAULT_FACINGS: Record<CharacterId, Facing> = {
   scanner: 'up',
   pattern_analyst: 'up',
-  decider: 'down',
+  decider: 'up', // mockup shows him from behind (red cap, back view)
   trader: 'down',
   librarian: 'up',
   reviewer_1: 'up',
