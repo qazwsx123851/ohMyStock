@@ -29,9 +29,9 @@ export interface SpriteMeta {
 }
 
 export const MOVABLE_SPRITES: Partial<Record<CharacterId, SpriteMeta>> = {
-  proposer: { url: '/office/sheet_proposer.png', w: 23, h: 51, dx: 0, dy: 0 },
-  decider: { url: '/office/sheet_decider.png', w: 25, h: 51, dx: 0, dy: 0 },
-  trader: { url: '/office/sheet_trader.png', w: 22, h: 51, dx: 0, dy: 0 },
+  proposer: { url: '/office/sheet_proposer.png', w: 31, h: 53, dx: 0, dy: 0 },
+  decider: { url: '/office/sheet_decider.png', w: 27, h: 53, dx: 0, dy: 0 },
+  trader: { url: '/office/sheet_trader.png', w: 29, h: 53, dx: 0, dy: 0 },
 }
 
 export const FACING_ROW = { down: 0, up: 1, left: 2, right: 3 } as const

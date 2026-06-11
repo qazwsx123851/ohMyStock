@@ -12,7 +12,8 @@ PIXELLAB_API_KEY env var). Zip layout:
 
     <Name>/animations/animating/<south|north|west|east>/frame_00N.png
 
-Characters generated 2026-06-11 (walking-4-frames template, 68x68 canvas).
+Characters generated 2026-06-11 in Pokemon Gen 2 overworld style
+(48px, custom chibi proportions, walking-4-frames template, 68x68 canvas).
 Re-running is idempotent.
 
 Usage (from repo root):
@@ -37,9 +38,9 @@ ROW_ORDER = ["down", "up", "left", "right"]  # must match FACING_ROW in assets.t
 DIR_NAME = {"down": "south", "up": "north", "left": "west", "right": "east"}
 
 CHAR_IDS: dict[str, str] = {
-    "proposer": "c5ede9c7-4e2d-454f-abd5-aa7f296b4864",
-    "decider": "27bd26f0-d279-477f-b9e9-2de69ea2635a",
-    "trader": "b55434a5-0f35-4cdd-833c-0c430face2fa",
+    "proposer": "de7aaa2d-fb14-4fed-83c0-034024cc03c4",
+    "decider": "69ae4c53-b940-4826-a699-95ae3f4c1bcb",
+    "trader": "f16182ec-094f-4bd2-8e6e-2ca42f0b9fa8",
 }
 
 
