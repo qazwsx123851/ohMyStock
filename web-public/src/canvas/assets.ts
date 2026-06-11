@@ -16,8 +16,8 @@ export const BG_URL = '/office/office-bg.png'
 
 /**
  * Sprite sheets: 4 rows = facing down / up / left / right, 4 cols = walk
- * cycle (stand / step-A / stand / step-B). Cell size = w × h. Built by
- * scripts/build_walk_sheets.py.
+ * cycle frames. Cell size = w × h. Built by
+ * scripts/fetch_pixellab_sheets.py (PixelLab walking-4-frames).
  */
 export interface SpriteMeta {
   url: string
@@ -29,9 +29,9 @@ export interface SpriteMeta {
 }
 
 export const MOVABLE_SPRITES: Partial<Record<CharacterId, SpriteMeta>> = {
-  proposer: { url: '/office/sheet_proposer.png', w: 41, h: 57, dx: 6, dy: -1 },
-  decider: { url: '/office/sheet_decider.png', w: 47, h: 50, dx: 4, dy: -3 },
-  trader: { url: '/office/sheet_trader.png', w: 44, h: 54, dx: 4, dy: 3 },
+  proposer: { url: '/office/sheet_proposer.png', w: 23, h: 51, dx: 0, dy: 0 },
+  decider: { url: '/office/sheet_decider.png', w: 25, h: 51, dx: 0, dy: 0 },
+  trader: { url: '/office/sheet_trader.png', w: 22, h: 51, dx: 0, dy: 0 },
 }
 
 export const FACING_ROW = { down: 0, up: 1, left: 2, right: 3 } as const
