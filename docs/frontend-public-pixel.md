@@ -97,15 +97,17 @@
 
 | character_id | 中文名 | 對應 ohMyStock 元件 | 預設座位 (grid x,y) | 主要 event |
 |---|---|---|---|---|
-| `scanner` | 掃盤員 | `screener_tool` | (2, 7) 左側工作站 | `screener_started` / `screener_completed` |
-| `pattern_analyst` | 型態分析師 | `vcp_detector` / `pattern_lib` | (5, 7) 左側工作站 | `pattern_detected` |
-| `decider` | 決策官 | `entry_decision_team` swarm | (9, 9) 室中央（紅帽） | `decider_thinking` / `decision_made` |
-| `trader` | 下單員 | Confirm Gate + Broker | (16, 7) 櫃台後 | `awaiting_confirm` / `order_sent` |
-| `librarian` | 圖書館員 | Trade Journal Service | (5, 13) 圖書桌凳 | `journal_written` / `journal_queried` |
-| `reviewer_1..5` | 五節點檢討團 | `post_trade_review_team` | (13,13) (16,13) (18,13) (12,14) (20,13) 右下檢討區 | `review_node_started` / `review_completed` |
-| `proposer` | 提案員 | `proposal_tool` | 流動，初始 (8, 4) 白板前 | `proposal_created` |
-| `validator` | 驗證員 | Proposal Validation Service | (10, 13) | `wfa_started` / `wfa_passed` / `wfa_failed` |
-| `guard` | 警衛 | Risk Gate | 入口 (0, 8) | `risk_off_triggered` |
+| `scanner` | 掃盤員 | `screener_tool` | (6, 12) 左側工作站（烙印於底圖） | `screener_started` / `screener_completed` |
+| `pattern_analyst` | 型態分析師 | `vcp_detector` / `pattern_lib` | (11, 12) 左側工作站（烙印於底圖） | `pattern_detected` |
+| `decider` | 決策官 | `entry_decision_team` swarm | (17, 16) 室中央（紅帽，可走動 sprite） | `decider_thinking` / `decision_made` |
+| `trader` | 下單員 | Confirm Gate + Broker | (26, 12) 櫃台後（可走動 sprite） | `awaiting_confirm` / `order_sent` |
+| `librarian` | 圖書館員 | Trade Journal Service | (6, 21) 圖書桌（僅氣泡） | `journal_written` / `journal_queried` |
+| `reviewer_1..5` | 五節點檢討團 | `post_trade_review_team` | (23,21) (27,21) 烙印於底圖；(25,24) (21,24) (28,24) 僅氣泡 | `review_node_started` / `review_completed` |
+| `proposer` | 提案員 | `proposal_tool` | (18, 10) 白板前（可走動 sprite） | `proposal_created` |
+| `validator` | 驗證員 | Proposal Validation Service | (15, 22)（僅氣泡） | `wfa_started` / `wfa_passed` / `wfa_failed` |
+| `guard` | 警衛 | Risk Gate | 入口 (0, 15)（僅氣泡） | `risk_off_triggered` |
+
+> 視覺三層：**可走動 sprite**（proposer/decider/trader，從設計圖摳出的 PNG）、**烙印於底圖**（4 個坐姿員工，可點擊、原地動作）、**僅氣泡**（其餘角色）。座標為 35×27 grid（16px cell，底圖 564×445）。資產由 `web-public/scripts/extract_office_assets.py` 從 `UI_Design.png` 產生。
 
 > Sprite 來源：v1 使用開源 [Metro City pixel pack](https://itch.io/) 或自繪（後續決定，見 plan「後續決定點」）。
 

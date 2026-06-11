@@ -16,23 +16,32 @@ import {
   CANVAS_LOGICAL_H,
   CANVAS_LOGICAL_W,
   CSS_SCALE,
-  TILE_PX,
   type Character,
-  type CharacterId,
 } from '@/types/public-event'
-import { INK } from '@/styles/palette'
-import { CHARACTER_STYLES } from '@/canvas/spritePlaceholder'
+import {
+  BLUE,
+  BLUE_DARK,
+  CYAN,
+  GREEN_LEAF,
+  INK,
+  INK_SOFT,
+  ORANGE,
+  RED,
+  TEAL,
+  UNIFORM_NAVY,
+} from '@/styles/palette'
+import { hitTestCharacters } from '@/canvas/assets'
 
-const LEGEND: ReadonlyArray<readonly [string, CharacterId]> = [
-  ['Scanner', 'scanner'],
-  ['PatternAnalyst', 'pattern_analyst'],
-  ['Decider', 'decider'],
-  ['Trader', 'trader'],
-  ['Librarian', 'librarian'],
-  ['Validator', 'validator'],
-  ['Reviewer', 'reviewer_1'],
-  ['Proposer', 'proposer'],
-  ['Guard', 'guard'],
+const LEGEND: ReadonlyArray<readonly [string, string]> = [
+  ['Scanner', BLUE],
+  ['PatternAnalyst', BLUE_DARK],
+  ['Decider', RED],
+  ['Trader', GREEN_LEAF],
+  ['Librarian', ORANGE],
+  ['Validator', TEAL],
+  ['Reviewer', CYAN],
+  ['Proposer', UNIFORM_NAVY],
+  ['Guard', INK_SOFT],
 ]
 
 const IDLE_TIMEOUT_MS = 60_000
@@ -72,25 +81,17 @@ export function OfficeScene() {
     const rect = canvas.getBoundingClientRect()
     const xLogical = ((ev.clientX - rect.left) * CANVAS_LOGICAL_W) / rect.width
     const yLogical = ((ev.clientY - rect.top) * CANVAS_LOGICAL_H) / rect.height
-    const gx = Math.floor(xLogical / TILE_PX)
-    const gy = Math.floor(yLogical / TILE_PX)
-    const hit = characters.find((c) => c.pos.x === gx && c.pos.y === gy)
-    setSelected(hit ?? null)
+    setSelected(hitTestCharacters(characters, xLogical, yLogical))
   }
 
   return (
     <section className="relative flex flex-col items-center">
       <div
-        data-testid="office-bezel"
-        className="rounded-2xl p-2.5"
-        style={{ background: INK, border: `3px solid ${INK}`, boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}
-      >
-      <div
         style={{
           width: CANVAS_LOGICAL_W * CSS_SCALE,
           height: CANVAS_LOGICAL_H * CSS_SCALE,
         }}
-        className="relative overflow-hidden rounded-lg"
+        className="relative"
       >
         <canvas
           ref={canvasRef}
@@ -118,16 +119,15 @@ export function OfficeScene() {
           </div>
         )}
       </div>
-      </div>
       <div
         data-testid="role-legend"
         className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1"
       >
-        {LEGEND.map(([label, id]) => (
-          <span key={id} className="flex items-center gap-1 text-xs text-[color:var(--muted-foreground)]">
+        {LEGEND.map(([label, colour]) => (
+          <span key={label} className="flex items-center gap-1 text-xs text-[color:var(--muted-foreground)]">
             <span
               className="inline-block h-2.5 w-2.5 rounded-[2px]"
-              style={{ background: CHARACTER_STYLES[id].shirt }}
+              style={{ background: colour }}
             />
             {label}
           </span>

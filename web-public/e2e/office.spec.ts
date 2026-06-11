@@ -11,22 +11,17 @@ import { expect, test } from '@playwright/test'
  * Spec: openspec/changes/web-public-pixel-office-mvp/specs/web-public-pixel-office/spec.md
  */
 
-test('canvas mounts at 384x256 with pixelated rendering and integer scale', async ({ page }) => {
+test('canvas mounts at the design-mockup resolution with pixelated rendering', async ({ page }) => {
   await page.goto('/')
   const canvas = page.getByTestId('office-canvas')
   await expect(canvas).toBeVisible()
-  await expect(canvas).toHaveAttribute('width', '384')
-  await expect(canvas).toHaveAttribute('height', '256')
+  await expect(canvas).toHaveAttribute('width', '564')
+  await expect(canvas).toHaveAttribute('height', '445')
 
   const rendering = await canvas.evaluate(
     (el) => window.getComputedStyle(el).imageRendering,
   )
   expect(rendering).toBe('pixelated')
-
-  const transform = await canvas.evaluate(
-    (el) => window.getComputedStyle(el).transform,
-  )
-  expect(transform).toMatch(/matrix\(2, ?0, ?0, ?2/)
 })
 
 test('disclaimer banner renders without close button', async ({ page }) => {

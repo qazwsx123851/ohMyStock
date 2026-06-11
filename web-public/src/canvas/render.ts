@@ -1,11 +1,10 @@
 /**
  * Single-pass scene renderer. Called every animation frame.
  *
- * Layout mirrors the reference design mockup: cream wall with furniture
- * along the top, sage checkered floor, workstations mid-left, L-shaped
- * reception counter right, review desks bottom-right, library table
- * bottom-left. Obstacle footprints live in characters/obstacles.ts and
- * MUST stay in sync with the geometry drawn here.
+ * The office is the design-mockup background image drawn 1:1; only the
+ * three standing protagonists (proposer / decider / trader) are drawn as
+ * dynamic sprites on top. Every character — drawn or baked — can show an
+ * action speech bubble anchored at its seat.
  *
  * Spec: openspec/specs/web-public-pixel-office/spec.md
  *       (Requirements: Office Scene Layout, Integer-Scale Pixel Rendering)
@@ -18,152 +17,11 @@ import {
   type Character,
   type GridPos,
 } from '@/types/public-event'
-import {
-  BLUE,
-  FLOOR_A,
-  FLOOR_A_DITHER,
-  FLOOR_B,
-  FLOOR_B_DITHER,
-  INK,
-  RED,
-  WALL_CREAM,
-  WALL_CREAM_SHADOW,
-  WALL_TRIM,
-  WALL_TRIM_DARK,
-  WHITE,
-} from '@/styles/palette'
-import {
-  drawBookshelf,
-  drawCabinet,
-  drawChairBack,
-  drawChairSeat,
-  drawCounterH,
-  drawCounterPlant,
-  drawCounterV,
-  drawDrawerUnit,
-  drawLibraryTable,
-  drawLocker,
-  drawPapers,
-  drawPlant,
-  drawPrinter,
-  drawRetroPC,
-  drawSideTable,
-  drawStool,
-  drawTrashBin,
-  drawVending,
-  drawWallClock,
-  drawWallFrames,
-  drawWaterCooler,
-  drawWhiteboard,
-  drawWindow,
-  drawWorkDesk,
-} from './tiles'
-
-const WALL_ROWS = 3
-
-/** Desk chairs (seat under the character, backrest over it). */
-const CHAIRS: ReadonlyArray<{ pos: GridPos; colour: string }> = [
-  { pos: { x: 2, y: 7 }, colour: RED },
-  { pos: { x: 5, y: 7 }, colour: BLUE },
-  { pos: { x: 13, y: 13 }, colour: BLUE },
-  { pos: { x: 16, y: 13 }, colour: BLUE },
-]
+import { INK, WHITE } from '@/styles/palette'
+import { MOVABLE_SPRITES, spriteDrawPos } from './assets'
 
 function gridToPx(p: GridPos): { x: number; y: number } {
   return { x: p.x * TILE_PX, y: p.y * TILE_PX }
-}
-
-function drawWallAndFloor(ctx: CanvasRenderingContext2D): void {
-  const wallH = WALL_ROWS * TILE_PX
-  // Cream wall + wood baseboard
-  ctx.fillStyle = WALL_CREAM
-  ctx.fillRect(0, 0, CANVAS_LOGICAL_W, wallH)
-  ctx.fillStyle = WALL_CREAM_SHADOW
-  ctx.fillRect(0, wallH - 17, CANVAS_LOGICAL_W, 4)
-  ctx.fillStyle = WALL_TRIM
-  ctx.fillRect(0, wallH - 13, CANVAS_LOGICAL_W, 11)
-  ctx.fillStyle = WALL_TRIM_DARK
-  ctx.fillRect(0, wallH - 3, CANVAS_LOGICAL_W, 2)
-  ctx.fillStyle = INK
-  ctx.fillRect(0, wallH - 1, CANVAS_LOGICAL_W, 1)
-
-  // Sage checkered floor with diagonal dither texture
-  for (let gy = WALL_ROWS; gy < CANVAS_LOGICAL_H / TILE_PX; gy++) {
-    for (let gx = 0; gx < CANVAS_LOGICAL_W / TILE_PX; gx++) {
-      const light = (gx + gy) % 2 === 0
-      const tx = gx * TILE_PX
-      const ty = gy * TILE_PX
-      ctx.fillStyle = light ? FLOOR_A : FLOOR_B
-      ctx.fillRect(tx, ty, TILE_PX, TILE_PX)
-      ctx.fillStyle = light ? FLOOR_A_DITHER : FLOOR_B_DITHER
-      for (let i = 0; i < 4; i++) {
-        ctx.fillRect(tx + i * 4 + (light ? 0 : 2), ty + i * 4, 2, 2)
-      }
-    }
-  }
-}
-
-function drawStaticFurniture(ctx: CanvasRenderingContext2D): void {
-  const T = TILE_PX
-  // --- Top wall, left to right ---
-  drawPlant(ctx, 1 * T, 18)
-  drawBookshelf(ctx, 2 * T, 6)
-  drawSideTable(ctx, 5 * T, 30)
-  drawWhiteboard(ctx, 7 * T, 6)
-  drawWallClock(ctx, 172, 8)
-  drawWallClock(ctx, 188, 8)
-  drawWallFrames(ctx, 204, 8)
-  drawCabinet(ctx, 224, 7)
-  drawLocker(ctx, 256, 7)
-  drawRetroPC(ctx, 274, 7)
-  drawWindow(ctx, 308, 8)
-  drawPlant(ctx, 344, 18)
-  // --- Left wall ---
-  drawVending(ctx, 0, 50)
-  // --- Mid-left workstations ---
-  drawWorkDesk(ctx, 2 * T, 6 * T)
-  drawWorkDesk(ctx, 5 * T, 6 * T)
-  // --- Reception counter (L-shape) ---
-  drawCounterH(ctx, 13 * T, 8 * T, 9 * T)
-  drawCounterV(ctx, 21 * T, 9 * T, 3 * T)
-  drawCounterPlant(ctx, 14 * T + 2, 8 * T + 2)
-  drawPapers(ctx, 19 * T, 8 * T + 3)
-  // --- Right wall ---
-  drawPrinter(ctx, 22 * T, 68)
-  drawDrawerUnit(ctx, 22 * T + 2, 100)
-  drawWaterCooler(ctx, 21 * T, 194)
-  drawTrashBin(ctx, 22 * T + 1, 226)
-  // --- Review desks bottom-right ---
-  drawWorkDesk(ctx, 13 * T, 12 * T)
-  drawWorkDesk(ctx, 16 * T, 12 * T)
-  // --- Library corner bottom-left ---
-  drawLibraryTable(ctx, 3 * T, 11 * T)
-  drawStool(ctx, 5 * T, 13 * T)
-  drawPlant(ctx, 1 * T, 194)
-}
-
-function frameIndex(char: Character, now: number): number {
-  if (char.state.kind === 'walking') {
-    const seq = [0, 1, 0, 2] as const
-    return seq[Math.floor((now - char.state.lastStepAt) / 150) % 4]!
-  }
-  if (char.state.kind === 'acting') {
-    return 3
-  }
-  return 0
-}
-
-function facingRow(char: Character): number {
-  switch (char.facing) {
-    case 'down':
-      return 0
-    case 'up':
-      return 1
-    case 'left':
-      return 2
-    case 'right':
-      return 3
-  }
 }
 
 function lerpPos(char: Character, now: number): { x: number; y: number } {
@@ -183,9 +41,19 @@ function lerpPos(char: Character, now: number): { x: number; y: number } {
   }
 }
 
+function imageReady(img: CanvasImageSource | null | undefined): img is HTMLImageElement {
+  return (
+    !!img &&
+    img instanceof HTMLImageElement &&
+    img.complete &&
+    img.naturalWidth > 0
+  )
+}
+
 export interface SceneSnapshot {
   characters: ReadonlyArray<Character>
   sprites: ReadonlyMap<string, CanvasImageSource>
+  bg: HTMLImageElement | null
 }
 
 export function drawScene(
@@ -195,42 +63,42 @@ export function drawScene(
 ): void {
   ctx.imageSmoothingEnabled = false
 
-  drawWallAndFloor(ctx)
-  drawStaticFurniture(ctx)
-  for (const chair of CHAIRS) {
-    const p = gridToPx(chair.pos)
-    drawChairSeat(ctx, p.x, p.y, chair.colour)
+  if (imageReady(snap.bg)) {
+    ctx.drawImage(snap.bg, 0, 0)
+  } else {
+    ctx.fillStyle = INK
+    ctx.fillRect(0, 0, CANVAS_LOGICAL_W, CANVAS_LOGICAL_H)
   }
 
-  // Painter's order: lower characters drawn later so they overlap upper ones.
-  const sorted = [...snap.characters].sort((a, b) => a.pos.y - b.pos.y)
+  // Movable sprites, lower characters drawn later for correct overlap.
+  const movable = snap.characters
+    .filter((c) => MOVABLE_SPRITES[c.id])
+    .sort((a, b) => a.pos.y - b.pos.y)
   const bubbles: Array<{ x: number; y: number; text: string }> = []
-  for (const char of sorted) {
-    const sheet = snap.sprites.get(char.id)
-    if (!sheet) continue
-    const row = facingRow(char)
-    const col = frameIndex(char, now)
+  for (const char of movable) {
+    const meta = MOVABLE_SPRITES[char.id]!
+    const img = snap.sprites.get(char.id)
     const dest = lerpPos(char, now)
-    ctx.drawImage(
-      sheet,
-      col * TILE_PX,
-      row * TILE_PX,
-      TILE_PX,
-      TILE_PX,
-      Math.round(dest.x),
-      Math.round(dest.y),
-      TILE_PX,
-      TILE_PX,
-    )
+    const draw = spriteDrawPos(meta, dest.x, dest.y)
+    // 2-frame walking bob keeps single-pose sprites lively
+    if (char.state.kind === 'walking' && Math.floor(now / 150) % 2 === 1) {
+      draw.y -= 1
+    }
+    if (imageReady(img)) {
+      ctx.drawImage(img, draw.x, draw.y)
+    }
     if (char.state.kind === 'acting' && char.state.bubble) {
-      bubbles.push({ x: dest.x, y: dest.y, text: char.state.bubble })
+      bubbles.push({ x: draw.x + meta.w / 2, y: draw.y, text: char.state.bubble })
     }
   }
 
-  // Chair backrests occlude seated characters' legs (they face the desk).
-  for (const chair of CHAIRS) {
-    const p = gridToPx(chair.pos)
-    drawChairBack(ctx, p.x, p.y, chair.colour)
+  // Baked / bubble-only characters still speak.
+  for (const char of snap.characters) {
+    if (MOVABLE_SPRITES[char.id]) continue
+    if (char.state.kind === 'acting' && char.state.bubble) {
+      const p = gridToPx(char.pos)
+      bubbles.push({ x: p.x + TILE_PX / 2, y: p.y, text: char.state.bubble })
+    }
   }
 
   for (const b of bubbles) {
@@ -240,16 +108,16 @@ export function drawScene(
 
 function drawBubble(
   ctx: CanvasRenderingContext2D,
-  px: number,
-  py: number,
+  cx: number,
+  topY: number,
   text: string,
 ): void {
-  const padding = 2
-  ctx.font = '6px ui-monospace, monospace'
+  const padding = 3
+  ctx.font = '10px ui-monospace, monospace'
   const w = Math.ceil(ctx.measureText(text).width) + padding * 2
-  const h = 9
-  const bx = Math.min(CANVAS_LOGICAL_W - w - 1, Math.max(1, px - w / 2 + TILE_PX / 2))
-  const by = Math.max(1, py - h - 1)
+  const h = 16
+  const bx = Math.min(CANVAS_LOGICAL_W - w - 1, Math.max(1, cx - w / 2))
+  const by = Math.max(1, topY - h - 2)
   ctx.fillStyle = WHITE
   ctx.fillRect(bx, by, w, h)
   ctx.strokeStyle = INK

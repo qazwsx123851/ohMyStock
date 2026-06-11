@@ -16,7 +16,7 @@ import {
   type PublicEvent,
 } from '@/types/public-event'
 import { DEFAULT_FACINGS, DEFAULT_SEATS } from '@/canvas/characters/seats'
-import { generatePlaceholderSheet } from '@/canvas/spritePlaceholder'
+import { BG_URL, MOVABLE_SPRITES, isMovable, loadImage } from '@/canvas/assets'
 
 export const QUEUE_CAP = 5
 export const TIMELINE_CAP = 100
@@ -37,18 +37,18 @@ function makeInitialQueues(): Record<CharacterId, CharacterAction[]> {
   return q
 }
 
-function makeInitialSprites(): Map<CharacterId, HTMLCanvasElement> | null {
+function makeInitialSprites(): Map<CharacterId, HTMLImageElement> | null {
   if (typeof document === 'undefined') return null
-  try {
-    const m = new Map<CharacterId, HTMLCanvasElement>()
-    for (const id of ALL_CHARACTER_IDS) {
-      m.set(id, generatePlaceholderSheet(id))
-    }
-    return m
-  } catch {
-    // jsdom (test env) lacks a 2D canvas context — render is a no-op there.
-    return null
+  const m = new Map<CharacterId, HTMLImageElement>()
+  for (const [id, meta] of Object.entries(MOVABLE_SPRITES)) {
+    m.set(id as CharacterId, loadImage(meta.url))
   }
+  return m
+}
+
+function makeInitialBg(): HTMLImageElement | null {
+  if (typeof document === 'undefined') return null
+  return loadImage(BG_URL)
 }
 
 export interface SceneState {
@@ -57,7 +57,8 @@ export interface SceneState {
   timeline: PublicEvent[]
   lastEventAt: number | null
   tickHz: 30 | 15
-  sprites: Map<CharacterId, HTMLCanvasElement> | null
+  sprites: Map<CharacterId, HTMLImageElement> | null
+  bg: HTMLImageElement | null
   enqueueAction: (action: CharacterAction) => void
   pushTimeline: (event: PublicEvent) => void
   dequeueAction: (id: CharacterId) => CharacterAction | undefined
@@ -73,11 +74,16 @@ export const useSceneStore = create<SceneState>((set, get) => ({
   lastEventAt: null,
   tickHz: 30,
   sprites: makeInitialSprites(),
+  bg: makeInitialBg(),
 
   enqueueAction(action) {
     const { characters, actionQueues } = get()
     const char = characters.find((c) => c.id === action.targetCharId)
     if (!char) return
+    // Characters baked into the background cannot walk — act in place.
+    if (!isMovable(action.targetCharId) && action.targetPos) {
+      action = { ...action, targetPos: undefined }
+    }
     const queue = actionQueues[action.targetCharId]
     queue.push(action)
     if (queue.length > QUEUE_CAP) {

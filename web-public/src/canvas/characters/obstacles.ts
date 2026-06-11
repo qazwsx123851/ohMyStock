@@ -1,40 +1,43 @@
 /**
- * Static obstacle grid for the office scene. Includes the wall band and
- * furniture footprints so BFS pathfind avoids walking through them.
- *
- * render.ts draws the same furniture geometry, so any change here MUST be
- * mirrored in render.ts drawStaticFurniture().
+ * Static obstacle grid for the office scene, derived from pixel rectangles
+ * measured on the design-mockup background (office-bg.png). Only the three
+ * movable characters consult this via BFS pathfind.
  */
 
-import { GRID_COLS, type GridKey, type GridPos, gridKey } from '@/types/public-event'
+import { TILE_PX, type GridKey, type GridPos, gridKey } from '@/types/public-event'
 
-function rect(x: number, y: number, w: number, h: number): GridPos[] {
+/** Pixel rects (x, y, w, h) of impassable furniture on the background. */
+const OBSTACLE_RECTS_PX: ReadonlyArray<readonly [number, number, number, number]> = [
+  [0, 0, 564, 118], // top wall band incl. wall furniture
+  [0, 110, 33, 58], // left fridge cabinet
+  [22, 118, 36, 55], // top-left floor plant
+  [500, 115, 40, 55], // top-right floor plant
+  [70, 150, 145, 140], // mid-left desk pair + chairs + workers
+  [366, 183, 40, 30], // back counter (plant)
+  [366, 210, 198, 40], // reception counter, horizontal arm
+  [515, 250, 49, 105], // reception counter, vertical arm
+  [520, 90, 44, 120], // right-wall printer + drawer unit
+  [295, 290, 185, 115], // bottom desk pair + workers
+  [40, 320, 140, 90], // library table
+  [25, 355, 35, 65], // bottom-left floor plant
+  [520, 355, 44, 100], // water cooler + waste bin
+]
+
+function tilesCovering(rect: readonly [number, number, number, number]): GridPos[] {
+  const [x, y, w, h] = rect
   const out: GridPos[] = []
-  for (let dx = 0; dx < w; dx++) {
-    for (let dy = 0; dy < h; dy++) {
-      out.push({ x: x + dx, y: y + dy })
+  const x0 = Math.floor(x / TILE_PX)
+  const y0 = Math.floor(y / TILE_PX)
+  const x1 = Math.floor((x + w - 1) / TILE_PX)
+  const y1 = Math.floor((y + h - 1) / TILE_PX)
+  for (let gx = x0; gx <= x1; gx++) {
+    for (let gy = y0; gy <= y1; gy++) {
+      out.push({ x: gx, y: gy })
     }
   }
   return out
 }
 
-const OBSTACLE_CELLS: GridPos[] = [
-  ...rect(0, 0, GRID_COLS, 3), // top wall band (cream wall + trim)
-  ...rect(0, 3, 1, 2), // vending cabinet, left wall
-  ...rect(2, 6, 2, 1), // workstation desk 1
-  ...rect(5, 6, 2, 1), // workstation desk 2
-  ...rect(13, 8, 9, 1), // reception counter, horizontal arm
-  ...rect(21, 9, 1, 3), // reception counter, vertical arm
-  ...rect(22, 4, 2, 2), // printer, right wall
-  ...rect(22, 6, 2, 2), // drawer unit, right wall
-  ...rect(21, 12, 1, 2), // water cooler
-  ...rect(22, 14, 1, 1), // waste bin
-  ...rect(13, 12, 2, 1), // review desk 1
-  ...rect(16, 12, 2, 1), // review desk 2
-  ...rect(3, 11, 3, 2), // library table
-  ...rect(1, 12, 1, 2), // floor plant, bottom-left
-]
-
 export const OBSTACLES: ReadonlySet<GridKey> = new Set(
-  OBSTACLE_CELLS.map(gridKey),
+  OBSTACLE_RECTS_PX.flatMap(tilesCovering).map(gridKey),
 )

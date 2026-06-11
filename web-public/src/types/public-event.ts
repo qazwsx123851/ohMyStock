@@ -112,9 +112,10 @@ export interface Region {
   h: number
 }
 
-export const GRID_COLS = 24
-export const GRID_ROWS = 16
+// Canvas matches the design-mockup background asset (office-bg.png) 1:1.
+export const CANVAS_LOGICAL_W = 564
+export const CANVAS_LOGICAL_H = 445
 export const TILE_PX = 16
-export const CANVAS_LOGICAL_W = GRID_COLS * TILE_PX // 384
-export const CANVAS_LOGICAL_H = GRID_ROWS * TILE_PX // 256
-export const CSS_SCALE = 2
+export const GRID_COLS = 35 // floor(564 / 16)
+export const GRID_ROWS = 27 // floor(445 / 16)
+export const CSS_SCALE = 1

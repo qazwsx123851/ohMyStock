@@ -4,26 +4,26 @@
 TBD - created by archiving change web-public-pixel-office-mvp. Update Purpose after archive.
 ## Requirements
 ### Requirement: Office Scene Layout
-The `OfficeScene` page SHALL render a single `<canvas>` element of fixed logical resolution 384×256 (grid 24×16, cell 16×16 px), CSS-upscaled by an integer factor (default `transform: scale(2)` → 768×512 display) laid out to match the reference design mockup: cream wall with furniture band along the top (rows 0–2, plant / bookshelf / side table / whiteboard chart / clocks / frames / cabinets / retro terminal / window / plant), sage checkered floor, two workstation desks mid-left, L-shaped reception counter on the right, two review desks bottom-right with water cooler and waste bin, and a library table bottom-left. The canvas is wrapped in a dark rounded bezel frame with a role legend row below. CSS MUST apply `image-rendering: pixelated` and the canvas context MUST set `imageSmoothingEnabled = false`. Furniture footprints in `characters/obstacles.ts` MUST mirror the geometry drawn by `render.ts`.
+The `OfficeScene` page SHALL render a single `<canvas>` element of fixed logical resolution 564×445 (pathfinding grid 35×27, cell 16×16 px) displayed 1:1. The scene background is the design mockup itself — `public/office/office-bg.png`, extracted by `scripts/extract_office_assets.py` (dark frame, cream wall + furniture band, sage checkered floor, mid-left workstations with two seated workers, L-shaped reception counter, bottom-right review desks with two seated workers, library table, water cooler, waste bin). Only the three standing protagonists (proposer / decider / trader) are drawn as dynamic sprites on top. A role legend row renders below the canvas. CSS MUST apply `image-rendering: pixelated` and the canvas context MUST set `imageSmoothingEnabled = false`. Obstacle rects in `characters/obstacles.ts` MUST mirror the furniture painted in the background image.
 
-#### Scenario: Canvas mounted at native GBC resolution
+#### Scenario: Canvas mounted at the design-mockup resolution
 - **WHEN** the user opens `/`
-- **THEN** a `<canvas width="384" height="256">` element is mounted with `image-rendering: pixelated` CSS, `imageSmoothingEnabled = false` on its 2D context, an integer CSS upscale (default `scale(2)`), and the design-mockup furniture layout is visible
+- **THEN** a `<canvas width="564" height="445">` element is mounted with `image-rendering: pixelated` CSS, `imageSmoothingEnabled = false` on its 2D context, and the design-mockup background with the three standing sprites is visible
 
 #### Scenario: Resize preserves pixel art
 - **WHEN** the viewport is resized
 - **THEN** the canvas scales via CSS only with integer factors (logical resolution stays 384×256) and sprites remain crisp without sub-pixel blur
 
 ### Requirement: Character Roster
-The scene SHALL instantiate exactly 13 character instances across 9 character types (`scanner`, `pattern_analyst`, `decider`, `trader`, `librarian`, `reviewer_1`..`reviewer_5`, `proposer`, `validator`, `guard`) at the default grid seats listed in `docs/frontend-public-pixel.md` §4.2. Each character MUST have a 4-direction × 4-frame sprite source (16 cells, **16×16 px each**, sheet 64×64 px). MVP MAY use a runtime-generated Pokémon-style sheet (palette-constrained hair / shirt / cap per character from `CHARACTER_STYLES`) instead of bundled PNG assets.
+The scene SHALL instantiate exactly 13 character instances across 9 character types (`scanner`, `pattern_analyst`, `decider`, `trader`, `librarian`, `reviewer_1`..`reviewer_5`, `proposer`, `validator`, `guard`) at the default grid seats listed in `docs/frontend-public-pixel.md` §4.2. Visual tiers: (1) **movable sprites** — proposer / decider / trader use single-pose PNG sprites extracted from the design mockup (`public/office/char_*.png`), walk with a 2-frame bob; (2) **baked** — scanner / pattern_analyst / reviewer_1 / reviewer_2 are painted into the background at their desks, are clickable via fixed hit boxes, and act in place (`targetPos` stripped); (3) **bubble-only** — the remaining roster characters render no body and surface activity via speech bubbles anchored at their themed furniture.
 
 #### Scenario: All 13 characters present at default seats on load
 - **WHEN** the scene initialises with no SSE events
 - **THEN** all 13 character instances render in `idle` state at their default grid coordinates from §4.2
 
-#### Scenario: Placeholder sprite uses the design-mockup palette
-- **WHEN** no `/sprites/<character>.png` is available
-- **THEN** a 64×64 sheet is generated at runtime using only colours from `src/styles/palette.ts`, drawing a 16×16 Pokémon-style figure (hair / face / shirt / pants, optional cap) with a distinct hair + shirt combination per character id from `CHARACTER_STYLES`, and rendering proceeds normally
+#### Scenario: Sprite assets come from the design mockup
+- **WHEN** the scene loads
+- **THEN** the three movable characters load their extracted PNG sprites from `/office/char_*.png`; if an image has not finished loading, its draw is skipped for that frame and rendering proceeds normally
 
 ### Requirement: Character State Machine
 Each character SHALL be in exactly one of three states: `idle`, `walking` (with `path: GridPos[]` and `pathIdx: number`), or `acting` (with `action: string`, `startedAt: number`, `durationMs: number`, optional `bubble: string`). Transitions: `idle` → `walking` on action arrival when path needed; `idle` → `acting` directly when already at target; `walking` → `acting` when `pathIdx >= path.length`; `acting` → `idle` when `now - startedAt >= durationMs`.
@@ -194,7 +194,7 @@ All visual output (Canvas fill / stroke, sprite generation, UI overlay text colo
 - **THEN** every match resolves to a value imported from `src/styles/palette.ts` (or appears inside a comment / test fixture explicitly marked as expected-violation)
 
 ### Requirement: Integer-Scale Pixel Rendering
-The canvas context MUST disable image smoothing (`ctx.imageSmoothingEnabled = false`) on every frame. CSS upscaling of the canvas element MUST use integer scale factors only (1×, 2×, 3×). No CSS transform with non-integer scale, no `filter: blur`, no `transition` on `transform` MAY be applied to the canvas element. The floor MUST be drawn as a per-tile sage checkerboard (`FLOOR_A` / `FLOOR_B`) with a subtle diagonal dither texture per tile.
+The canvas context MUST disable image smoothing (`ctx.imageSmoothingEnabled = false`) on every frame. CSS upscaling of the canvas element MUST use integer scale factors only (1×, 2×, 3×). No CSS transform with non-integer scale, no `filter: blur`, no `transition` on `transform` MAY be applied to the canvas element. The floor and walls are part of the background image asset and MUST NOT be redrawn procedurally.
 
 #### Scenario: Smoothing disabled every frame
 - **WHEN** the render function executes

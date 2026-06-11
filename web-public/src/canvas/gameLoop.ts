@@ -69,6 +69,7 @@ export function startLoop(opts: StartLoopOptions): LoopHandle {
     const snap: SceneSnapshot = {
       characters: store.characters,
       sprites: (store.sprites ?? new Map()) as ReadonlyMap<string, CanvasImageSource>,
+      bg: store.bg,
     }
     drawScene(ctx, snap, now)
     rafId = raf(frame)
