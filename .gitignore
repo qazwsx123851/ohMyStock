@@ -23,6 +23,7 @@ anthropic_key.*
 .claude/cache/
 .claude/.session/
 .claude/skills/ui-ux-pro-max/
+.playwright-mcp/
 AGENTS.md
 .idea/
 .vscode/
