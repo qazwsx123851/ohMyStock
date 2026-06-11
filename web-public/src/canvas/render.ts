@@ -1,9 +1,14 @@
 /**
  * Single-pass scene renderer. Called every animation frame.
  *
- * Spec: openspec/changes/web-public-pixel-office-mvp/specs/web-public-pixel-office/spec.md
- *       (Requirements: Office Scene Layout, Integer-Scale Pixel Rendering,
- *        Frozen Gen 2 Palette)
+ * Layout mirrors the reference design mockup: cream wall with furniture
+ * along the top, sage checkered floor, workstations mid-left, L-shaped
+ * reception counter right, review desks bottom-right, library table
+ * bottom-left. Obstacle footprints live in characters/obstacles.ts and
+ * MUST stay in sync with the geometry drawn here.
+ *
+ * Spec: openspec/specs/web-public-pixel-office/spec.md
+ *       (Requirements: Office Scene Layout, Integer-Scale Pixel Rendering)
  */
 
 import {
@@ -12,69 +17,140 @@ import {
   TILE_PX,
   type Character,
   type GridPos,
-  type Region,
 } from '@/types/public-event'
 import {
-  GB_FLOOR_DARK,
-  GB_FLOOR_LIGHT,
-  GB_WALL,
+  BLUE,
+  FLOOR_A,
+  FLOOR_A_DITHER,
+  FLOOR_B,
+  FLOOR_B_DITHER,
+  INK,
+  RED,
+  WALL_CREAM,
+  WALL_CREAM_SHADOW,
+  WALL_TRIM,
+  WALL_TRIM_DARK,
+  WHITE,
 } from '@/styles/palette'
-import { drawBookshelf, drawCounter, drawScreen, drawTable } from './tiles'
+import {
+  drawBookshelf,
+  drawCabinet,
+  drawChairBack,
+  drawChairSeat,
+  drawCounterH,
+  drawCounterPlant,
+  drawCounterV,
+  drawDrawerUnit,
+  drawLibraryTable,
+  drawLocker,
+  drawPapers,
+  drawPlant,
+  drawPrinter,
+  drawRetroPC,
+  drawSideTable,
+  drawStool,
+  drawTrashBin,
+  drawVending,
+  drawWallClock,
+  drawWallFrames,
+  drawWaterCooler,
+  drawWhiteboard,
+  drawWindow,
+  drawWorkDesk,
+} from './tiles'
 
-export const REGIONS: readonly Region[] = [
-  { label: '行情大廳', x: 0, y: 0, w: 12, h: 4 },
-  { label: 'K 線分析室', x: 12, y: 0, w: 12, h: 4 },
-  { label: '決策桌', x: 0, y: 4, w: 12, h: 8 },
-  { label: '圖書館', x: 12, y: 4, w: 12, h: 8 },
-  { label: '實驗室', x: 0, y: 12, w: 12, h: 4 },
-  { label: '會議室', x: 12, y: 12, w: 12, h: 4 },
+const WALL_ROWS = 3
+
+/** Desk chairs (seat under the character, backrest over it). */
+const CHAIRS: ReadonlyArray<{ pos: GridPos; colour: string }> = [
+  { pos: { x: 2, y: 7 }, colour: RED },
+  { pos: { x: 5, y: 7 }, colour: BLUE },
+  { pos: { x: 13, y: 13 }, colour: BLUE },
+  { pos: { x: 16, y: 13 }, colour: BLUE },
 ]
 
 function gridToPx(p: GridPos): { x: number; y: number } {
   return { x: p.x * TILE_PX, y: p.y * TILE_PX }
 }
 
-function drawFloor(ctx: CanvasRenderingContext2D): void {
-  for (let y = 0; y < CANVAS_LOGICAL_H; y++) {
-    ctx.fillStyle = y % 2 === 0 ? GB_FLOOR_LIGHT : GB_FLOOR_DARK
-    ctx.fillRect(0, y, CANVAS_LOGICAL_W, 1)
-  }
-}
+function drawWallAndFloor(ctx: CanvasRenderingContext2D): void {
+  const wallH = WALL_ROWS * TILE_PX
+  // Cream wall + wood baseboard
+  ctx.fillStyle = WALL_CREAM
+  ctx.fillRect(0, 0, CANVAS_LOGICAL_W, wallH)
+  ctx.fillStyle = WALL_CREAM_SHADOW
+  ctx.fillRect(0, wallH - 17, CANVAS_LOGICAL_W, 4)
+  ctx.fillStyle = WALL_TRIM
+  ctx.fillRect(0, wallH - 13, CANVAS_LOGICAL_W, 11)
+  ctx.fillStyle = WALL_TRIM_DARK
+  ctx.fillRect(0, wallH - 3, CANVAS_LOGICAL_W, 2)
+  ctx.fillStyle = INK
+  ctx.fillRect(0, wallH - 1, CANVAS_LOGICAL_W, 1)
 
-function drawRegionFrames(ctx: CanvasRenderingContext2D): void {
-  ctx.strokeStyle = GB_WALL
-  ctx.lineWidth = 1
-  ctx.font = '6px ui-monospace, monospace'
-  ctx.fillStyle = GB_WALL
-  ctx.textBaseline = 'top'
-  for (const r of REGIONS) {
-    const px = r.x * TILE_PX
-    const py = r.y * TILE_PX
-    const pw = r.w * TILE_PX
-    const ph = r.h * TILE_PX
-    ctx.strokeRect(px + 0.5, py + 0.5, pw - 1, ph - 1)
-    ctx.fillText(r.label, px + 2, py + 1)
+  // Sage checkered floor with diagonal dither texture
+  for (let gy = WALL_ROWS; gy < CANVAS_LOGICAL_H / TILE_PX; gy++) {
+    for (let gx = 0; gx < CANVAS_LOGICAL_W / TILE_PX; gx++) {
+      const light = (gx + gy) % 2 === 0
+      const tx = gx * TILE_PX
+      const ty = gy * TILE_PX
+      ctx.fillStyle = light ? FLOOR_A : FLOOR_B
+      ctx.fillRect(tx, ty, TILE_PX, TILE_PX)
+      ctx.fillStyle = light ? FLOOR_A_DITHER : FLOOR_B_DITHER
+      for (let i = 0; i < 4; i++) {
+        ctx.fillRect(tx + i * 4 + (light ? 0 : 2), ty + i * 4, 2, 2)
+      }
+    }
   }
 }
 
 function drawStaticFurniture(ctx: CanvasRenderingContext2D): void {
-  drawScreen(ctx, 1 * TILE_PX, 1 * TILE_PX, 3 * TILE_PX, 2 * TILE_PX)
-  drawScreen(ctx, 16 * TILE_PX, 1 * TILE_PX, 3 * TILE_PX, 2 * TILE_PX)
-  drawCounter(ctx, 3 * TILE_PX, 6 * TILE_PX, 7 * TILE_PX, 2 * TILE_PX)
-  drawBookshelf(ctx, 20 * TILE_PX, 5 * TILE_PX, 3 * TILE_PX, 6 * TILE_PX)
-  drawBookshelf(ctx, 14 * TILE_PX, 5 * TILE_PX, 3 * TILE_PX, 6 * TILE_PX)
-  drawTable(ctx, 3 * TILE_PX, 13 * TILE_PX, 5 * TILE_PX, 2 * TILE_PX)
-  drawTable(ctx, 15 * TILE_PX, 13 * TILE_PX, 7 * TILE_PX, 2 * TILE_PX)
+  const T = TILE_PX
+  // --- Top wall, left to right ---
+  drawPlant(ctx, 1 * T, 18)
+  drawBookshelf(ctx, 2 * T, 6)
+  drawSideTable(ctx, 5 * T, 30)
+  drawWhiteboard(ctx, 7 * T, 6)
+  drawWallClock(ctx, 172, 8)
+  drawWallClock(ctx, 188, 8)
+  drawWallFrames(ctx, 204, 8)
+  drawCabinet(ctx, 224, 7)
+  drawLocker(ctx, 256, 7)
+  drawRetroPC(ctx, 274, 7)
+  drawWindow(ctx, 308, 8)
+  drawPlant(ctx, 344, 18)
+  // --- Left wall ---
+  drawVending(ctx, 0, 50)
+  // --- Mid-left workstations ---
+  drawWorkDesk(ctx, 2 * T, 6 * T)
+  drawWorkDesk(ctx, 5 * T, 6 * T)
+  // --- Reception counter (L-shape) ---
+  drawCounterH(ctx, 13 * T, 8 * T, 9 * T)
+  drawCounterV(ctx, 21 * T, 9 * T, 3 * T)
+  drawCounterPlant(ctx, 14 * T + 2, 8 * T + 2)
+  drawPapers(ctx, 19 * T, 8 * T + 3)
+  // --- Right wall ---
+  drawPrinter(ctx, 22 * T, 68)
+  drawDrawerUnit(ctx, 22 * T + 2, 100)
+  drawWaterCooler(ctx, 21 * T, 194)
+  drawTrashBin(ctx, 22 * T + 1, 226)
+  // --- Review desks bottom-right ---
+  drawWorkDesk(ctx, 13 * T, 12 * T)
+  drawWorkDesk(ctx, 16 * T, 12 * T)
+  // --- Library corner bottom-left ---
+  drawLibraryTable(ctx, 3 * T, 11 * T)
+  drawStool(ctx, 5 * T, 13 * T)
+  drawPlant(ctx, 1 * T, 194)
 }
 
 function frameIndex(char: Character, now: number): number {
   if (char.state.kind === 'walking') {
-    return Math.floor((now - char.state.lastStepAt) / 150) % 4
+    const seq = [0, 1, 0, 2] as const
+    return seq[Math.floor((now - char.state.lastStepAt) / 150) % 4]!
   }
   if (char.state.kind === 'acting') {
     return 3
   }
-  return Math.floor(now / 400) % 2
+  return 0
 }
 
 function facingRow(char: Character): number {
@@ -119,11 +195,17 @@ export function drawScene(
 ): void {
   ctx.imageSmoothingEnabled = false
 
-  drawFloor(ctx)
+  drawWallAndFloor(ctx)
   drawStaticFurniture(ctx)
-  drawRegionFrames(ctx)
+  for (const chair of CHAIRS) {
+    const p = gridToPx(chair.pos)
+    drawChairSeat(ctx, p.x, p.y, chair.colour)
+  }
 
-  for (const char of snap.characters) {
+  // Painter's order: lower characters drawn later so they overlap upper ones.
+  const sorted = [...snap.characters].sort((a, b) => a.pos.y - b.pos.y)
+  const bubbles: Array<{ x: number; y: number; text: string }> = []
+  for (const char of sorted) {
     const sheet = snap.sprites.get(char.id)
     if (!sheet) continue
     const row = facingRow(char)
@@ -141,8 +223,18 @@ export function drawScene(
       TILE_PX,
     )
     if (char.state.kind === 'acting' && char.state.bubble) {
-      drawBubble(ctx, dest.x, dest.y, char.state.bubble)
+      bubbles.push({ x: dest.x, y: dest.y, text: char.state.bubble })
     }
+  }
+
+  // Chair backrests occlude seated characters' legs (they face the desk).
+  for (const chair of CHAIRS) {
+    const p = gridToPx(chair.pos)
+    drawChairBack(ctx, p.x, p.y, chair.colour)
+  }
+
+  for (const b of bubbles) {
+    drawBubble(ctx, b.x, b.y, b.text)
   }
 }
 
@@ -158,12 +250,12 @@ function drawBubble(
   const h = 9
   const bx = Math.min(CANVAS_LOGICAL_W - w - 1, Math.max(1, px - w / 2 + TILE_PX / 2))
   const by = Math.max(1, py - h - 1)
-  ctx.fillStyle = GB_FLOOR_LIGHT
+  ctx.fillStyle = WHITE
   ctx.fillRect(bx, by, w, h)
-  ctx.strokeStyle = GB_WALL
+  ctx.strokeStyle = INK
   ctx.lineWidth = 1
   ctx.strokeRect(bx + 0.5, by + 0.5, w - 1, h - 1)
-  ctx.fillStyle = GB_WALL
+  ctx.fillStyle = INK
   ctx.textBaseline = 'top'
   ctx.fillText(text, bx + padding, by + padding)
 }

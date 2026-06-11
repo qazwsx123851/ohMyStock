@@ -15,7 +15,7 @@ import {
   type CharacterId,
   type PublicEvent,
 } from '@/types/public-event'
-import { DEFAULT_SEATS } from '@/canvas/characters/seats'
+import { DEFAULT_FACINGS, DEFAULT_SEATS } from '@/canvas/characters/seats'
 import { generatePlaceholderSheet } from '@/canvas/spritePlaceholder'
 
 export const QUEUE_CAP = 5
@@ -26,7 +26,7 @@ function makeInitialCharacters(): Character[] {
     id,
     pos: { ...DEFAULT_SEATS[id] },
     seat: { ...DEFAULT_SEATS[id] },
-    facing: 'down',
+    facing: DEFAULT_FACINGS[id],
     state: { kind: 'idle' as const },
   }))
 }

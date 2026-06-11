@@ -97,14 +97,14 @@
 
 | character_id | 中文名 | 對應 ohMyStock 元件 | 預設座位 (grid x,y) | 主要 event |
 |---|---|---|---|---|
-| `scanner` | 掃盤員 | `screener_tool` | (3, 2) | `screener_started` / `screener_completed` |
-| `pattern_analyst` | 型態分析師 | `vcp_detector` / `pattern_lib` | (16, 2) | `pattern_detected` |
-| `decider` | 決策官 | `entry_decision_team` swarm | (4, 8) | `decider_thinking` / `decision_made` |
-| `trader` | 下單員 | Confirm Gate + Broker | (8, 8) | `awaiting_confirm` / `order_sent` |
-| `librarian` | 圖書館員 | Trade Journal Service | (18, 8) | `journal_written` / `journal_queried` |
-| `reviewer_1..5` | 五節點檢討團 | `post_trade_review_team` | (14–22, 14) 圓桌 | `review_node_started` / `review_completed` |
-| `proposer` | 提案員 | `proposal_tool` | 流動，初始 (10, 11) | `proposal_created` |
-| `validator` | 驗證員 | Proposal Validation Service | (4, 14) | `wfa_started` / `wfa_passed` / `wfa_failed` |
+| `scanner` | 掃盤員 | `screener_tool` | (2, 7) 左側工作站 | `screener_started` / `screener_completed` |
+| `pattern_analyst` | 型態分析師 | `vcp_detector` / `pattern_lib` | (5, 7) 左側工作站 | `pattern_detected` |
+| `decider` | 決策官 | `entry_decision_team` swarm | (9, 9) 室中央（紅帽） | `decider_thinking` / `decision_made` |
+| `trader` | 下單員 | Confirm Gate + Broker | (16, 7) 櫃台後 | `awaiting_confirm` / `order_sent` |
+| `librarian` | 圖書館員 | Trade Journal Service | (5, 13) 圖書桌凳 | `journal_written` / `journal_queried` |
+| `reviewer_1..5` | 五節點檢討團 | `post_trade_review_team` | (13,13) (16,13) (18,13) (12,14) (20,13) 右下檢討區 | `review_node_started` / `review_completed` |
+| `proposer` | 提案員 | `proposal_tool` | 流動，初始 (8, 4) 白板前 | `proposal_created` |
+| `validator` | 驗證員 | Proposal Validation Service | (10, 13) | `wfa_started` / `wfa_passed` / `wfa_failed` |
 | `guard` | 警衛 | Risk Gate | 入口 (0, 8) | `risk_off_triggered` |
 
 > Sprite 來源：v1 使用開源 [Metro City pixel pack](https://itch.io/) 或自繪（後續決定，見 plan「後續決定點」）。

@@ -18,8 +18,22 @@ import {
   CSS_SCALE,
   TILE_PX,
   type Character,
+  type CharacterId,
 } from '@/types/public-event'
-import { GB_WALL } from '@/styles/palette'
+import { INK } from '@/styles/palette'
+import { CHARACTER_STYLES } from '@/canvas/spritePlaceholder'
+
+const LEGEND: ReadonlyArray<readonly [string, CharacterId]> = [
+  ['Scanner', 'scanner'],
+  ['PatternAnalyst', 'pattern_analyst'],
+  ['Decider', 'decider'],
+  ['Trader', 'trader'],
+  ['Librarian', 'librarian'],
+  ['Validator', 'validator'],
+  ['Reviewer', 'reviewer_1'],
+  ['Proposer', 'proposer'],
+  ['Guard', 'guard'],
+]
 
 const IDLE_TIMEOUT_MS = 60_000
 
@@ -67,11 +81,16 @@ export function OfficeScene() {
   return (
     <section className="relative flex flex-col items-center">
       <div
+        data-testid="office-bezel"
+        className="rounded-2xl p-2.5"
+        style={{ background: INK, border: `3px solid ${INK}`, boxShadow: '0 4px 16px rgba(0,0,0,0.25)' }}
+      >
+      <div
         style={{
           width: CANVAS_LOGICAL_W * CSS_SCALE,
           height: CANVAS_LOGICAL_H * CSS_SCALE,
         }}
-        className="relative"
+        className="relative overflow-hidden rounded-lg"
       >
         <canvas
           ref={canvasRef}
@@ -90,14 +109,29 @@ export function OfficeScene() {
           <div
             data-testid="idle-overlay"
             className="absolute inset-0 flex items-center justify-center pointer-events-none"
-            // GB_WALL with ~35% alpha (0x59 = 89/255). Palette-derived.
-            style={{ background: `${GB_WALL}59` }}
+            // INK with ~35% alpha (0x59 = 89/255). Palette-derived.
+            style={{ background: `${INK}59` }}
           >
             <p className="px-3 py-1 rounded bg-white text-sm font-mono">
               {t('idle.overlay')}
             </p>
           </div>
         )}
+      </div>
+      </div>
+      <div
+        data-testid="role-legend"
+        className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1"
+      >
+        {LEGEND.map(([label, id]) => (
+          <span key={id} className="flex items-center gap-1 text-xs text-[color:var(--muted-foreground)]">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-[2px]"
+              style={{ background: CHARACTER_STYLES[id].shirt }}
+            />
+            {label}
+          </span>
+        ))}
       </div>
       <AgentInfoSheet
         open={selected !== null}

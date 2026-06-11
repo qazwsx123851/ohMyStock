@@ -4,26 +4,26 @@
 TBD - created by archiving change web-public-pixel-office-mvp. Update Purpose after archive.
 ## Requirements
 ### Requirement: Office Scene Layout
-The `OfficeScene` page SHALL render a single `<canvas>` element of fixed logical resolution 384×256 (grid 24×16, cell 16×16 px), CSS-upscaled by an integer factor (default `transform: scale(2)` → 768×512 display) composed of six labelled regions: 行情大廳 `(0,0)–(11,3)`, K 線分析室 `(12,0)–(23,3)`, 決策桌 `(0,4)–(11,11)`, 圖書館 `(12,4)–(23,11)`, 實驗室 `(0,12)–(11,15)`, 會議室 `(12,12)–(23,15)`. CSS MUST apply `image-rendering: pixelated` and the canvas context MUST set `imageSmoothingEnabled = false`.
+The `OfficeScene` page SHALL render a single `<canvas>` element of fixed logical resolution 384×256 (grid 24×16, cell 16×16 px), CSS-upscaled by an integer factor (default `transform: scale(2)` → 768×512 display) laid out to match the reference design mockup: cream wall with furniture band along the top (rows 0–2, plant / bookshelf / side table / whiteboard chart / clocks / frames / cabinets / retro terminal / window / plant), sage checkered floor, two workstation desks mid-left, L-shaped reception counter on the right, two review desks bottom-right with water cooler and waste bin, and a library table bottom-left. The canvas is wrapped in a dark rounded bezel frame with a role legend row below. CSS MUST apply `image-rendering: pixelated` and the canvas context MUST set `imageSmoothingEnabled = false`. Furniture footprints in `characters/obstacles.ts` MUST mirror the geometry drawn by `render.ts`.
 
 #### Scenario: Canvas mounted at native GBC resolution
 - **WHEN** the user opens `/`
-- **THEN** a `<canvas width="384" height="256">` element is mounted with `image-rendering: pixelated` CSS, `imageSmoothingEnabled = false` on its 2D context, an integer CSS upscale (default `scale(2)`), and the six region labels are visible at the documented coordinates
+- **THEN** a `<canvas width="384" height="256">` element is mounted with `image-rendering: pixelated` CSS, `imageSmoothingEnabled = false` on its 2D context, an integer CSS upscale (default `scale(2)`), and the design-mockup furniture layout is visible
 
 #### Scenario: Resize preserves pixel art
 - **WHEN** the viewport is resized
 - **THEN** the canvas scales via CSS only with integer factors (logical resolution stays 384×256) and sprites remain crisp without sub-pixel blur
 
 ### Requirement: Character Roster
-The scene SHALL instantiate exactly 13 character instances across 9 character types (`scanner`, `pattern_analyst`, `decider`, `trader`, `librarian`, `reviewer_1`..`reviewer_5`, `proposer`, `validator`, `guard`) at the default grid seats listed in `docs/frontend-public-pixel.md` §4.2. Each character MUST have a 4-direction × 4-frame sprite source (16 cells, **16×16 px each**, sheet 64×64 px). MVP MAY use a runtime-generated Pokémon Gen 2-style placeholder sheet (palette-constrained head + body + hat-colour) instead of bundled PNG assets.
+The scene SHALL instantiate exactly 13 character instances across 9 character types (`scanner`, `pattern_analyst`, `decider`, `trader`, `librarian`, `reviewer_1`..`reviewer_5`, `proposer`, `validator`, `guard`) at the default grid seats listed in `docs/frontend-public-pixel.md` §4.2. Each character MUST have a 4-direction × 4-frame sprite source (16 cells, **16×16 px each**, sheet 64×64 px). MVP MAY use a runtime-generated Pokémon-style sheet (palette-constrained hair / shirt / cap per character from `CHARACTER_STYLES`) instead of bundled PNG assets.
 
 #### Scenario: All 13 characters present at default seats on load
 - **WHEN** the scene initialises with no SSE events
 - **THEN** all 13 character instances render in `idle` state at their default grid coordinates from §4.2
 
-#### Scenario: Placeholder sprite uses Gen 2 palette
+#### Scenario: Placeholder sprite uses the design-mockup palette
 - **WHEN** no `/sprites/<character>.png` is available
-- **THEN** a 64×64 placeholder sheet is generated at runtime using only colours from the frozen Gen 2 palette (§Visual Palette in design), drawing a 16×16 chibi figure (head circle, body trapezoid, hat block) with a distinct hat colour per character id, and rendering proceeds normally
+- **THEN** a 64×64 sheet is generated at runtime using only colours from `src/styles/palette.ts`, drawing a 16×16 Pokémon-style figure (hair / face / shirt / pants, optional cap) with a distinct hair + shirt combination per character id from `CHARACTER_STYLES`, and rendering proceeds normally
 
 ### Requirement: Character State Machine
 Each character SHALL be in exactly one of three states: `idle`, `walking` (with `path: GridPos[]` and `pathIdx: number`), or `acting` (with `action: string`, `startedAt: number`, `durationMs: number`, optional `bubble: string`). Transitions: `idle` → `walking` on action arrival when path needed; `idle` → `acting` directly when already at target; `walking` → `acting` when `pathIdx >= path.length`; `acting` → `idle` when `now - startedAt >= durationMs`.
@@ -182,19 +182,19 @@ React Router v7 SHALL define exactly two routes under the existing `App` shell: 
 - **WHEN** the user navigates to `/anything-else`
 - **THEN** the router resolves to the index route (`/`) or 404 boundary; no third route is registered
 
-### Requirement: Frozen Gen 2 Palette
-All visual output (Canvas fill / stroke, sprite generation, region backgrounds, UI overlay text colour, Tailwind theme tokens for non-Canvas components) MUST use only colours imported from `src/styles/palette.ts`. The palette is frozen at exactly seven tokens: `--gb-wall #2b2b2b`, `--gb-floor-dark #a0a0a0`, `--gb-floor-light #d8d8d8`, `--gb-furniture #e8b840`, `--gb-furniture-shadow #a07820`, `--gb-accent #e84020`, `--gb-highlight #80b8e8`. Hard-coded hex / rgb / hsl literals outside this file MUST NOT appear anywhere under `src/canvas/`, `src/components/`, or `src/pages/`.
+### Requirement: Single-Module Palette
+All visual output (Canvas fill / stroke, sprite generation, UI overlay text colour, Tailwind theme tokens for non-Canvas components) MUST use only colours imported from `src/styles/palette.ts`. The palette is derived from the reference design mockup (sage checkered floor, cream wall, warm wood furniture, near-black outlines, per-character hair / shirt colours) and exported as a single `PALETTE` const object. Hard-coded hex / rgb / hsl literals outside this file MUST NOT appear anywhere under `src/canvas/`, `src/components/`, or `src/pages/`.
 
-#### Scenario: Palette module exports exactly seven tokens
+#### Scenario: Palette module is the single colour source
 - **WHEN** `src/styles/palette.ts` is imported
-- **THEN** it exports an object with exactly the seven keys above and the documented hex values, marked `as const`
+- **THEN** it exports a `PALETTE` object marked `as const` plus named token exports, and every Canvas / sprite colour resolves to one of its values
 
 #### Scenario: Source grep finds no off-palette literals
 - **WHEN** `grep -rE '#[0-9a-fA-F]{3,6}|rgb\(|hsl\(' src/canvas src/components src/pages` is run
 - **THEN** every match resolves to a value imported from `src/styles/palette.ts` (or appears inside a comment / test fixture explicitly marked as expected-violation)
 
 ### Requirement: Integer-Scale Pixel Rendering
-The canvas context MUST disable image smoothing (`ctx.imageSmoothingEnabled = false`) on every frame. CSS upscaling of the canvas element MUST use integer scale factors only (1×, 2×, 3×). No CSS transform with non-integer scale, no `filter: blur`, no `transition` on `transform` MAY be applied to the canvas element. The floor MUST be drawn as alternating 1-px horizontal stripes (even rows `--gb-floor-light`, odd rows `--gb-floor-dark`).
+The canvas context MUST disable image smoothing (`ctx.imageSmoothingEnabled = false`) on every frame. CSS upscaling of the canvas element MUST use integer scale factors only (1×, 2×, 3×). No CSS transform with non-integer scale, no `filter: blur`, no `transition` on `transform` MAY be applied to the canvas element. The floor MUST be drawn as a per-tile sage checkerboard (`FLOOR_A` / `FLOOR_B`) with a subtle diagonal dither texture per tile.
 
 #### Scenario: Smoothing disabled every frame
 - **WHEN** the render function executes
