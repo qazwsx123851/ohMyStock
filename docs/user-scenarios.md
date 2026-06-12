@@ -12,8 +12,8 @@
 
 | # | 情境 | 觸發 | Phase | 主要頁面 | 耗時 |
 |---|------|------|-------|----------|------|
-| 1 | Pre-market 5 分鐘 routine | 每交易日 08:30 | Phase 0 | `/`, `/paper`, `/decisions` | 5 分 |
-| 2 | Intraday signal → Confirm Gate | 盤中事件觸發 | Phase 3 模式 A | `/decisions` | 2-5 分/筆 |
+| 1 | Pre-market 5 分鐘 routine | 每交易日 08:30 | Phase 0 | `/`, `/paper` | 5 分 |
+| 2 | Intraday signal → Confirm Gate | 盤中事件觸發 | Phase 3 模式 A | `/paper`（Confirm Gate 內嵌） | 2-5 分/筆 |
 | 3 | Post-close 持倉檢視 | 每交易日 14:00 後 | Phase 4 | `/paper`, `/paper/positions` | 10-15 分 |
 | 4 | 週五選股 deep dive | 週五 17:30+ | Phase 1 | `/`, `/swarm/:preset/:runId`, `/market/:symbol` | 30-60 分 |
 | 5 | 月營收掃描檢視 | 每月 1-10 日 19:30+ | Phase 1.5 | `/`, `/market/:symbol` | 10-20 分 |
@@ -36,11 +36,11 @@
 **主要頁面**
 - `/` Dashboard（§17.B） — 風險面板、權益曲線、watchlist、本月 LLM 成本
 - `/paper` Paper Trading（§17.H） — 月度熔斷距離、持倉概況
-- `/decisions` 決策審核（§17.Q） — 若昨晚 Phase 2B 推出待 confirm 決策
+- `/paper` 決策審核（§17.Q，Confirm Gate 內嵌於 Paper Overview） — 若昨晚 Phase 2B 推出待 confirm 決策
 
 **Mark 做的決定**
 - 看 Dashboard 頂部 Risk Gate 燈：🟢 → 正常；🟡 → 仔細看 watchlist；🔴 → 跳到 §8 Risk-Off 流程
-- 看「今日待辦」面板有沒有 ≥ 65 score 的待 confirm；有就點 `/decisions` 進 §2 流程
+- 看「今日待辦」面板有沒有 ≥ 65 score 的待 confirm；有就點 `/paper` 進 §2 流程
 - 看本月 LLM 成本進度條：≥ 80% 橘色 → 提醒自己今日少跑 ad-hoc swarm
 
 **LLM 做的決定（昨晚已完成）**
@@ -55,7 +55,7 @@
 
 **引用**
 - `workflow-cheatsheet.md` §0 Risk Gate / 月度熔斷
-- `frontend.md` §17.B Dashboard、§17.H Paper、§17.Q `/decisions`
+- `frontend.md` §17.B Dashboard、§17.H Paper、§17.Q 決策審核（實作內嵌於 `/paper`）
 - `safety-and-simulation.md` §2.11 LLM 成本軟熔斷
 
 ---
@@ -67,7 +67,7 @@
 **Goal**：在 expire 倒數歸零前（預設 22:14 同日），判斷是否 confirm LLM 提案、reject、或讓它過期。
 
 **主要頁面**
-- `/decisions`（§17.Q）— 待 confirm 決策佇列
+- `/paper`（§17.Q，Confirm Gate 內嵌）— 待 confirm 決策佇列
 
 **Mark 做的決定**
 - 展開 reasoning 區塊：看 Must-have 3/3 是否扎實、加分項命中哪幾項、cited skills 是否合理
@@ -90,7 +90,7 @@
 **引用**
 - `workflow-cheatsheet.md` §6.7 模式 A 人工 confirm、§6.8 必須記錄欄位
 - `llm-decision-schema.md` §2.1 LLM 輸出嚴格約束、§4 Trade Journal schema
-- `frontend.md` §17.Q `/decisions` 互動約束
+- `frontend.md` §17.Q 互動約束（實作內嵌於 `/paper`）
 - `safety-and-simulation.md` §2.9 防線 9（LLM 自動下單熔斷）
 
 ---
@@ -379,7 +379,7 @@
 | N Settings | `/settings` | §9, §10 |
 | O Audit | `/audit` | §8, §9 |
 | P Paper 子頁 | `/paper/orders\|positions\|equity` | §3 |
-| Q 決策審核 | `/decisions` | §1, §2 |
+| Q 決策審核 | `/paper`（內嵌） | §1, §2 |
 | R 復盤 | `/reviews/:id` | §6 |
 | S 提案 | `/proposals/:id` | §6 |
 
