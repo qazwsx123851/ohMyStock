@@ -94,11 +94,15 @@ export function TransitionDialog({
   React.useEffect(() => {
     if (!open) return
     setActor(readDefaultActor())
-    setValidationReportPath('')
+    // Manual-verdict flow: the report sits at the proposals root as
+    // <slug>.validation.json, so prefill (still editable).
+    setValidationReportPath(
+      target === 'approved' ? `${slug}.validation.json` : '',
+    )
     setMergedToVersion('')
     setReason('')
     setSubmitError(null)
-  }, [open, target])
+  }, [open, target, slug])
 
   const trimmedActor = actor.trim()
   const trimmedValidationPath = validationReportPath.trim()

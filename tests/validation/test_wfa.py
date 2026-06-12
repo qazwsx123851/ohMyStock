@@ -245,6 +245,51 @@ def test_run_validation_pass_transitions_to_approved_and_moves_report(
     ]
 
 
+# ---- manual-verdict mode: report written, no transition --------------------
+# Spec: openspec/changes/proposal-manual-verdict/specs/wfa-validation-engine/spec.md
+
+
+def test_run_validation_manual_mode_writes_report_without_transition(
+    tmp_path: Path,
+    synthetic_loader: Callable[
+        [dict[str, list[BarRow]]], Callable[[str, str, str], list[BarRow]]
+    ],
+) -> None:
+    proposal_path = make_validating_proposal(tmp_path)
+    slug = proposal_path.stem
+    bars = {"2330": _synthetic_bars("2330", 253, 100.0)}
+    loader = synthetic_loader(bars)
+
+    report = run_validation(
+        proposal_path,
+        strategy_name="sma_cross",
+        period={"from": "2025-01-02", "to": "2025-12-30"},
+        param_overrides={"fast": 10},
+        universe=["2330"],
+        wfa_windows=5,
+        in_sample_ratio=0.7,
+        initial_capital=1_000_000,
+        market_data_loader=loader,
+        auto_transition=False,
+    )
+
+    assert report.verdict == "pass"
+
+    # Report written in place (proposals root)...
+    report_path = tmp_path / f"{slug}.validation.json"
+    assert report_path.is_file()
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert payload["verdict"] == "pass"
+
+    # ...but the markdown stays put in validating, untouched.
+    assert proposal_path.is_file()
+    text = proposal_path.read_text(encoding="utf-8")
+    assert "status: validating" in text
+    assert "wfa-validator" not in text
+    assert not (tmp_path / "PENDING_REVIEW" / f"{slug}.md").exists()
+    assert not (tmp_path / "rejected" / f"{slug}.md").exists()
+
+
 # ---- 9.8: fail transitions to rejected + reason carries failure slug -------
 
 

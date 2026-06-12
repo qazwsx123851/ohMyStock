@@ -56,7 +56,6 @@ from ohmystock.proposal import (
     transition_proposal,
 )
 from ohmystock.validation import (
-    ValidationReport,
     WfaValidationError,
     run_validation,
 )
@@ -419,35 +418,20 @@ def _parse_param_pairs(pairs: list[str]) -> dict[str, Any]:
 
 
 def _post_run_state_paths(
-    report: ValidationReport,
     slug: str,
-    root: Path,
     dry_run: bool,
 ) -> tuple[str | None, str | None]:
     """Compute ``(new_path, report_path)`` forward-slash strings post-run.
 
-    Dry-run → ``(None, None)``. Otherwise, infer the new markdown location
-    from ``report.verdict`` (pass → ``PENDING_REVIEW/`` / fail → ``rejected/``)
-    plus the co-located ``<slug>.validation.json``. Each path is converted to
-    a forward-slash POSIX string relative to ``root``; if ``relative_to``
-    fails (path outside root), fall back to ``str(...)`` + a warning so the
-    endpoint never 500s on a defensive edge.
+    Dry-run → ``(None, None)``. Otherwise the endpoint runs with
+    ``auto_transition=False`` (manual-verdict mode, spec
+    proposal-manual-verdict): the markdown never moves, so ``new_path`` is
+    always ``None`` and the report sits at the proposals root as
+    ``<slug>.validation.json``.
     """
     if dry_run:
         return None, None
-
-    sink_name = "PENDING_REVIEW" if report.verdict == "pass" else "rejected"
-    new_path = root / sink_name / f"{slug}.md"
-    report_path = root / sink_name / f"{slug}.validation.json"
-
-    def _rel(p: Path) -> str:
-        try:
-            return p.relative_to(root).as_posix()
-        except ValueError:
-            logger.warning("post-run path outside proposals root: %s", p)
-            return str(p)
-
-    return _rel(new_path), _rel(report_path)
+    return None, f"{slug}.validation.json"
 
 
 # Router ----------------------------------------------------------------------
@@ -726,6 +710,7 @@ def validate_proposal_endpoint(
                 initial_capital=initial_capital,
                 market_data_loader=market_data_loader,
                 dry_run=body.dry_run,
+                auto_transition=False,
             )
         except WfaValidationError as exc:
             msg = str(exc)
@@ -742,16 +727,12 @@ def validate_proposal_endpoint(
             http_status, envelope = _map_state_error(state_exc)
             return JSONResponse(status_code=http_status, content=envelope)
 
-        new_path_str, report_path_str = _post_run_state_paths(
-            report, slug, root, body.dry_run
-        )
+        new_path_str, report_path_str = _post_run_state_paths(slug, body.dry_run)
 
-        if body.dry_run:
-            new_status: Literal["approved", "rejected", "validating"] = "validating"
-        elif report.verdict == "pass":
-            new_status = "approved"
-        else:
-            new_status = "rejected"
+        # Manual-verdict mode: the proposal always stays in ``validating``;
+        # the operator approves/rejects via the transition endpoint after
+        # reviewing the report.
+        new_status: Literal["validating"] = "validating"
 
         return JSONResponse(
             status_code=200,

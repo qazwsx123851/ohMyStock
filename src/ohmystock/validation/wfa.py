@@ -9,7 +9,9 @@ and OOS slice, aggregates per-window OOS metrics, evaluates three threshold
 checks (Sharpe gap, Sharpe degradation, MDD degradation), writes a
 ``<slug>.validation.json`` sibling-of-proposal report, and finally calls
 ``transition_proposal`` to move the proposal to ``approved`` (pass) or
-``rejected`` (fail).
+``rejected`` (fail). Passing ``auto_transition=False`` skips that final
+transition — the report is still written but the proposal stays in
+``validating`` for a human verdict (admin endpoint mode).
 """
 
 from __future__ import annotations
@@ -493,6 +495,7 @@ def run_validation(
     initial_capital: int | float,
     market_data_loader: Callable[[str, str, str], list[BarRow]],
     dry_run: bool = False,
+    auto_transition: bool = True,
 ) -> ValidationReport:
     """Validate a ``validating`` proposal via walk-forward analysis.
 
@@ -660,7 +663,8 @@ def run_validation(
 
     report_path = proposal_path.parent / f"{slug}{_REPORT_SUFFIX}"
     _write_report_atomic(report_path, report)
-    _transition_after_verdict(proposal_path, slug, verdict, failures, report_path)
+    if auto_transition:
+        _transition_after_verdict(proposal_path, slug, verdict, failures, report_path)
     return report
 
 

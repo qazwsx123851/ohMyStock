@@ -69,20 +69,22 @@ afterEach(() => {
 })
 
 describe('TransitionDialog required-field validation', () => {
-  it('approved: submit disabled until both actor + validation_report_path filled', () => {
+  it('approved: report path prefilled with <slug>.validation.json; clearing it disables submit', () => {
     renderDialog('approved')
     const submit = screen.getByRole('button', { name: 'Approve' })
-    expect(submit).toBeDisabled()
+    const pathInput = screen.getByLabelText('Validation report path')
+
+    // Manual-verdict flow prefill (proposal-manual-verdict).
+    expect(pathInput).toHaveValue('2026-04-30-x.validation.json')
+    expect(submit).toBeDisabled() // actor still empty
 
     fireEvent.change(screen.getByLabelText('Actor'), {
       target: { value: 'mark' },
     })
-    expect(submit).toBeDisabled()
-
-    fireEvent.change(screen.getByLabelText('Validation report path'), {
-      target: { value: 'reports/x.json' },
-    })
     expect(submit).not.toBeDisabled()
+
+    fireEvent.change(pathInput, { target: { value: '' } })
+    expect(submit).toBeDisabled()
   })
 
   it('merged: submit disabled until merged_to_version filled', () => {

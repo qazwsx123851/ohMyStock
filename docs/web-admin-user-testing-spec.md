@@ -42,7 +42,7 @@
 | PR-04 | reject 路徑 | /proposals/:slug | P1 | [可測] |
 | PR-05 | 終態守恆（merged/rejected 無 action） | /proposals/:slug | P1 | [可測] |
 | PR-06 | 非法轉移 / 缺欄位錯誤 | /proposals/:slug | P1 | [可測] |
-| PR-B1 | Re-validate 按鈕 | /proposals/:slug | P2 | [BLOCKED][偏離] |
+| PR-B1 | Re-validate 按鈕 | /proposals/:slug | P2 | [可測]（已實作） |
 | **Tier 2 — 觸發長任務** | | | | |
 | SW-01 | swarm 觸發 → 導向 DAG | /swarm | P1 | [可測] |
 | SW-02 | swarm 節點 SSE 進度 | /swarm/:preset/:runId | P2 | [可測] |
@@ -87,13 +87,13 @@
 
 | # | 主題 | user-scenarios.md | 實作現況 | 建議 |
 |---|---|---|---|---|
-| D1 | Confirm Gate 路由 | §2 在 `/decisions` | 內嵌在 `/paper`（PaperOverviewPage），無 `/decisions` 路由 | 改文件 |
+| D1 | Confirm Gate 路由 | §2 在 `/decisions` | 內嵌在 `/paper`（PaperOverviewPage），無 `/decisions` 路由 | 已改文件（user-scenarios.md 路由同步為 `/paper`）|
 | D2 | confirm 二次輸入張數 | §2「觸發 ConfirmDialog 二次輸入張數」 | 已補 ConfirmDialog + override_qty（伺服器 clamp） | 已實作（CG-B1 done）|
 | D3 | reject 自訂原因 | §2「寫進 reject reason」 | 已補 reject reason dialog（CG-B2 done） | 已實作 |
 | D4 | Dashboard risk gate 三色燈 | §1/§8 風險面板 | 已補 5 條件三色燈（顯示用，接法 A） | 已實作（DB-B1 done）|
 | D5 | Dashboard 月度熔斷 banner | §1/§8 紅色 banner | 已補 banner（顯示用） | 已實作（DB-B2 done）|
 | D6 | Dashboard 成本進度條 | §1「≥80% 橘色進度條」 | 已補進度條（≥80% 橘） | 已實作（DB-B3 done）|
-| D7 | proposal 驗證後人工確認 | §6 看完 WFA 報告才點 merge/reject | validate 實跑後**自動**轉 approved/rejected | 改文件 or 加 dry-run 預設 |
+| D7 | proposal 驗證後人工確認 | §6 看完 WFA 報告才點 merge/reject | validate 改為人工模式：報告產出後停在 validating，人工 Approve/Reject | 已實作（proposal-manual-verdict）|
 | D8 | proposal Re-validate 按鈕 | §6「[Re-validate] 換參數重跑」 | Run Validation 已帶上次參數重驗；rejected 後端不可重驗 | 現況已滿足（PR-B1 done），文件對齊 |
 | D9 | Settings 連線測試 | §9「點連線測試」 | 已補 test-connection endpoint + 按鈕 | 已實作（ST-B1 done）|
 | D10 | Settings 剩餘額度/模型分布 | §9/§10 | 已補 budget 區塊（唯讀） | 已實作（ST-B2 done）|

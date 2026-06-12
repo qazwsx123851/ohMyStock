@@ -75,8 +75,8 @@ function toastMessage(
       : `Dry run: verdict=fail — no state change — ${n} failure(s)`
   }
   return result.verdict === 'pass'
-    ? 'Validated: verdict=pass — moved to PENDING_REVIEW'
-    : `Validated: verdict=fail — moved to rejected — ${n} failure(s)`
+    ? 'Validated: verdict=pass — 報告已產出，請審閱後 Approve/Reject'
+    : `Validated: verdict=fail — 報告已產出（${n} failure(s)），請審閱後 Approve/Reject`
 }
 
 export interface ValidationDialogProps {
@@ -195,9 +195,9 @@ export function ValidationDialog({
         <DialogHeader>
           <DialogTitle>Run Validation</DialogTitle>
           <DialogDescription>
-            對 validating proposal 跑 walk-forward 驗證；pass 移到
-            PENDING_REVIEW，fail 移到 rejected。勾選 Dry run 只算 verdict
-            不變動狀態。
+            對 validating proposal 跑 walk-forward 驗證；產出報告後狀態維持
+            validating，由你審閱報告再手動 Approve/Reject。勾選 Dry run
+            只算 verdict 不寫報告。
           </DialogDescription>
         </DialogHeader>
 

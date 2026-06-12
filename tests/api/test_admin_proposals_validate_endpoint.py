@@ -1,8 +1,8 @@
 """HTTP tests for ``POST /api/admin/proposals/{slug}/validate``.
 
 Covers auth gate, body validation (extra/missing/inverted/empty), path traversal,
-unknown slug, unparseable params, happy-pass (verdict=pass → PENDING_REVIEW/),
-happy-fail (verdict=fail → rejected/), dry-run (status stays validating),
+unknown slug, unparseable params, happy-pass / happy-fail (manual-verdict mode:
+report written, status stays validating), dry-run (status stays validating),
 state-machine guard (status != validating → 409 illegal_transition), unknown
 strategy / missing bars / period_too_short → 422 wfa_validation_failed, GET 405.
 
@@ -298,18 +298,20 @@ async def test_validate_pass_returns_200_with_envelope(
     assert body["ok"] is True
     data = body["data"]
     assert data["verdict"] == "pass"
-    assert data["new_status"] == "approved"
-    assert data["new_path"].startswith("PENDING_REVIEW/")
-    assert data["new_path"].endswith(f"{slug}.md")
-    assert data["report_path"].startswith("PENDING_REVIEW/")
-    assert data["report_path"].endswith(f"{slug}.validation.json")
+    # Manual-verdict mode (proposal-manual-verdict): the proposal stays in
+    # validating; the operator approves via the transition endpoint.
+    assert data["new_status"] == "validating"
+    assert data["new_path"] is None
+    assert data["report_path"] == f"{slug}.validation.json"
     assert data["failures"] == []
     assert set(data["deltas"].keys()) == {"sharpe", "max_drawdown", "win_rate"}
 
-    moved_md = proposals_root / "PENDING_REVIEW" / f"{slug}.md"
-    moved_report = proposals_root / "PENDING_REVIEW" / f"{slug}.validation.json"
-    assert moved_md.is_file()
-    assert moved_report.is_file()
+    staying_md = proposals_root / f"{slug}.md"
+    report = proposals_root / f"{slug}.validation.json"
+    assert staying_md.is_file()
+    assert "status: validating" in staying_md.read_text(encoding="utf-8")
+    assert report.is_file()
+    assert not (proposals_root / "PENDING_REVIEW" / f"{slug}.md").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -352,11 +354,15 @@ async def test_validate_fail_returns_200_with_failures(
     assert r.status_code == 200, r.text
     data = r.json()["data"]
     assert data["verdict"] == "fail"
-    assert data["new_status"] == "rejected"
-    assert data["new_path"].startswith("rejected/")
-    assert data["report_path"].startswith("rejected/")
+    # Manual-verdict mode: fail no longer auto-rejects — the operator
+    # reviews the report and rejects via the transition endpoint.
+    assert data["new_status"] == "validating"
+    assert data["new_path"] is None
+    assert data["report_path"] == f"{slug}.validation.json"
     assert len(data["failures"]) >= 1
     assert any("sharpe_gap" in f for f in data["failures"])
+    assert (proposals_root / f"{slug}.md").is_file()
+    assert not (proposals_root / "rejected" / f"{slug}.md").exists()
 
 
 # ---------------------------------------------------------------------------
