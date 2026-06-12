@@ -53,7 +53,10 @@ test.describe('DB Dashboard', () => {
     const tripped = (await stats.json()).data.monthly_breaker?.tripped === true
 
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await expect(page.getByText('今日已實現損益', { exact: true })).toBeVisible()
+    // stats/today 的 risk gate 會打真 yfinance，冷快取時可能 >5s。
+    await expect(page.getByText('今日已實現損益', { exact: true })).toBeVisible({
+      timeout: 30_000,
+    })
     if (tripped) {
       await expect(page.getByText('月度熔斷已觸發', { exact: false })).toBeVisible()
       await expect(page.getByText('禁止新進場至月底', { exact: false })).toBeVisible()
