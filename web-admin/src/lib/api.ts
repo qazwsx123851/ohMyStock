@@ -57,21 +57,20 @@ export type StatsSummary = {
   risk_gate?: RiskGate
 }
 
-// Open position row from GET /api/admin/positions/open
+// Open position row from GET /api/admin/positions/open — mirrors the backend
+// PositionItem (src/ohmystock/api/routes/positions.py). v0 is long-only and
+// has no mark-price source, so there are no side / mark_price / P&L fields.
 export type OpenPosition = {
+  decision_id: string
   symbol: string
-  side: 'long' | 'short'
-  qty: number
+  sector: string
   entry_price: number
-  mark_price: number
-  unrealized_pnl_twd: number
-  unrealized_pnl_pct: number
-  stop_loss: number
-  t1_target: number
+  qty_lots: number
+  entry_ts: string
   hold_days: number
-  time_stop_date: string
-  entry_reason: string
-  entry_at: string
+  stop_loss: number | null
+  t1_target: number | null
+  time_stop_date: string | null
 }
 
 // Envelope returned by GET /api/admin/positions/open ({ items, asof_iso, count }).
@@ -683,6 +682,11 @@ export function openSSE(path: string, handlers: SseHandlers): SseHandle {
         const { value, done } = await reader.read()
         if (done) break
         buffer += decoder.decode(value, { stream: true })
+        // Normalize CRLF: sse-starlette terminates lines with \r\n, so the
+        // \n\n frame separator below never matches without this. A chunk
+        // ending in a bare \r is completed by the next chunk's \n before
+        // any frame split can consume it.
+        buffer = buffer.replace(/\r\n/g, '\n')
 
         // SSE messages separated by blank line
         let sep = buffer.indexOf('\n\n')

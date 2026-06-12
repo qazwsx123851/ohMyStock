@@ -284,13 +284,19 @@ export function SwarmRunPage() {
     enabled: runId.length > 0,
   })
 
-  // Subscribe to live feed scoped to this run.
-  const liveEvents = useLiveFeedStore((s) =>
-    s.events.filter((e) => {
-      if (!e.event_type.startsWith('swarm_')) return false
-      const payload = (e.payload ?? {}) as Record<string, unknown>
-      return payload.run_id === runId
-    }),
+  // Subscribe to live feed scoped to this run. Select the raw array and
+  // filter in useMemo — filtering inside the selector returns a fresh array
+  // per getSnapshot call, which React 18 treats as an ever-changing store
+  // and loops re-renders forever (React error #185).
+  const allEvents = useLiveFeedStore((s) => s.events)
+  const liveEvents = React.useMemo(
+    () =>
+      allEvents.filter((e) => {
+        if (!e.event_type.startsWith('swarm_')) return false
+        const payload = (e.payload ?? {}) as Record<string, unknown>
+        return payload.run_id === runId
+      }),
+    [allEvents, runId],
   )
 
   const baseline = React.useMemo<Record<string, NodeState>>(

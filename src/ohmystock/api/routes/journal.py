@@ -130,6 +130,7 @@ def _build_filters(
     *,
     kind: list[str] | None,
     symbol: str | None,
+    decision_id: str | None,
     date_from: str | None,
     date_to: str | None,
 ) -> tuple[str, list[Any]]:
@@ -143,6 +144,9 @@ def _build_filters(
     if symbol is not None:
         clauses.append("symbol = ?")
         params.append(symbol)
+    if decision_id is not None:
+        clauses.append("decision_id = ?")
+        params.append(decision_id)
     if date_from is not None:
         clauses.append("substr(created_at, 1, 10) >= ?")
         params.append(date_from)
@@ -175,6 +179,7 @@ def _row_to_item(row: tuple[Any, ...]) -> JournalRowItem:
 def get_journal_rows(
     kind: list[str] | None = Query(default=None),
     symbol: str | None = Query(default=None),
+    decision_id: str | None = Query(default=None),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
     limit: int = Query(default=_DEFAULT_LIMIT),
@@ -202,6 +207,7 @@ def get_journal_rows(
         where, params = _build_filters(
             kind=kind_v,
             symbol=symbol,
+            decision_id=decision_id,
             date_from=date_from_v,
             date_to=date_to_v,
         )

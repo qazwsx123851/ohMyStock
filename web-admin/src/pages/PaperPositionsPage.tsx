@@ -18,7 +18,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 const numFmt = new Intl.NumberFormat('zh-TW')
-const signedTwdFmt = new Intl.NumberFormat('zh-TW', { signDisplay: 'exceptZero' })
 const signedPctFmt = new Intl.NumberFormat('zh-TW', {
   signDisplay: 'exceptZero',
   minimumFractionDigits: 1,
@@ -56,36 +55,18 @@ function SideCell({ side }: { side: 'long' | 'short' }) {
   )
 }
 
-function PnlCell({
-  value,
-  format,
-}: {
-  value: number
-  format: Intl.NumberFormat
-}) {
-  const d = directionOf(value)
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center justify-end gap-1 tabular',
-        dirClass(d),
-      )}
-      data-direction={d}
-    >
-      <DirGlyph d={d} size="size-3.5" />
-      <span>{format.format(value)}</span>
-    </span>
-  )
-}
-
+// Backend PositionItem is long-only (v0) with no mark-price source, so the
+// table has no 現價 / 未實現 P&L columns; 紅漲綠跌 dual-encoding lives in the
+// 方向 cell + DetailPanel distance cells.
 const COLUMNS: DataTableColumn<OpenPosition>[] = [
   { id: 'symbol', header: 'Symbol', accessor: (r) => r.symbol },
-  { id: 'side', header: '方向', accessor: (r) => <SideCell side={r.side} /> },
+  { id: 'side', header: '方向', accessor: () => <SideCell side="long" /> },
+  { id: 'sector', header: '產業', accessor: (r) => r.sector },
   {
     id: 'qty',
-    header: 'Qty',
+    header: 'Qty（張）',
     align: 'right',
-    accessor: (r) => numFmt.format(r.qty),
+    accessor: (r) => numFmt.format(r.qty_lots),
   },
   {
     id: 'entry_price',
@@ -94,39 +75,18 @@ const COLUMNS: DataTableColumn<OpenPosition>[] = [
     accessor: (r) => priceFmt.format(r.entry_price),
   },
   {
-    id: 'mark_price',
-    header: '現價',
-    align: 'right',
-    accessor: (r) => priceFmt.format(r.mark_price),
-  },
-  {
-    id: 'unrealized_pnl_twd',
-    header: '未實現 P&L',
-    align: 'right',
-    sortable: true,
-    accessor: (r) => (
-      <PnlCell value={r.unrealized_pnl_twd} format={signedTwdFmt} />
-    ),
-  },
-  {
-    id: 'unrealized_pnl_pct',
-    header: 'P&L%',
-    align: 'right',
-    accessor: (r) => (
-      <PnlCell value={r.unrealized_pnl_pct} format={signedPctFmt} />
-    ),
-  },
-  {
     id: 'stop_loss',
     header: '停損',
     align: 'right',
-    accessor: (r) => priceFmt.format(r.stop_loss),
+    accessor: (r) =>
+      r.stop_loss == null ? '—' : priceFmt.format(r.stop_loss),
   },
   {
     id: 't1_target',
     header: 'T1',
     align: 'right',
-    accessor: (r) => priceFmt.format(r.t1_target),
+    accessor: (r) =>
+      r.t1_target == null ? '—' : priceFmt.format(r.t1_target),
   },
   {
     id: 'hold_days',
@@ -141,11 +101,25 @@ function distancePct(from: number, to: number): number {
   return ((to - from) / from) * 100
 }
 
+function DistanceCell({ pct }: { pct: number | null }) {
+  if (pct == null) return <span className="ml-1">—</span>
+  const d = directionOf(pct)
+  return (
+    <span
+      className={cn('ml-1 inline-flex items-center gap-1 tabular', dirClass(d))}
+      data-direction={d}
+    >
+      <DirGlyph d={d} size="size-3" />
+      {signedPctFmt.format(pct)}%
+    </span>
+  )
+}
+
 function DetailPanel({ row }: { row: OpenPosition }) {
-  const stopDistPct = distancePct(row.entry_price, row.stop_loss)
-  const t1DistPct = distancePct(row.entry_price, row.t1_target)
-  const stopDir = directionOf(stopDistPct)
-  const t1Dir = directionOf(t1DistPct)
+  const stopDistPct =
+    row.stop_loss == null ? null : distancePct(row.entry_price, row.stop_loss)
+  const t1DistPct =
+    row.t1_target == null ? null : distancePct(row.entry_price, row.t1_target)
 
   return (
     <Card className="mt-3 p-4 text-sm" data-testid="positions-detail-panel">
@@ -157,42 +131,24 @@ function DetailPanel({ row }: { row: OpenPosition }) {
         <div>
           <span className="text-muted-foreground">進場時間：</span>
           <span className="ml-1 tabular">
-            {dayjs(row.entry_at).format('YYYY-MM-DD HH:mm')}
+            {dayjs(row.entry_ts).format('YYYY-MM-DD HH:mm')}
           </span>
         </div>
         <div className="md:col-span-2">
-          <span className="text-muted-foreground">進場理由：</span>
-          <span className="ml-1">{row.entry_reason || '—'}</span>
+          <span className="text-muted-foreground">產業：</span>
+          <span className="ml-1">{row.sector || '—'}</span>
         </div>
         <div>
           <span className="text-muted-foreground">停損距離：</span>
-          <span
-            className={cn(
-              'ml-1 inline-flex items-center gap-1 tabular',
-              dirClass(stopDir),
-            )}
-            data-direction={stopDir}
-          >
-            <DirGlyph d={stopDir} size="size-3" />
-            {signedPctFmt.format(stopDistPct)}%
-          </span>
+          <DistanceCell pct={stopDistPct} />
         </div>
         <div>
           <span className="text-muted-foreground">T1 距離：</span>
-          <span
-            className={cn(
-              'ml-1 inline-flex items-center gap-1 tabular',
-              dirClass(t1Dir),
-            )}
-            data-direction={t1Dir}
-          >
-            <DirGlyph d={t1Dir} size="size-3" />
-            {signedPctFmt.format(t1DistPct)}%
-          </span>
+          <DistanceCell pct={t1DistPct} />
         </div>
         <div className="md:col-span-2">
           <span className="text-muted-foreground">Time stop：</span>
-          <span className="ml-1 tabular">{row.time_stop_date}</span>
+          <span className="ml-1 tabular">{row.time_stop_date ?? '—'}</span>
         </div>
       </div>
     </Card>

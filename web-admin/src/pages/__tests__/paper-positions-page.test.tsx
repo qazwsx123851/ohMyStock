@@ -8,34 +8,28 @@ import type { OpenPosition } from '@/lib/api'
 
 const POSITIONS_OK: OpenPosition[] = [
   {
+    decision_id: 'd-1',
     symbol: '2330',
-    side: 'long',
-    qty: 100,
-    entry_price: 1000.5,
-    mark_price: 1025,
-    unrealized_pnl_twd: 2450,
-    unrealized_pnl_pct: 2.5,
-    stop_loss: 970,
-    t1_target: 1080,
+    sector: '半導體',
+    entry_price: 600,
+    qty_lots: 2,
+    entry_ts: '2026-04-22T09:30:00+08:00',
     hold_days: 12,
+    stop_loss: 570,
+    t1_target: 660,
     time_stop_date: '2026-05-20',
-    entry_reason: 'SEPA breakout + RS≥80',
-    entry_at: '2026-04-22T09:30:00+08:00',
   },
   {
-    symbol: '6505',
-    side: 'short',
-    qty: 500,
-    entry_price: 33.5,
-    mark_price: 32.8,
-    unrealized_pnl_twd: -350,
-    unrealized_pnl_pct: -2.1,
-    stop_loss: 31,
-    t1_target: 35.5,
+    decision_id: 'd-2',
+    symbol: '0050',
+    sector: 'ETF',
+    entry_price: 180,
+    qty_lots: 1,
+    entry_ts: '2026-04-30T10:00:00+08:00',
     hold_days: 8,
-    time_stop_date: '2026-05-15',
-    entry_reason: 'breakdown retest',
-    entry_at: '2026-04-30T10:00:00+08:00',
+    stop_loss: null,
+    t1_target: null,
+    time_stop_date: null,
   },
 ]
 
@@ -76,7 +70,7 @@ describe('PaperPositionsPage', () => {
     resolveFetch(jsonResponse({ ok: true, data: [] }))
   })
 
-  it('resolved: renders both rows with --up/--down dual-encoding (color + arrow svg)', async () => {
+  it('resolved: renders rows, long-only 多 cells with up dual-encoding, — for null levels', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({
         ok: true,
@@ -86,13 +80,11 @@ describe('PaperPositionsPage', () => {
 
     const { container } = renderWithQuery(<PaperPositionsPage />)
     await screen.findByText('2330')
-    expect(screen.getByText('6505')).toBeInTheDocument()
+    expect(screen.getByText('0050')).toBeInTheDocument()
 
+    // v0 long-only：每列方向 cell 都是 多 + up 雙重編碼（色 + 箭頭 svg）。
     const upCells = container.querySelectorAll('[data-direction="up"]')
-    const downCells = container.querySelectorAll('[data-direction="down"]')
     expect(upCells.length).toBeGreaterThanOrEqual(2)
-    expect(downCells.length).toBeGreaterThanOrEqual(2)
-
     let upHasUpClass = false
     let upHasArrowSvg = false
     upCells.forEach((el) => {
@@ -102,17 +94,12 @@ describe('PaperPositionsPage', () => {
     expect(upHasUpClass).toBe(true)
     expect(upHasArrowSvg).toBe(true)
 
-    let downHasDownClass = false
-    let downHasArrowSvg = false
-    downCells.forEach((el) => {
-      if (el.className.includes('text-down')) downHasDownClass = true
-      if (el.querySelector('svg')) downHasArrowSvg = true
-    })
-    expect(downHasDownClass).toBe(true)
-    expect(downHasArrowSvg).toBe(true)
+    // 0050 缺 stop_loss / t1_target → 該列以 — 呈現。
+    const row0050 = screen.getByText('0050').closest('tr')!
+    expect(row0050.textContent).toContain('—')
   })
 
-  it('detail panel toggles when a row is clicked', async () => {
+  it('detail panel toggles when a row is clicked, 距離% 帶方向編碼', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse({
         ok: true,
@@ -133,7 +120,12 @@ describe('PaperPositionsPage', () => {
       '[data-testid="positions-detail-panel"]',
     )
     expect(panel).not.toBeNull()
-    expect(panel!.textContent).toContain('SEPA breakout + RS≥80')
+    // 2330：停損 570 vs entry 600 → -5%（down）；T1 660 → +10%（up）。
+    expect(panel!.textContent).toContain('半導體')
+    expect(panel!.querySelector('[data-direction="down"]')).not.toBeNull()
+    expect(panel!.querySelector('[data-direction="up"]')).not.toBeNull()
+    expect(panel!.textContent).toContain('-5')
+    expect(panel!.textContent).toContain('+10')
   })
 
   it('empty: renders 目前無開倉 + ListOrdered icon when API returns []', async () => {
