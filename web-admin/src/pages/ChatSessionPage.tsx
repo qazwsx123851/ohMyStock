@@ -252,6 +252,9 @@ export function ChatSessionPage() {
         onError: (err) => {
           setStreamError(err)
           setStreaming(null)
+          // Restore the draft so the error card's「已保留你輸入的內容」holds
+          // (input was cleared optimistically before the stream started).
+          setInput(content)
           queryClient.invalidateQueries({
             queryKey: ['chat-session', sessionId],
           })

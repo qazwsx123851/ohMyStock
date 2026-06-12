@@ -74,9 +74,11 @@ test('CH-04 送訊息（無 API key）：alert 顯示 missing_api_key、訊息�
 
   const alert = page.getByRole('alert')
   await expect(alert).toContainText('網路或服務異常（missing_api_key）')
-  // TODO（已回報 UX bug）：錯誤卡寫「已保留你輸入的內容」，但
-  // ChatSessionPage.startStream 在 stream 前就清空 input — 內容實際遺失。
+  // 錯誤後草稿還原（onError setInput(content)），對齊「已保留你輸入的內容」。
   await expect(page.getByLabel('訊息輸入')).toBeEnabled()
+  await expect(page.getByLabel('訊息輸入')).toHaveValue(
+    '這則訊息不該被保存（無 key）',
+  )
 
   // 422 在 insert_message 之前 → API 確認 message 數仍為 2。
   const resp = await page.request.get(
