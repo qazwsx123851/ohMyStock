@@ -371,9 +371,9 @@ Malformed `param_overrides` entries (failing `ast.literal_eval`) MUST return HTT
 
 The route SHALL construct the `market_data_loader` via a module-level `_MARKET_DATA_LOADER_FACTORY: Callable[[], Callable[[str, str, str], list[BarRow]]]` that defaults to `lambda: (lambda sym, s, e: select_bars(get_connection(), sym, s, e))`. Tests SHALL monkeypatch this factory to inject synthetic loaders, the same pattern as the existing `_PROPOSALS_ROOT_FACTORY`.
 
-The route SHALL call `ohmystock.validation.run_validation(proposal_path, strategy_name=..., period=..., param_overrides=..., universe=..., wfa_windows=..., in_sample_ratio=..., initial_capital=..., market_data_loader=..., dry_run=...)` synchronously and return its `ValidationReport`. The route MUST NOT directly invoke `_run_one`, `_split_windows`, or any other private helper — all validation flow goes through the public library entry point.
+The route SHALL call `ohmystock.validation.run_validation(proposal_path, strategy_name=..., period=..., param_overrides=..., universe=..., wfa_windows=..., in_sample_ratio=..., initial_capital=..., market_data_loader=..., dry_run=..., auto_transition=False)` synchronously and return its `ValidationReport`. The route SHALL pass `auto_transition=False` unconditionally（manual-verdict mode）. The request body（`ValidateRequest`, `extra="forbid"`）is unchanged — no new field is exposed. The route MUST NOT directly invoke `_run_one`, `_split_windows`, or any other private helper — all validation flow goes through the public library entry point.
 
-The route MUST NOT mutate proposal state directly; state transitions happen inside `run_validation` via `transition_proposal`.
+The route MUST NOT mutate proposal state directly. In manual-verdict mode the validate route never causes a transition; human verdict confirmation goes through the existing `POST .../transition` endpoint over the legal edges `validating → approved`（requires `validation_report_path`）and `validating → rejected`（requires `reason`）.
 
 #### Scenario: factory override drives the run
 - **WHEN** a test monkeypatches `_MARKET_DATA_LOADER_FACTORY` to return a lambda that yields synthetic bars
@@ -383,35 +383,32 @@ The route MUST NOT mutate proposal state directly; state transitions happen insi
 
 #### Scenario: synchronous call returns full ValidationReport shape
 - **WHEN** the validator computes a verdict (pass or fail) without raising
-- **THEN** the route returns the report's verdict, deltas, and post-transition paths in the response envelope
+- **THEN** the route returns the report's verdict, deltas, and report path in the response envelope
 - **AND** the response is emitted in a single HTTP exchange (no polling/queue)
 
 ---
 
 ### Requirement: Validate endpoint success envelope shape
 
-On `verdict == "pass"` with `dry_run == false`, the response SHALL be HTTP 200 with `data = { verdict: "pass", slug, new_status: "approved", new_path: "PENDING_REVIEW/<slug>.md", report_path: "PENDING_REVIEW/<slug>.validation.json", deltas: {sharpe, max_drawdown, win_rate}, failures: [] }`.
+On `verdict == "pass"` with `dry_run == false`, the response SHALL be HTTP 200 with `data = { verdict: "pass", slug, new_status: "validating", new_path: null, report_path: "<slug>.validation.json", deltas: {sharpe, max_drawdown, win_rate}, failures: [] }` — the proposal is NOT moved.
 
-On `verdict == "fail"` with `dry_run == false`, the response SHALL be HTTP 200 with `data = { verdict: "fail", slug, new_status: "rejected", new_path: "rejected/<slug>.md", report_path: "rejected/<slug>.validation.json", deltas: {...}, failures: [str, ...] }`.
+On `verdict == "fail"` with `dry_run == false`, the response SHALL be HTTP 200 with `data = { verdict: "fail", slug, new_status: "validating", new_path: null, report_path: "<slug>.validation.json", deltas: {...}, failures: [str, ...] }` — the proposal is NOT moved.
 
 On `dry_run == true` (regardless of computed verdict), the response SHALL be HTTP 200 with `data = { verdict: "pass" | "fail", slug, new_status: "validating", new_path: null, report_path: null, deltas: {...}, failures: [...] }`. No `.validation.json` file MUST exist on disk after a dry-run.
 
-`new_path` and `report_path`, when present, MUST be forward-slash-joined paths relative to `_PROPOSALS_ROOT_FACTORY()`. The conversion MUST use `Path.relative_to(root).as_posix()`.
+`report_path`, when present, SHALL be the literal `"<slug>.validation.json"` string（forward-slash, relative to the proposals root）.
 
-#### Scenario: pass response payload
-- **WHEN** the validator returns `verdict=pass` against a `validating` proposal in non-dry-run mode
-- **THEN** the response is HTTP 200
-- **AND** `data.verdict == "pass"` and `data.new_status == "approved"`
-- **AND** `data.new_path` ends with `/<slug>.md` and starts with `PENDING_REVIEW/`
-- **AND** `data.report_path` ends with `/<slug>.validation.json` and starts with `PENDING_REVIEW/`
-- **AND** `data.failures == []`
+#### Scenario: pass verdict no longer moves the file
+- **WHEN** a non-dry-run validate completes with verdict `pass`
+- **THEN** the response has `new_status: "validating"`, `new_path: null`, `report_path: "<slug>.validation.json"`
+- **AND** `<root>/<slug>.md` still exists with frontmatter `status: validating`
+- **AND** `<root>/PENDING_REVIEW/<slug>.md` does NOT exist
 
-#### Scenario: fail response payload
-- **WHEN** the validator returns `verdict=fail` against a `validating` proposal in non-dry-run mode
-- **THEN** the response is HTTP 200
-- **AND** `data.verdict == "fail"` and `data.new_status == "rejected"`
-- **AND** `data.new_path` starts with `rejected/`
-- **AND** `data.failures` is a non-empty list of strings
+#### Scenario: fail verdict no longer moves the file
+- **WHEN** a non-dry-run validate completes with verdict `fail`
+- **THEN** the response has `new_status: "validating"`, `new_path: null`
+- **AND** `<root>/rejected/<slug>.md` does NOT exist
+- **AND** the operator can subsequently `POST .../transition` to `rejected` with a reason
 
 #### Scenario: dry-run response payload
 - **WHEN** the validator runs in dry-run mode

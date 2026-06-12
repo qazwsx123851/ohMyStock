@@ -20,7 +20,7 @@
 ## 4. 文件同步
 
 - [x] 4.1 `docs/web-admin-user-testing-spec.md` 落差總表 D7 改為已解決
-- [ ] 4.2 spec delta 同步至 `openspec/specs/`（留待 `/opsx:archive` 流程處理）
+- [x] 4.2 spec delta 同步至 `openspec/specs/`（`/opsx:archive` 流程完成：wfa-validation-engine / admin-proposals-endpoints / web-admin-proposals-pages）
 
 ## 5. 驗收
 

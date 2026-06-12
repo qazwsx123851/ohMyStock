@@ -189,7 +189,7 @@ The buttons MUST NOT be `disabled` for legal-but-not-current transitions (e.g. `
 The `<TransitionDialog>` component SHALL be a single shadcn `<Dialog>` whose form fields are conditional on a `target: ProposalStatus` prop:
 
 - `target == "validating"` → no `<TransitionDialog>` is opened; an `<AlertDialog>` confirmation runs instead, with only an `actor` input (defaulted from `localStorage`).
-- `target == "approved"` → fields: `actor` (required), `validation_report_path` (required, text input).
+- `target == "approved"` → fields: `actor` (required), `validation_report_path` (required, text input). When the dialog opens, the `validation_report_path` input SHALL be prefilled with `<slug>.validation.json`（the manual-mode report location）; the value remains editable.
 - `target == "merged"` → fields: `actor` (required), `merged_to_version` (required, text input).
 - `target == "rejected"` → fields: `actor` (required), `reason` (required, `<Textarea>` ≥ 2 rows).
 
@@ -200,10 +200,14 @@ On submit, the component MUST call `transitionProposal(slug, body)` (the `lib/ap
 On non-200 response, the envelope `code` and `message` MUST render inline below the form (`<p className="text-sm text-destructive">`) and the dialog stays open. The submit button MUST become re-enabled so the user can correct and retry.
 
 #### Scenario: approve dialog requires both fields
-- **WHEN** the user opens the Approve dialog with empty `actor` and empty `validation_report_path`
+- **WHEN** the user opens the Approve dialog with empty `actor` and clears the prefilled `validation_report_path`
 - **THEN** the submit button is disabled
 - **WHEN** the user fills both
 - **THEN** the submit button is enabled
+
+#### Scenario: approve dialog prefilled
+- **WHEN** the operator opens Approve… on proposal `2026-06-01-foo`
+- **THEN** the Validation report path input initial value is `2026-06-01-foo.validation.json`
 
 #### Scenario: successful submit closes dialog and refetches
 - **WHEN** the user submits a valid Approve transition
@@ -315,6 +319,8 @@ The button MUST NOT appear for any status other than `validating`. The page MUST
 
 The system SHALL ship a new component `<ValidationDialog>` at `web-admin/src/components/validation-dialog.tsx` built on the existing inline `<Dialog>` primitive at `components/ui/dialog.tsx` (same primitive `<TransitionDialog>` uses; no new Radix dependency).
 
+The dialog description SHALL describe the manual-verdict flow: running validation produces a report and keeps the proposal in `validating`; the operator reviews the report then uses Approve/Reject. The dialog description and the success toast MUST NOT claim the file was moved.
+
 The dialog MUST render the following fields in order:
 
 1. **Strategy** (`<select>`) — required. Options populated from `listStrategies()` (the existing helper that backs the `/backtest` page's strategy picker). Default selection: persisted `localStorage["ohmystock.admin.lastValidation"].strategy` if present, otherwise the first registered strategy.
@@ -373,24 +379,29 @@ On success (HTTP 200), the dialog SHALL:
 2. Invalidate the React Query key `["proposal", slug]` so the page refetches the latest frontmatter / status / extra_frontmatter.
 3. Close the dialog.
 4. Show a toast whose message mirrors the response envelope:
-   - `verdict=pass` non-dry-run → `Validated: verdict=pass — moved to PENDING_REVIEW`.
-   - `verdict=fail` non-dry-run → `Validated: verdict=fail — moved to rejected — N failure(s)` where N = `failures.length`.
+   - `verdict=pass` non-dry-run → `Validated: verdict=pass — 報告已產出，請審閱後 Approve/Reject`.
+   - `verdict=fail` non-dry-run → `Validated: verdict=fail — 報告已產出（N failure(s)），請審閱後 Approve/Reject` where N = `failures.length`.
    - dry-run pass → `Dry run: verdict=pass — no state change`.
    - dry-run fail → `Dry run: verdict=fail — no state change — N failure(s)`.
 
 On error (HTTP ≠ 200), the dialog MUST remain open and surface an inline error showing `{error.code}: {error.message}` immediately above the footer; the form fields MUST remain editable so the user can correct and resubmit.
 
 #### Scenario: pass success persists settings, invalidates query, closes dialog
-- **WHEN** the user submits and the endpoint returns `{ok: true, data: {verdict: "pass", new_status: "approved", ...}}`
+- **WHEN** the user submits and the endpoint returns `{ok: true, data: {verdict: "pass", new_status: "validating", new_path: null, ...}}`
 - **THEN** `localStorage["ohmystock.admin.lastValidation"]` is updated with the strategy, universe, wfa_windows, in_sample_ratio, initial_capital from the just-submitted form
 - **AND** the React Query cache key `["proposal", <slug>]` is invalidated
 - **AND** the dialog closes
 - **AND** a toast appears containing the substring `verdict=pass`
 
 #### Scenario: fail success closes dialog with failure-count toast
-- **WHEN** the user submits and the endpoint returns `{ok: true, data: {verdict: "fail", new_status: "rejected", failures: ["sharpe_gap: ..."]}}`
+- **WHEN** the user submits and the endpoint returns `{ok: true, data: {verdict: "fail", new_status: "validating", new_path: null, failures: ["sharpe_gap: ..."]}}`
 - **THEN** the dialog closes
 - **AND** a toast appears containing `verdict=fail` and `1 failure`
+
+#### Scenario: non-dry-run toast reflects manual flow
+- **WHEN** a non-dry-run validation returns verdict `fail` with 2 failures
+- **THEN** the toast contains `verdict=fail`、`2 failure(s)` and `請審閱後 Approve/Reject`
+- **AND** does not contain `moved to`
 
 #### Scenario: dry-run success keeps proposal at validating
 - **WHEN** the user checks Dry-run and submits, receiving `{ok: true, data: {verdict: "pass", new_status: "validating", new_path: null}}`

@@ -8,7 +8,7 @@
 
 ### Requirement: `run_validation` public API shape
 
-The system SHALL expose `ohmystock.validation.wfa.run_validation(proposal_path, *, strategy_name, period, param_overrides, universe, wfa_windows=5, in_sample_ratio=0.7, initial_capital, market_data_loader, dry_run=False) -> ValidationReport` as the single library entry point for walk-forward validation.
+The system SHALL expose `ohmystock.validation.wfa.run_validation(proposal_path, *, strategy_name, period, param_overrides, universe, wfa_windows=5, in_sample_ratio=0.7, initial_capital, market_data_loader, dry_run=False, auto_transition=True) -> ValidationReport` as the single library entry point for walk-forward validation.
 
 `ValidationReport` MUST be a frozen dataclass with these fields, in this order: `proposal_id: str`, `slug: str`, `validated_at: str` (ISO-8601 with `+08:00` offset), `strategy: str`, `period: dict[str, str]` (`{from, to}` ISO dates), `param_overrides: dict[str, Any]`, `effective_kwargs: dict[str, Any]`, `universe: list[str]`, `wfa_windows: list[WfaWindow]`, `baseline_oos_aggregate: dict[str, float]`, `candidate_oos_aggregate: dict[str, float]`, `candidate_is_oos_sharpe_gap_pct: float`, `deltas: dict[str, float]`, `thresholds: dict[str, float]`, `verdict: Literal["pass", "fail"]`, `failures: list[str]`.
 
@@ -110,12 +110,19 @@ If `<proposal_dir>/<slug>.validation.json` already exists, the validator SHALL s
 
 ### Requirement: Proposal state transition
 
-When `dry_run=False`, after the report file is on disk, the validator SHALL call `transition_proposal` from `ohmystock.proposal`:
+When `dry_run=False` and `auto_transition=True`（預設；CLI 路徑不變）, after the report file is on disk, the validator SHALL call `transition_proposal` from `ohmystock.proposal`:
 
 - `verdict == "pass"` → `transition_proposal(proposal_path, "approved", actor="wfa-validator", validation_report_path=Path(f"{slug}.validation.json"))`
 - `verdict == "fail"` → `transition_proposal(proposal_path, "rejected", actor="wfa-validator", reason=<one-line summary>)` where `<one-line summary>` SHALL be `"; ".join(failures)` truncated to 200 chars.
 
 After `transition_proposal` returns the new path, the validator SHALL move the report file to remain a sibling: if `new_path.parent != proposal_path.parent`, `report_path.rename(new_path.parent / report_path.name)`. The move MUST happen even if it crosses directory boundaries (e.g. root → `PENDING_REVIEW/`).
+
+When `auto_transition=False` and `dry_run=False`, the validator SHALL:
+- write `<slug>.validation.json` atomically next to the proposal markdown（proposals root）,
+- emit `WFA_PASSED` / `WFA_FAILED` exactly as before,
+- return the `ValidationReport` WITHOUT calling `transition_proposal` — the markdown stays in place with frontmatter `status: validating`, and no changelog line is appended.
+
+`dry_run=True` SHALL keep precedence: no report file and no transition regardless of `auto_transition`.
 
 The validator SHALL refuse to call `transition_proposal` if the proposal's current `status` (read from frontmatter) is not exactly `"validating"`. In that case it MUST raise `WfaValidationError("status_not_validating: actual=<current>")` BEFORE running any backtest.
 
@@ -138,6 +145,16 @@ The validator SHALL refuse to call `transition_proposal` if the proposal's curre
 - **THEN** `WfaValidationError` is raised before any backtest call
 - **AND** the error message contains both `status_not_validating` and `pending`
 - **AND** no file is written and no transition happens
+
+#### Scenario: manual mode keeps proposal in validating
+- **WHEN** `run_validation(..., dry_run=False, auto_transition=False)` completes with verdict pass or fail
+- **THEN** `<root>/<slug>.validation.json` exists
+- **AND** the proposal markdown remains at `<root>/<slug>.md` with frontmatter `status: validating`
+- **AND** no changelog line is appended
+
+#### Scenario: default remains auto
+- **WHEN** `run_validation` is called without `auto_transition`（e.g. CLI `ohmystock validate-proposal`）
+- **THEN** pass/fail still auto-transitions to `approved`/`rejected` as previously specified
 
 ---
 
