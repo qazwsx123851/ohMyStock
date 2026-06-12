@@ -24,13 +24,18 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from ohmystock.backtest.storage import init_schema as init_backtest
+from ohmystock.chat.schema import ChatMessage, ChatSession
 from ohmystock.chat.storage import init_schema as init_chat
+from ohmystock.chat.storage import insert_message, insert_session
+from ohmystock.chip.cache import init_chip_schema, insert_three_major_rows
 from ohmystock.data.cache import init_market_data_schema, insert_bars
 from ohmystock.data.disposition import init_schema as init_disposition
 from ohmystock.data.sources.base import BarRow
 from ohmystock.journal.schema import init_schema as init_journal
 from ohmystock.memory.schema import init_schema as init_memory
 from ohmystock.proposal import ProposalDraft, transition_proposal, write_proposal
+from ohmystock.review.index import upsert_index_entry
+from ohmystock.review.models import IndexEntry, Period
 from ohmystock.sepa.rs import init_schema as init_rs
 from ohmystock.swarm_runs.storage import init_schema as init_swarm_runs
 
@@ -43,6 +48,7 @@ _INITS = (
     init_disposition,
     init_rs,
     init_market_data_schema,
+    init_chip_schema,
 )
 
 _TPE = timezone(timedelta(hours=8))
@@ -284,6 +290,248 @@ def seed_bars(conn: sqlite3.Connection) -> None:
 
 
 # ---------------------------------------------------------------------------
+# chat fixtures (tier5: sessions CRUD + FTS5 search; zero-LLM)
+# ---------------------------------------------------------------------------
+
+
+def seed_chat(conn: sqlite3.Connection) -> None:
+    """3 sessions with fixed timestamps. ASCII FTS token `e2etokenalpha`
+    because FTS5 unicode61 does not tokenise CJK-only content reliably.
+    The 05-01 vs 05-02 date spread drives the search date-range filter."""
+
+    def session(sid: str, title: str, status: str, created: str, updated: str):
+        insert_session(
+            conn,
+            ChatSession(
+                id=sid,
+                title=title,
+                model="claude-sonnet-4-6",
+                status=status,  # type: ignore[arg-type]
+                created_at=created,
+                updated_at=updated,
+            ),
+        )
+
+    def message(mid: str, sid: str, role: str, content: str, created: str):
+        insert_message(
+            conn,
+            ChatMessage(
+                id=mid,
+                session_id=sid,
+                role=role,  # type: ignore[arg-type]
+                content=content,
+                created_at=created,
+            ),
+        )
+
+    # A: detail page + missing_api_key send target (2 messages).
+    session(
+        "chat_e2e00001",
+        "e2e 固定對話 A",
+        "active",
+        "2026-05-01T10:00:00+08:00",
+        "2026-05-01T10:01:00+08:00",
+    )
+    message(
+        "msg_aaaaaaaaaa01",
+        "chat_e2e00001",
+        "user",
+        "請幫我看台積電走勢 e2etokenalpha",
+        "2026-05-01T10:00:30+08:00",
+    )
+    message(
+        "msg_aaaaaaaaaa02",
+        "chat_e2e00001",
+        "assistant",
+        "e2e fixture 回覆：已收到。",
+        "2026-05-01T10:01:00+08:00",
+    )
+
+    # B: UI delete target (0 messages).
+    session(
+        "chat_e2e00002",
+        "e2e 固定對話 B",
+        "active",
+        "2026-05-01T11:00:00+08:00",
+        "2026-05-01T11:00:00+08:00",
+    )
+
+    # Deleted: drives (已刪除) search badge + session_deleted detail page.
+    session(
+        "chat_e2e00003",
+        "e2e 已刪除對話",
+        "deleted",
+        "2026-05-02T09:00:00+08:00",
+        "2026-05-02T09:05:00+08:00",
+    )
+    message(
+        "msg_aaaaaaaaaa03",
+        "chat_e2e00003",
+        "user",
+        "已刪除對話的內容 e2etokenalpha",
+        "2026-05-02T09:00:30+08:00",
+    )
+
+
+# ---------------------------------------------------------------------------
+# reviews fixtures (tier6: _index.json + <review_id>/ files)
+# ---------------------------------------------------------------------------
+
+
+def seed_reviews(root: Path) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+
+    # Full monthly review: all 6 standard files -> partial=false.
+    monthly = root / "2026-05-e2e-monthly"
+    monthly.mkdir(parents=True, exist_ok=True)
+    (monthly / "data.json").write_text("{}\n", encoding="utf-8")
+    (monthly / "attribution.json").write_text("{}\n", encoding="utf-8")
+    (monthly / "metrics.json").write_text(
+        json.dumps(
+            {
+                "overall": {
+                    "win_rate": 0.583,
+                    "profit_factor": 1.42,
+                    "expectancy_pct": 0.012,
+                    "max_drawdown_pct": -0.08,
+                    "max_consecutive_loss": 2,
+                    "avg_hold_days": 6.5,
+                }
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (monthly / "critique.md").write_text("# e2e critique\n", encoding="utf-8")
+    (monthly / "report.md").write_text(
+        "# e2e 五月復盤報告\n\n勝率 58.3%，PF 1.42。\n", encoding="utf-8"
+    )
+    # Row format must satisfy routes/reviews._PROPOSAL_LINK_RE + >=4 cells.
+    (monthly / "proposals_created.md").write_text(
+        "| Proposal | Status | Priority | Target |\n"
+        "|---|---|---|---|\n"
+        "| [e2e-pr05m](../../proposals/2026-01-06-e2e-pr05m.md) "
+        "| merged | medium | cheatsheet §6.6 |\n",
+        encoding="utf-8",
+    )
+    upsert_index_entry(
+        root,
+        IndexEntry(
+            review_id="2026-05-e2e-monthly",
+            kind="monthly",
+            period=Period.model_validate(
+                {"from": "2026-05-01", "to": "2026-05-31"}
+            ),
+            trade_count=12,
+            win_rate=0.583,
+            pf=1.42,
+            proposals_created=1,
+            completed_at="2026-05-31T18:00:00+08:00",
+        ),
+    )
+
+    # Partial quarterly review: only report.md -> partial banner + 缺漏.
+    quarterly = root / "2026-04-e2e-quarterly"
+    quarterly.mkdir(parents=True, exist_ok=True)
+    (quarterly / "report.md").write_text(
+        "# e2e 季度復盤（部分產出）\n", encoding="utf-8"
+    )
+    upsert_index_entry(
+        root,
+        IndexEntry(
+            review_id="2026-04-e2e-quarterly",
+            kind="quarterly",
+            period=Period.model_validate(
+                {"from": "2026-02-01", "to": "2026-04-30"}
+            ),
+            trade_count=5,
+            win_rate=0.4,
+            pf=0.85,
+            proposals_created=0,
+            completed_at="2026-04-30T18:00:00+08:00",
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# market symbol fixtures (tier8: /market/3017, now-relative)
+# ---------------------------------------------------------------------------
+
+
+def seed_market_symbol(conn: sqlite3.Connection, now: datetime) -> None:
+    """Symbol 3017, untouched by every other fixture. Bars must end near
+    `now` because routes/market._fetch_bars windows back from today —
+    the fixed-2025 bars used by WFA/backtest would 404 here."""
+
+    # 70 weekdays ending at the last weekday <= today.
+    end = now.date()
+    while end.weekday() >= 5:
+        end -= timedelta(days=1)
+    days: list[date] = []
+    cur = end
+    while len(days) < 70:
+        if cur.weekday() < 5:
+            days.append(cur)
+        cur -= timedelta(days=1)
+    days.reverse()
+
+    fetched = now.isoformat()
+    rows = []
+    for i, d in enumerate(days):
+        price = 100.0 + i * 0.5
+        rows.append(
+            BarRow(
+                ts=d.isoformat(),
+                o=price,
+                h=price,
+                l=price,
+                c=price,
+                v=2_000_000,
+                amount=int(price * 2_000_000),
+            )
+        )
+    insert_bars(conn, "3017", rows, "e2e", fetched)
+
+    # RS rating: latest row wins (no date window in routes/market._fetch_rs).
+    conn.execute(
+        "INSERT OR REPLACE INTO rs_rating_cache "
+        "(asof_date, symbol, rs_rating, universe_size, computed_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (days[-1].isoformat(), "3017", 87, 200, fetched),
+    )
+
+    # Institutional: last 5 bar dates; shares -> lots /1000 in the route.
+    # Per-day total = 3000 - 1000 + 500 = +2500 lots; KPI sums 5 days = +12500.
+    insert_three_major_rows(
+        conn,
+        [
+            {
+                "symbol": "3017",
+                "date": d.isoformat(),
+                "foreign_net": 3_000_000,
+                "invest_trust_net": -1_000_000,
+                "prop_dealer_net": 500_000,
+            }
+            for d in days[-5:]
+        ],
+        "e2e",
+        fetched,
+    )
+
+    # Pattern row (kind=reject is safe: AU/PP/Dashboard assert specific
+    # decision_ids only). No later 3017 entry exists -> outcome 未進場.
+    _insert_journal(
+        conn,
+        "e2e-mk-pattern",
+        "reject",
+        "3017",
+        (now - timedelta(days=3)).isoformat(),
+        {"pattern": "VCP breakout", "score": 0.86, "reason": "e2e pattern fixture"},
+    )
+
+
+# ---------------------------------------------------------------------------
 # proposals fixtures (Tier 1 state machine)
 # ---------------------------------------------------------------------------
 
@@ -357,6 +605,10 @@ def main() -> int:
     if not proposals_dir:
         print("PROPOSALS_DIR not set; refusing to seed", file=sys.stderr)
         return 1
+    reviews_dir = os.environ.get("REVIEWS_DIR")
+    if not reviews_dir:
+        print("REVIEWS_DIR not set; refusing to seed", file=sys.stderr)
+        return 1
 
     resolved = Path(db_path).expanduser()
     resolved.parent.mkdir(parents=True, exist_ok=True)
@@ -371,13 +623,19 @@ def main() -> int:
         seed_journal(conn, now)
         seed_memory(conn, now)
         seed_bars(conn)
+        seed_chat(conn)
+        seed_market_symbol(conn, now)
         conn.commit()
     finally:
         conn.close()
 
     seed_proposals(Path(proposals_dir).expanduser())
+    seed_reviews(Path(reviews_dir).expanduser())
 
-    print(f"seeded schema + fixtures into {resolved} and {proposals_dir}")
+    print(
+        f"seeded schema + fixtures into {resolved}, {proposals_dir} "
+        f"and {reviews_dir}"
+    )
     return 0
 
 

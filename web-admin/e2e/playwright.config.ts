@@ -8,6 +8,7 @@ import {
   PATH_WITH_UV,
   PREVIEW_URL,
   PROPOSALS_DIR,
+  REVIEWS_DIR,
 } from './constants'
 
 // Self-contained E2E harness: Playwright boots the backend (uvicorn --factory)
@@ -50,6 +51,12 @@ export default defineConfig({
         OHMYSTOCK_ADMIN_TOKEN: ADMIN_TOKEN,
         OHMYSTOCK_DB_PATH: DB_PATH,
         PROPOSALS_DIR,
+        REVIEWS_DIR,
+        // Single space (strips to empty server-side): env beats the repo's
+        // .env in pydantic-settings, so chat send deterministically 422s with
+        // missing_api_key instead of calling the real Anthropic API. A space
+        // (not '') avoids Windows dropping empty env vars on spawn.
+        ANTHROPIC_API_KEY: ' ',
         PATH: PATH_WITH_UV,
       },
     },

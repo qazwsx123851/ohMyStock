@@ -27,6 +27,10 @@ export const DB_PATH = path.join(E2E_TMP_DIR, 'journal.db')
 // backend via PROPOSALS_DIR so e2e never touches the repo's real proposals/.
 export const PROPOSALS_DIR = path.join(E2E_TMP_DIR, 'proposals')
 
+// Throwaway reviews root (_index.json + <review_id>/ fixtures). Passed to the
+// backend via REVIEWS_DIR so e2e never reads the repo's real reviews/.
+export const REVIEWS_DIR = path.join(E2E_TMP_DIR, 'reviews')
+
 // Playwright spawns webServer / globalSetup via cmd.exe, whose PATH lacks the
 // uv install dir (~/.local/bin, uv's default Windows location). Prepend it so
 // `uv run ...` resolves without relying on the interactive shell's PATH.
