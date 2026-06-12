@@ -5,7 +5,7 @@
 > **角色**：Mark（唯一 admin）。
 > **撰寫依據**：實讀 `web-admin/src/pages/*`、`web-admin/src/components/*`、`src/ohmystock/api/routes/*`、對應 service 層（confirm_gate / proposal / memory）。本檔以**實作現況**為準，文件預期與實作的偏離單獨標註。
 > **本輪只出規格，不寫測試碼**。
-> **最後更新**：2026-06-07
+> **最後更新**：2026-06-12（D7 manual verdict：PR-02 非 dry-run 分支同步為人工模式）
 
 ---
 
@@ -267,12 +267,13 @@
 
 - **Given** dry_run 取消勾選、verdict=pass
   **When** validate
-  **Then** 提案**自動**轉 `approved`、檔搬 `PENDING_REVIEW/`、存 `*.validation.json`，toast「moved to PENDING_REVIEW」
-  （[偏離] D7：文件 §6 假設人工看報告後才轉，實作自動轉）
+  **Then** 報告寫入 proposals 根目錄 `<slug>.validation.json`；提案**停在 `validating`、不轉狀態、不搬檔**，回 `new_status:"validating"`、`new_path:null`、`report_path:"<slug>.validation.json"`
+  **And** toast「Validated: verdict=pass — 報告已產出，請審閱後 Approve/Reject」
+  **And** 後續人工開 `[Approve…]`（Validation report path 預填 `<slug>.validation.json`）或 `[Reject…]` 決定（D7 manual verdict）
 
 - **Given** dry_run 取消勾選、verdict=fail
   **When** validate
-  **Then** 提案**自動**轉 `rejected`、檔搬 `rejected/`，toast 顯示 failure 數
+  **Then** 同樣只寫報告、停在 `validating`、**不**搬 `rejected/`；toast「Validated: verdict=fail — 報告已產出（N failure(s)），請審閱後 Approve/Reject」
 
 - **Given** validate endpoint 收到非 validating 提案
   **Then** 409 `illegal_transition`
