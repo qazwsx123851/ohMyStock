@@ -3,7 +3,10 @@ import path from 'node:path'
 
 // Backend (uvicorn factory) + frontend (vite preview) ports. The vite preview
 // proxy in vite.config.ts forwards /api from PREVIEW_PORT to BACKEND_PORT.
-export const BACKEND_PORT = 8000
+// 8001 (not 8000) so e2e never reuses a manually started real-DB backend —
+// playwright's reuseExistingServer would otherwise write test orders into
+// the real journal.db.
+export const BACKEND_PORT = 8001
 export const PREVIEW_PORT = 4173
 export const PREVIEW_URL = `http://localhost:${PREVIEW_PORT}`
 export const BACKEND_HEALTH_URL = `http://127.0.0.1:${BACKEND_PORT}/healthz`

@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test'
 import {
   ADMIN_TOKEN,
   BACKEND_HEALTH_URL,
+  BACKEND_PORT,
   DB_PATH,
   PATH_WITH_UV,
   PREVIEW_URL,
@@ -38,7 +39,7 @@ export default defineConfig({
   webServer: [
     {
       // Backend: uvicorn factory mode, no reload, temp DB + test token.
-      command: 'uv run ohmystock api --no-reload --host 127.0.0.1 --port 8000',
+      command: `uv run ohmystock api --no-reload --host 127.0.0.1 --port ${BACKEND_PORT}`,
       url: BACKEND_HEALTH_URL,
       cwd: repoRoot,
       reuseExistingServer: !process.env.CI,
