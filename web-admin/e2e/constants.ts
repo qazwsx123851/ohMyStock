@@ -20,6 +20,10 @@ export const TOKEN_STORAGE_KEY = 'ohmystock.admin.token'
 export const E2E_TMP_DIR = path.join(os.tmpdir(), 'ohmystock-e2e')
 export const DB_PATH = path.join(E2E_TMP_DIR, 'journal.db')
 
+// Throwaway proposals root (markdown state machine fixtures). Passed to the
+// backend via PROPOSALS_DIR so e2e never touches the repo's real proposals/.
+export const PROPOSALS_DIR = path.join(E2E_TMP_DIR, 'proposals')
+
 // Playwright spawns webServer / globalSetup via cmd.exe, whose PATH lacks the
 // uv install dir (~/.local/bin, uv's default Windows location). Prepend it so
 // `uv run ...` resolves without relying on the interactive shell's PATH.

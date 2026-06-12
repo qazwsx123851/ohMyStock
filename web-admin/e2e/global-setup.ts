@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { DB_PATH, E2E_TMP_DIR, PATH_WITH_UV } from './constants'
+import { DB_PATH, E2E_TMP_DIR, PATH_WITH_UV, PROPOSALS_DIR } from './constants'
 
 // Runs once before the suite: wipe the throwaway temp dir and (re)create the
 // SQLite schema so smoke pages query real tables instead of 500-ing on
@@ -21,6 +21,11 @@ export default function globalSetup() {
   execSync(`uv run python "${seeder}"`, {
     cwd: repoRoot,
     stdio: 'inherit',
-    env: { ...process.env, OHMYSTOCK_DB_PATH: DB_PATH, PATH: PATH_WITH_UV },
+    env: {
+      ...process.env,
+      OHMYSTOCK_DB_PATH: DB_PATH,
+      PROPOSALS_DIR,
+      PATH: PATH_WITH_UV,
+    },
   })
 }

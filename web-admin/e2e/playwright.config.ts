@@ -6,6 +6,7 @@ import {
   DB_PATH,
   PATH_WITH_UV,
   PREVIEW_URL,
+  PROPOSALS_DIR,
 } from './constants'
 
 // Self-contained E2E harness: Playwright boots the backend (uvicorn --factory)
@@ -47,6 +48,7 @@ export default defineConfig({
       env: {
         OHMYSTOCK_ADMIN_TOKEN: ADMIN_TOKEN,
         OHMYSTOCK_DB_PATH: DB_PATH,
+        PROPOSALS_DIR,
         PATH: PATH_WITH_UV,
       },
     },
