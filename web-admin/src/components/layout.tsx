@@ -4,7 +4,7 @@ import {
   LayoutDashboard, MessagesSquare, Network, FlaskConical, ReceiptText, ListOrdered,
   Briefcase, LineChart, BookOpen, History, Settings, ShieldCheck, Sparkles,
   ClipboardList, GitPullRequest,
-  PanelLeftClose, PanelLeftOpen, LogOut,
+  PanelLeftClose, PanelLeftOpen, LogOut, Sun, Moon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUiStore, logout } from '@/stores'
@@ -164,12 +164,30 @@ function TpeClock() {
   return <span className="tabular text-xs text-muted-foreground" title="Asia/Taipei">{formatted}</span>
 }
 
+function ThemeToggle() {
+  const theme = useUiStore((s) => s.theme)
+  const toggleTheme = useUiStore((s) => s.toggleTheme)
+  const isDark = theme === 'dark'
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={isDark ? '切換為淺色' : '切換為深色'}
+      title={isDark ? '切換為淺色' : '切換為深色'}
+      className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {isDark ? <Sun className="size-4" aria-hidden /> : <Moon className="size-4" aria-hidden />}
+    </button>
+  )
+}
+
 function TopBar() {
   const location = useLocation()
   return (
     <header className="flex h-12 items-center gap-3 border-b bg-card px-4">
       <h1 className="text-sm font-semibold text-foreground">{pageTitle(location.pathname)}</h1>
       <div className="ml-auto flex items-center gap-3">
+        <ThemeToggle />
         <TpeClock />
         <button
           type="button"

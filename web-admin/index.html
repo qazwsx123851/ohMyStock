@@ -1,7 +1,20 @@
 <!doctype html>
-<html lang="zh-Hant-TW" class="dark">
+<html lang="zh-Hant-TW">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // FOUC guard: apply theme before first paint. Only an explicit
+      // 'light' preference goes light; everything else defaults to dark.
+      (function () {
+        try {
+          if (localStorage.getItem('ohmystock.admin.theme') !== 'light') {
+            document.documentElement.classList.add('dark')
+          }
+        } catch (e) {
+          document.documentElement.classList.add('dark')
+        }
+      })()
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ohMyStock 後台</title>

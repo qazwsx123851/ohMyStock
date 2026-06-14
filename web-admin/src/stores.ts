@@ -3,6 +3,7 @@ import type { LiveEvent } from '@/lib/api'
 
 const TOKEN_KEY = 'ohmystock.admin.token'
 const SIDEBAR_KEY = 'ohmystock.admin.sidebar.collapsed'
+const THEME_KEY = 'ohmystock.admin.theme'
 const LIVE_FEED_CAP = 100
 
 // ---------------------------------------------------------------------------
@@ -50,9 +51,13 @@ export function logout(): void {
 // ui - sidebar collapse state
 // ---------------------------------------------------------------------------
 
+type Theme = 'light' | 'dark'
+
 type UiState = {
   sidebarCollapsed: boolean
   toggleSidebar: () => void
+  theme: Theme
+  toggleTheme: () => void
 }
 
 const initialCollapsed = (): boolean => {
@@ -63,6 +68,15 @@ const initialCollapsed = (): boolean => {
   }
 }
 
+// Mirrors the FOUC guard in index.html: only an explicit 'light' goes light.
+const initialTheme = (): Theme => {
+  try {
+    return localStorage.getItem(THEME_KEY) === 'light' ? 'light' : 'dark'
+  } catch {
+    return 'dark'
+  }
+}
+
 export const useUiStore = create<UiState>((set) => ({
   sidebarCollapsed: initialCollapsed(),
   toggleSidebar: () =>
@@ -70,6 +84,14 @@ export const useUiStore = create<UiState>((set) => ({
       const next = !s.sidebarCollapsed
       try { localStorage.setItem(SIDEBAR_KEY, next ? '1' : '0') } catch { /* ignore */ }
       return { sidebarCollapsed: next }
+    }),
+  theme: initialTheme(),
+  toggleTheme: () =>
+    set((s) => {
+      const next: Theme = s.theme === 'dark' ? 'light' : 'dark'
+      try { localStorage.setItem(THEME_KEY, next) } catch { /* ignore */ }
+      document.documentElement.classList.toggle('dark', next === 'dark')
+      return { theme: next }
     }),
 }))
 
